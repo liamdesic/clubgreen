@@ -12,6 +12,8 @@
 
   async function fetchLeaderboardData() {
     loading = true;
+
+    // Fetch settings
     const settingsRes = await supabase
       .from('leaderboard_settings')
       .select('*')
@@ -20,45 +22,62 @@
 
     if (settingsRes.error) {
       console.error('❌ Error loading leaderboard settings:', settingsRes.error.message);
-    } else {
-      leaderboardSettings = settingsRes.data;
+      loading = false;
+      return;
     }
 
+    leaderboardSettings = settingsRes.data;
+
+    // Fetch all scores
     const { data, error } = await supabase
       .from('scorecard')
-      .select('player_id, name, score, hole_number, hole_in_ones, created_at');
+      .select('player_id, name, score, hole_number, hole_in_ones, created_at, published');
 
     if (error) {
       console.error('❌ Error loading leaderboard:', error.message);
-    } else {
-      const playerMap = new Map();
-      const now = new Date();
-      const cutoff = new Date(now.getTime() - (leaderboardSettings?.time_window_minutes || 120) * 60000);
+      loading = false;
+      return;
+    }
 
-      for (const row of data) {
-        const createdAt = new Date(row.created_at);
-        if (createdAt < cutoff) continue;
-        const id = row.player_id;
-        if (!id) continue;
+    const playerMap = new Map();
+    const now = new Date();
+    let cutoff = null;
 
-        if (!playerMap.has(id)) {
-          playerMap.set(id, {
-            id,
-            name: row.name,
-            totalScore: 0,
-            holeInOnes: 0
-          });
-        }
+    if (leaderboardSettings.time_filter === 'last_hour') {
+      cutoff = new Date(now.getTime() - 60 * 60000);
+    } else if (leaderboardSettings.time_filter === 'last_2_hours') {
+      cutoff = new Date(now.getTime() - 120 * 60000);
+    } else if (leaderboardSettings.time_filter === 'custom') {
+      const minutes = leaderboardSettings.time_window_minutes || 120;
+      cutoff = new Date(now.getTime() - minutes * 60000);
+    }
 
-        const player = playerMap.get(id);
-        player.totalScore += row.score;
-        player.holeInOnes += row.hole_in_ones;
+    for (const row of data) {
+      if (!row.published) continue;
+      const createdAt = new Date(row.created_at);
+      if (cutoff && createdAt < cutoff) continue;
+
+      const id = row.player_id;
+      if (!id) continue;
+
+      if (!playerMap.has(id)) {
+        playerMap.set(id, {
+          id,
+          name: row.name,
+          totalScore: 0,
+          holeInOnes: 0
+        });
       }
 
-      leaderboardData = Array.from(playerMap.values()).sort((a, b) => a.totalScore - b.totalScore);
-
-
+      const player = playerMap.get(id);
+      player.totalScore += row.score;
+      player.holeInOnes += row.hole_in_ones;
     }
+
+    leaderboardData = Array.from(playerMap.values())
+  .sort((a, b) => a.totalScore - b.totalScore)
+  .slice(0, 10);
+
     loading = false;
   }
 
@@ -66,6 +85,7 @@
     fetchLeaderboardData();
   }
 </script>
+
 <!-- 🏆 Leaderboard Modal -->
 <div class="leaderboard-modal" transition:fly={{ y: -20, duration: 300 }}>
   <div class="modal-header">
