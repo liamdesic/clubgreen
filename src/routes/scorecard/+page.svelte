@@ -241,13 +241,14 @@ async function showFinalScreen() {
 <!-- 🌟 Persistent UI Elements -->
 <header class="app-header">
   <div class="header-inner">
-    <div class="header-left">
-      <h2>{leaderboardSettings?.event_name || 'Live Leaderboard'}</h2>
-    </div>
-    <div class="header-right">
+    <div class="leaderboard-link">
       <button class="leaderboard-button" on:click={() => showLeaderboardModal = !showLeaderboardModal}>
         <i class="fa-solid fa-trophy"></i> Live Leaderboard
       </button>
+      
+    </div>
+    <div class="event-title">
+      <h2>{leaderboardSettings?.event_name || 'Live Leaderboard'}</h2>
     </div>
   </div>
 
