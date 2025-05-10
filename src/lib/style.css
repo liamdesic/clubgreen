@@ -364,9 +364,9 @@ button:disabled {
 
 /* 🎯 Stroke buttons */
 .score-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  display: grid;
+   width: 100%
+   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 8px;
 
 }
@@ -377,12 +377,14 @@ button:disabled {
   font-family: 'Inter', sans-serif;
   font-weight: 500;
   border-radius: 10px;
-  padding: 10px 14px;
+  padding: 10px 0;
   font-size: 1.7rem;
-  min-width: 40px;
-  cursor: pointer;
+  width: 100%; /* 🟢 Force full width per grid cell */
   border: none;
+  cursor: pointer;
 }
+
+
 
 .score-buttons button:hover {
   background-color: #00b74f;
