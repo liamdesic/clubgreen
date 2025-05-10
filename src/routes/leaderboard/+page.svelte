@@ -456,11 +456,6 @@
   height: 100%;
   }
   .qr-box {
-
-& h2 {
-margin-block-start: 0em !important;
-margin-block-end: 0em !important;
-}
     background: white;
     color: black;
     border-radius: 12px;
@@ -473,6 +468,11 @@ margin-block-end: 0em !important;
     align-items: center;
     justify-content: center;
   }
+
+.qr-box h2 {
+margin-block-start: 0em !important;
+margin-block-end: 0em !important;
+}
 
 .qr-box img {
 object-fit: contain;
