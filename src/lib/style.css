@@ -199,6 +199,7 @@ button:disabled {
   margin: 0.8rem;
 }
 .bottom-bar-button.outline {
+   display: none;
   background: none;
   color: black;
   font-size: 1rem;
