@@ -221,7 +221,7 @@
       {/each}
     </div>
 <div class="event-message" style="display:flex; width: 100%; padding: 1.5rem; background: rgba(255,255,255,0.2);">
-<h3> Mother's Day Gift for 1st Place at the start of every hour </h3>
+<h3> Mothers Day Gift for 1st Place at the start of every hour </h3>
 </div>
   </div>
 
