@@ -362,7 +362,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.4rem;
+  padding: 1rem;
   border-bottom: 1px solid #ddd;
   background: white;
   color: #0f2f2e;
