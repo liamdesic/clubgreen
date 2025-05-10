@@ -365,7 +365,7 @@ button:disabled {
 /* 🎯 Stroke buttons */
 .score-buttons {
   display: grid;
-   width: 100%
+   width: 100%;
    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 8px;
 
