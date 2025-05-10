@@ -268,8 +268,8 @@
   .header {
     display: flex;
     align-items: center;
-    gap: 2rem;
-    margin-bottom: 2rem;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
   }
 
   .logo {
@@ -281,12 +281,12 @@
   }
 
   .title-block h1 {
-    font-size: 4rem;
+    font-size: 3rem;
     margin: 0;
   }
 
   .title-block h2 {
-    font-size: 3rem;
+    font-size: 2rem;
     color: #00c853;
     margin-top: 0.5rem;
   }
@@ -296,7 +296,7 @@
 
 .content {
   display: flex;
-  gap: 2rem;
+  gap: 1.5rem;
   flex: 1;
   align-items: flex-start;
 }
@@ -313,7 +313,7 @@
   background: rgba(255, 255, 255, 0.1);
   color: black;
   border-radius: 18px;
-  padding: 1rem;
+  padding: 0.8rem;
   flex: 1;
   box-sizing: border-box;
   overflow: hidden;
@@ -322,7 +322,7 @@
 /* -------------------- 🏷️ HEADER ROW -------------------- */
 
 .score-table .header-row {
-  padding: 1.4rem;
+  padding: 1.2rem;
   margin-bottom: 1rem;
   border-top-left-radius: 18px;
   border-top-right-radius: 18px;
