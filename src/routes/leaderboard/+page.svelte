@@ -457,17 +457,17 @@
   }
   .qr-box {
 
-h2 {
+& h2 {
 margin-block-start: 0em !important;
 margin-block-end: 0em !important;
+}
     background: white;
     color: black;
     border-radius: 12px;
-    padding: 1rem;
+    padding: 0.5rem;
     text-align: center;
     font-weight: bold;
     height: auto;
-    border: 2px dashed #ccc;
     display: flex;
     flex-direction: column;
     align-items: center;
