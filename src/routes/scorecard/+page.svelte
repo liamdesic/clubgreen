@@ -337,7 +337,7 @@ async function showFinalScreen() {
 <!-- 🚀 Bottom green bar -->
 <div class="bottom-buttons">
   <button class="bottom-bar-button" on:click={startGame}>Start Game</button>
-<!------ <button class="bottom-bar-button outline" on:click={addTestPlayers}>Add Test Players</button> ------>
+<!------//button class="bottom-bar-button outline" on:click={addTestPlayers}>Add Test Players button// ------>
 </div>
 
 
