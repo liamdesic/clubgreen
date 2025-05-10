@@ -249,8 +249,8 @@
 
 
 </div>
-<div class="event-message" style="display:inline; font-size: 2rem; padding: 1.5rem; background: none;">
-<h3> Mothers Day Gift for 1st Place at the start of every hour </h3>
+<div class="event-message" style="display:inline; font-size: 2rem; padding: 1.5rem; background: none !important;">
+<h3 style="background: none !important;"> Mothers Day Gift for 1st Place at the start of every hour </h3>
 
 
 
