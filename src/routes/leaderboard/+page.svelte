@@ -260,7 +260,7 @@
   }
 
   .main-wrapper {
-    padding: 5rem;
+    padding: 2rem;
 
   }
 
