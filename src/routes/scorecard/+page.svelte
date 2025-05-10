@@ -353,7 +353,7 @@ async function showFinalScreen() {
         <div class="player-card dark current-player-card">
           <div class="name-centered">{player.name}</div>
           <div class="score-buttons">
-            {#each [1, 2, 3, 4, 5, 6, 7] as stroke}
+            {#each [1, 2, 3, 4, 5, 6] as stroke}
               <button on:click={() => recordScore(stroke)}>{stroke}</button>
             {/each}
           </div>
