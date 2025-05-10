@@ -367,7 +367,7 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
 
 }
 
@@ -377,9 +377,9 @@ button:disabled {
   font-family: 'Inter', sans-serif;
   font-weight: 500;
   border-radius: 10px;
-  padding: 12px 18px;
+  padding: 10px 14px;
   font-size: 1.7rem;
-  min-width: 45px;
+  min-width: 40px;
   cursor: pointer;
   border: none;
 }
@@ -393,7 +393,7 @@ button:disabled {
   background-color: #0f2f2e;
   color: white;
   border-radius: 14px;
-  padding: 16px 20px;
+  padding: 10px 14px;
   font-size: 1.4rem;
   display: flex;
   justify-content: space-between;
