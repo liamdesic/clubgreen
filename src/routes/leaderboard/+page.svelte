@@ -474,6 +474,10 @@ margin-block-end: 0em !important;
     justify-content: center;
   }
 
+.qr-box img {
+object-fit: contain;
+}
+
   /* 📱 iPad support */
   @media (max-width: 1024px) {
     .content {
