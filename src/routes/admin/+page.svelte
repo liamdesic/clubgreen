@@ -456,7 +456,7 @@
 
 <style>
   .admin-title {
-    text-align: center;
+    text-align: left;
     margin-bottom: 1rem;
   }
 
