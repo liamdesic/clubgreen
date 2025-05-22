@@ -2,6 +2,67 @@ import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { browser } from '$app/environment';
 
+// Custom storage implementation to ensure cookies are properly set
+class CustomStorage {
+  getItem(key: string): string | null {
+    if (!browser) return null;
+    try {
+      const cookies = document.cookie.split(';');
+      for (const cookie of cookies) {
+        const [cookieKey, cookieValue] = cookie.trim().split('=');
+        if (cookieKey === key) {
+          return decodeURIComponent(cookieValue);
+        }
+      }
+      return null;
+    } catch (e) {
+      console.error('Error reading cookie:', e);
+      return null;
+    }
+  }
+
+  setItem(key: string, value: string): void {
+    if (!browser) return;
+    try {
+      // Set a cookie with path='/' and a longer expiry time
+      const maxAge = 7 * 24 * 60 * 60; // 7 days
+      document.cookie = `${key}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+      
+      // For dashboard auth check compatibility, also set the specific cookies checked in +page.server.ts
+      if (key === 'supabase.auth.token') {
+        try {
+          const parsed = JSON.parse(value);
+          if (parsed?.access_token) {
+            document.cookie = `sb-access-token=${encodeURIComponent(parsed.access_token)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+          }
+          if (parsed?.refresh_token) {
+            document.cookie = `sb-refresh-token=${encodeURIComponent(parsed.refresh_token)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+          }
+        } catch (e) {
+          console.error('Error parsing auth token:', e);
+        }
+      }
+    } catch (e) {
+      console.error('Error setting cookie:', e);
+    }
+  }
+
+  removeItem(key: string): void {
+    if (!browser) return;
+    try {
+      document.cookie = `${key}=; path=/; max-age=0`;
+      
+      // Also clear specific cookies
+      if (key === 'supabase.auth.token') {
+        document.cookie = `sb-access-token=; path=/; max-age=0`;
+        document.cookie = `sb-refresh-token=; path=/; max-age=0`;
+      }
+    } catch (e) {
+      console.error('Error removing cookie:', e);
+    }
+  }
+}
+
 let supabaseUrl: string;
 let supabaseAnonKey: string;
 
@@ -54,8 +115,17 @@ try {
 let supabase: SupabaseClient;
 
 if (browser && supabaseUrl && supabaseAnonKey) {
-  // Create a real Supabase client for browser use
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
+  // Create a real Supabase client for browser use with custom storage
+  const customStorage = new CustomStorage();
+  
+  supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      storage: customStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
 } else {
   // For server-side rendering, create a minimal mock that won't throw errors
   // This is a simplified mock that just returns empty data for common operations

@@ -125,31 +125,69 @@
           
           // Wait a moment to see if the client initializes (sometimes env vars load async)
           console.log('Waiting for Supabase client to initialize...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Check again
-          if (!supabase || !supabase.auth || typeof supabase.auth.setSession !== 'function') {
-            throw new Error('Supabase client not available. Please refresh the page and try again.');
+          try {
+            console.log('Setting session with tokens');
+            
+            // Check if Supabase client is properly initialized
+            if (!supabase || !supabase.auth || typeof supabase.auth.setSession !== 'function') {
+              console.error('Supabase client not properly initialized');
+              throw new Error('Authentication service unavailable');
+            }
+            
+            // Set the session with the tokens
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken || ''
+            });
+            
+            if (error) {
+              console.error('Error setting session:', error);
+              authError = error.message;
+              throw error;
+            }
+            
+            // Manually set cookies for additional persistence
+            document.cookie = `sb-access-token=${accessToken}; path=/; max-age=3600; SameSite=Lax; secure`;
+            document.cookie = `sb-refresh-token=${refreshToken}; path=/; max-age=3600; SameSite=Lax; secure`;
+            
+            console.log('Session set successfully:', data.session ? 'Yes' : 'No');
+            
+            // Verify the session was actually set
+            const { data: { session } } = await supabase.auth.getSession();
+            console.log('Session verified:', session ? 'Yes' : 'No');
+            
+            // Clear the hash and redirect to the final destination
+            if (window.history && window.history.replaceState) {
+              const url = new URL(window.location.href);
+              url.hash = '';
+              url.searchParams.delete('redirectTo');
+              window.history.replaceState({}, document.title, url.toString());
+              console.log('URL cleaned up');
+            }
+            
+            console.log('Redirecting to:', finalRedirectTo);
+            // Redirect to the final destination
+            // Ensure the path is properly formatted (should start with '/' and be absolute)
+            const redirectPath = finalRedirectTo.startsWith('/') ? finalRedirectTo : `/${finalRedirectTo}`;
+            console.log('Formatted redirect path:', redirectPath);
+            
+            // Use a small timeout to ensure the browser has time to process everything
+            setTimeout(() => {
+              console.log('Executing redirect now...');
+              goto(redirectPath, { replaceState: true });
+            }, 100);
+          } catch (err) {
+            console.error('Error processing authentication:', err);
+            authError = err instanceof Error ? err.message : 'Authentication failed';
+          } finally {
+            processingAuth = false;
           }
+        } catch (err) {
+          console.error('Error processing authentication:', err);
+          authError = err instanceof Error ? err.message : 'Authentication failed';
+        } finally {
+          processingAuth = false;
         }
-        
-        // Set the session using the token from the URL
-        const { data, error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken || ''
-        });
-        
-        if (error) {
-          console.error('Error setting session:', error);
-          authError = error.message;
-          throw error;
-        }
-        
-        console.log('Session set successfully:', data.session ? 'Yes' : 'No');
-        
-        // Verify the session was actually set
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log('Session verified:', session ? 'Yes' : 'No');
         
         if (!session) {
           throw new Error('Failed to establish session after setting tokens');
@@ -166,7 +204,15 @@
         
         console.log('Redirecting to:', finalRedirectTo);
         // Redirect to the final destination
-        goto(finalRedirectTo);
+        // Ensure the path is properly formatted (should start with '/' and be absolute)
+        const redirectPath = finalRedirectTo.startsWith('/') ? finalRedirectTo : `/${finalRedirectTo}`;
+        console.log('Formatted redirect path:', redirectPath);
+        
+        // Use a small timeout to ensure the browser has time to process everything
+        setTimeout(() => {
+          console.log('Executing redirect now...');
+          goto(redirectPath, { replaceState: true });
+        }, 100);
       } catch (err) {
         console.error('Error processing authentication:', err);
         authError = err instanceof Error ? err.message : 'Authentication failed';
