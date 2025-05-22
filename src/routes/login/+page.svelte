@@ -116,6 +116,23 @@
       try {
         console.log('Setting session with tokens');
         
+        // Check if Supabase client is properly initialized
+        if (!supabase || !supabase.auth || typeof supabase.auth.setSession !== 'function') {
+          console.error('Supabase client not properly initialized');
+          console.log('Supabase client state:', supabase ? 'Exists' : 'Undefined');
+          console.log('Auth object:', supabase?.auth ? 'Exists' : 'Undefined');
+          console.log('setSession method:', typeof supabase?.auth?.setSession);
+          
+          // Wait a moment to see if the client initializes (sometimes env vars load async)
+          console.log('Waiting for Supabase client to initialize...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Check again
+          if (!supabase || !supabase.auth || typeof supabase.auth.setSession !== 'function') {
+            throw new Error('Supabase client not available. Please refresh the page and try again.');
+          }
+        }
+        
         // Set the session using the token from the URL
         const { data, error } = await supabase.auth.setSession({
           access_token: accessToken,
