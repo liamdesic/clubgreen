@@ -8,6 +8,7 @@
   import { Mail } from 'lucide-svelte';
   import { RotateCcw } from 'lucide-svelte';
   import { ArrowRight } from 'lucide-svelte';
+  import Button from '$lib/components/Button.svelte';
 
 
 
