@@ -9,11 +9,17 @@ let supabaseAnonKey: string;
 try {
   supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  
+  // Log environment variables (masking part of the key for security)
+  if (browser) {
+    console.log('Supabase URL:', supabaseUrl);
+    console.log('Supabase Anon Key available:', supabaseAnonKey ? 'Yes (key masked for security)' : 'No');
+  }
 } catch (e) {
   // This will happen during SSR if env vars aren't available
   supabaseUrl = '';
   supabaseAnonKey = '';
-  console.warn('Supabase environment variables not available in this context');
+  console.warn('Supabase environment variables not available in this context', e);
 }
 
 // Create a real client if we're in the browser and have credentials

@@ -50,42 +50,66 @@ async function handleAuth() {
   }
 
   loading = true;
+  
+  // Debug logs
+  console.log('Starting magic link authentication');
+  console.log('Current origin:', window.location.origin);
+  console.log('Redirect URL:', `${window.location.origin}/dashboard`);
+  
+  try {
+    const { error: magicErr } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: `${window.location.origin}/dashboard`
+      }
+    });
 
-  const { error: magicErr } = await supabase.auth.signInWithOtp({
-  email,
-  options: {
-    shouldCreateUser: true,
-    emailRedirectTo: `${window.location.origin}/dashboard`
+    loading = false;
+
+    if (magicErr) {
+      console.error('Magic link error:', magicErr);
+      error = magicErr.message;
+    } else {
+      console.log('Magic link sent successfully');
+      linkSent = true;
+    }
+  } catch (e) {
+    console.error('Exception during magic link auth:', e);
+    loading = false;
+    error = 'An unexpected error occurred. Please try again.';
   }
-});
-
-loading = false;
-
-if (magicErr) {
-  error = magicErr.message;
-} else {
-  linkSent = true;
-}
-
 }
 
 
 async function verifyCode() {
   error = '';
   loading = true;
+  
+  console.log('Verifying OTP code');
+  console.log('Email:', email);
+  console.log('Code length:', otpCode.length);
 
-  const { error: verifyErr } = await supabase.auth.verifyOtp({
-    email,
-    token: otpCode,
-    type: 'email'
-  });
+  try {
+    const { error: verifyErr } = await supabase.auth.verifyOtp({
+      email,
+      token: otpCode,
+      type: 'email'
+    });
 
-  loading = false;
+    loading = false;
 
-  if (verifyErr) {
-    error = 'Invalid or expired code.';
-  } else {
-    goto('/dashboard');
+    if (verifyErr) {
+      console.error('OTP verification error:', verifyErr);
+      error = 'Invalid or expired code.';
+    } else {
+      console.log('OTP verification successful, redirecting to dashboard');
+      goto('/dashboard');
+    }
+  } catch (e) {
+    console.error('Exception during OTP verification:', e);
+    loading = false;
+    error = 'An unexpected error occurred during verification.';
   }
 }
 
