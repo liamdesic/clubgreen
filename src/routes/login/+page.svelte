@@ -56,8 +56,17 @@ async function handleAuth() {
   console.log('Current origin:', window.location.origin);
   console.log('Redirect URL:', `${window.location.origin}/dashboard`);
   
+  // Log Supabase auth availability
+  console.log('Supabase auth available:', supabase && supabase.auth ? 'Yes' : 'No');
+  
   try {
-    const { error: magicErr } = await supabase.auth.signInWithOtp({
+    // First, check if we can get the current session to verify Supabase connection
+    const { data: sessionData } = await supabase.auth.getSession();
+    console.log('Current session check:', sessionData ? 'Success' : 'No session');
+    
+    // Attempt to send magic link
+    console.log('Sending magic link to:', email);
+    const { data: otpData, error: magicErr } = await supabase.auth.signInWithOtp({
       email,
       options: {
         shouldCreateUser: true,
@@ -66,6 +75,7 @@ async function handleAuth() {
     });
 
     loading = false;
+    console.log('OTP data received:', otpData ? 'Yes' : 'No');
 
     if (magicErr) {
       console.error('Magic link error:', magicErr);

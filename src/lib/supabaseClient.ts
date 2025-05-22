@@ -7,13 +7,16 @@ let supabaseAnonKey: string;
 
 // In a server context, we need to handle the case where import.meta.env might not be available
 try {
-  supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  // Try both naming conventions for environment variables (VITE_ and PUBLIC_)
+  supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+  supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
   
   // Log environment variables (masking part of the key for security)
   if (browser) {
     console.log('Supabase URL:', supabaseUrl);
     console.log('Supabase Anon Key available:', supabaseAnonKey ? 'Yes (key masked for security)' : 'No');
+    console.log('Environment variable names checked:', 
+      'PUBLIC_SUPABASE_URL, VITE_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, VITE_SUPABASE_ANON_KEY');
   }
 } catch (e) {
   // This will happen during SSR if env vars aren't available
