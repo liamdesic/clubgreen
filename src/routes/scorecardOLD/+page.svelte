@@ -1,5 +1,5 @@
 <script>
-  import '../../lib/style.css';
+  import '../../lib/styles/scorecard.css';
   import { onMount } from 'svelte';
   import confetti from 'canvas-confetti';
   import { supabase } from '$lib/supabaseClient';
