@@ -1,0 +1,532 @@
+/* ------------------------------
+   🎯 GENERAL LAYOUT & RESET
+------------------------------ */
+:root {
+  --accent-color: #00c853; /* Default accent color - will be overridden by event settings */
+  --accent-color-dark: #006622; /* Darker version of default */
+}
+
+/* This will be set by JavaScript when dynamic color is applied */
+[style*="--accent-color"] {
+  --accent-h: 138;
+  --accent-s: 10%;
+  --accent-l: 119%;
+  --accent-color-dark: color-mix(in srgb, var(--accent-color) 20%, #101010);
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  font-family: 'obviously', sans-serif;
+  font-size: 1.25rem; /* Base font size increased */
+  line-height: 1.5;
+  background-color: var(--accent-color-dark);
+  color: white;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ------------------------------
+   🧠 HEADER
+------------------------------ */
+.header {
+  padding: 2rem 2rem 1.5rem;
+  margin-bottom: 1.5rem;
+  background: var(--accent-color-dark);
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  max-width: 100%;
+  margin: 0;
+  width: 100%;
+}
+
+.logos-container {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin-right: 2.5rem;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+}
+
+.logo-container.org-logo {
+  max-width: 350px;
+}
+
+.logo-container.event-logo {
+  max-width: 350px;
+}
+
+.logo {
+  height: auto;
+  max-height: 400px;
+  width: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.titles {
+  line-height: 1.2;
+  text-align: left;
+}
+
+.titles h1 {
+  margin: 0;
+  font-size: 5rem;
+  color: white;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.event-title {
+  margin: 0.5rem 0 0 0 !important;
+  font-size: 4rem !important;
+  color: var(--accent-color, #00c853) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.25px !important;
+}
+
+/* ------------------------------
+   🏆 LEADERBOARD GRID LAYOUT
+------------------------------ */
+.leaderboard-layout {
+  background: black;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+/* ------------------------------
+   🧾 COLUMNS & TABLES
+------------------------------ */
+.leaderboard-column {
+  background: var(--user-color-dark);
+  color: var(--user-theme-text-primary);
+  border-radius: 20px;
+  flex: 1;
+  min-width: 280px;
+  max-width: 350px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.leaderboard-header {
+  background-color: var(--accent-color);
+  color: white;
+  font-weight: 800;
+  display: flex;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  font-size: 1.5rem;
+  border-radius: 20px 20px 0 0;
+}
+
+.col-rank,
+.col-name,
+.col-score {
+  flex: 1;
+  text-align: left;
+}
+
+.col-rank {
+  flex: 0.5;
+}
+
+.col-score {
+  text-align: right;
+}
+
+/* ------------------------------
+   📢 AD BOX
+------------------------------ */
+.ad-box {
+  background: white;
+  color: #0f2f2e;
+  border-radius: 20px;
+  text-align: center;
+  padding: 1rem;
+  max-width: 200px;
+  flex-shrink: 0;
+}
+
+.ad-image {
+  max-width: 100%;
+  border-radius: 12px;
+  margin-bottom: 0.5rem;
+}
+
+.ad-text {
+  font-weight: 700;
+  font-size: 1.5rem; /* Increased from 1rem */
+  line-height: 1.4;
+}
+
+/* ------------------------------
+   📱 RESPONSIVE (iPads & Mobile)
+------------------------------ */
+@media (max-width: 900px) {
+  .leaderboard-layout {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .header {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .qr-box {
+    margin-top: 1.5rem;
+  }
+
+  .main-title {
+    font-size: 2.2rem;
+  }
+
+  .event-title {
+    font-size: 1.5rem;
+  }
+}
+
+/* Global Styles */
+:global(body) {
+  background: #082c2c;
+  color: white;
+  font-family: 'obviously', sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+.main-wrapper {
+  padding: 6rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0; /* Allows content to scroll if needed */
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Header Styles */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.logo {
+  width: 10rem;
+  height: 10rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.logo img {
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+  object-fit: contain;
+}
+
+.title-block h1 {
+  font-size: 4.5rem; /* Increased from 3rem */
+  margin: 0;
+  line-height: 1.2;
+}
+
+.title-block h2 {
+  font-size: 3rem; /* Increased from 2rem */
+  color: var(--accent-color);
+  margin-top: 0.5rem;
+  line-height: 1.3;
+}
+
+/* Content Styles */
+.content {
+  display: flex;
+  gap: 1.5rem;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  align-items: flex-start;
+  box-sizing: border-box;
+}
+
+.leaderboard-tables {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  gap: 2rem;
+}
+
+/* Score Table Styles */
+.score-table {
+  background: rgba(255, 255, 255, 0.1);
+  color: black;
+  border-radius: 18px;
+  padding: 0.8rem;
+  flex: 1;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.score-table .header-row {
+  padding: 1.2rem;
+  margin-bottom: 1rem;
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+  background: var(--accent-color) !important;
+}
+
+.score-table .header-row .rank {
+  text-align: left;
+  font-size: 2.2rem;
+  color: white;
+}
+
+.score-table .header-row .name {
+  flex: 1;
+  padding-left: 2rem;
+  display: flex;
+  align-items: center;
+  font-size: 2.2rem !important;
+  gap: 0.5rem;
+  color: white;
+}
+
+.score-table .header-row .score-label {
+  text-align: center;
+  display: flex;
+  gap: 1.2rem; /* Increased gap */
+  align-items: center;
+  font-size: 2.2rem !important; /* Increased from 1.6rem */
+  opacity: 1;
+  color: white;
+  margin-right: 8px; /* Increased margin */
+}
+
+
+.score-table .row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.2rem;
+  border-bottom: 1px solid #ddd;
+  background: white;
+  color: #0f2f2e;
+  border-radius: 12px;
+  margin-bottom: 0.75rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.score-table .row:nth-child(even) {
+  background: rgba(255, 255, 255, 1);
+}
+
+.score-table .row:nth-child(odd) {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+/* -------------------- 🥇 COLUMN: RANK -------------------- */
+
+.rank {
+  font-size: 2rem;
+  padding-left: 1rem;
+  width: 2rem;
+  color: var(--accent-color);
+  flex: 0 0 3rem;
+}
+
+/* -------------------- 🙋 COLUMN: NAME -------------------- */
+
+.name {
+  flex: 1;
+  font-weight: 700;
+  padding-left: 2rem;
+  font-size: 2.6rem;
+  display: flex;
+  align-items: center;
+  justify-content: left;
+}
+
+/* Hole-in-one note */
+
+.hio-note {
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding-left: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.hio-note i {
+  color: #e53935;
+}
+
+/* -------------------- 🟢 COLUMN: SCORE -------------------- */
+
+.score-pill {
+  background: var(--accent-color);
+  color: white;
+  font-weight: bold;
+  border-radius: 999px;
+  padding: 0.6rem;
+  margin-right: 20px;
+  text-align: center;
+  min-width: 85px;
+  font-size: 2.5rem;
+}
+
+
+.logo img {
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+  object-fit: contain;
+}
+
+
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    width: 200px;
+    flex-shrink: 0;
+  }
+
+  .ad-box img{
+  border-radius: 12px;
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+  }
+  
+  .qr-box {
+    background: white;
+    color: #0f2f2e;
+    border-radius: 16px;
+    padding: 1.5rem;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    max-width: 240px;
+    margin: 0 auto;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  
+  .qr-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+  }
+
+  .qr-title h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.5rem;
+    color: var(--accent-color);
+    font-weight: 700;
+  }
+  
+  .qr-title p {
+    margin: 0 0 1.2rem 0;
+    color: #666;
+    font-size: 1rem;
+  }
+  
+  .qr-code-container {
+    background: #f8fafc;
+    padding: 1rem;
+    border-radius: 12px;
+    margin: 0 auto;
+    width: fit-content;
+  }
+  
+  .qr-code {
+    width: 160px;
+    height: 160px;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+  
+  .qr-placeholder {
+    padding: 1.5rem;
+    color: #666;
+    background: #f8fafc;
+    border-radius: 8px;
+    font-size: 0.9rem;
+  }
+
+  /* 📱 iPad support */
+  @media (max-width: 1024px) {
+    .content {
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .leaderboard-tables {
+      flex-direction: column;
+      width: 100%;
+    }
+
+    .sidebar {
+      flex-direction: row;
+      justify-content: center;
+      width: 100%;
+    }
+  }
+
+  button.fullscreen-toggle {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    padding: 0.7rem 1rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  button.fullscreen-toggle i {
+    margin-right: 0.5rem;
+  }
+
+  :global(body):has(button.fullscreen-toggle:hover) button.fullscreen-toggle,
+  :global(body):has(button.fullscreen-toggle:focus) button.fullscreen-toggle {
+    opacity: 1 !important;
+    pointer-events: auto;
+  }
+
+.fullscreen-toggle.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+

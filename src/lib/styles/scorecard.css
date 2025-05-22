@@ -1,0 +1,873 @@
+/* -----------------------------------
+   🎨 BASE STYLES & TYPOGRAPHY
+----------------------------------- */
+@import url('https://use.typekit.net/kic0xlz.css'); /* Obviously font */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css');
+
+:root {
+  --accent-color: #00c853; /* Default accent color - will be overridden by event settings */
+  --accent-color-dark: #006622; /* Darker version of default */
+  --accent-color-light: #66e699; /* Lighter version of default */
+}
+
+/* This will be set by JavaScript when dynamic color is applied */
+[style*="--accent-color"] {
+  --accent-h: 138;
+  --accent-s: 10%;
+  --accent-l: 119%;
+  --accent-color-dark: color-mix(in srgb, var(--accent-color) 20%, #101010);
+  --accent-color-light: color-mix(in srgb, var(--accent-color) 20%, white);
+}
+
+body {
+  font-family: 'obviously', sans-serif;
+  background: var(--accent-color-light);
+  margin: 0;
+  padding: 0;
+  max-width: 600px;
+  margin-inline: auto;
+  color: #d8d8d8;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Main content wrapper */
+.scorecard-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-height: 100vh;
+  justify-content: space-between;
+  max-width: 600px;
+  gap: 0;
+}
+
+/* Header container */
+.header-container {
+  flex: 0 0 auto;
+  z-index: 10;
+}
+
+/* Header section */
+.app-header {
+  background: var(--accent-color-dark);
+  color: white;
+  position: relative;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  top: 0;
+  z-index: 10;
+  width: 100%;
+}
+
+
+
+/* Main content container */
+.main-content-container {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-self: center;
+  width: 100%;
+  position: relative;
+}
+
+/* Main content area */
+.main-content {
+  background: #f4f4f4;
+  border-radius: 30px 30px 0 0;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  width: 100%;
+  padding: 1.5rem 1.5rem 0;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 30px rgba(0,0,0,0.3);
+}
+
+/* Player entry card */
+.player-entry-card {
+
+  background: #f4f4f4;
+  border-radius: 30px 30px 0px 0px;
+  padding: 2rem;
+    text-align: center;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 220px;
+}
+
+/* Form inside player entry */
+.player-entry-card form {
+  
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Entry buttons container */
+.entry-buttons {
+  margin-top: auto;
+  padding-top: 1.5rem;
+  text-align: center;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+}
+
+/* Bottom buttons */
+.bottom-buttons {
+  z-index: 20;
+  border-radius: 0 0 20px 20px;
+  width: 100%;
+}
+
+/* Removed duplicate main-content declaration */
+
+/* -----------------------------------
+   📋 PLAYER ENTRY SCREEN
+----------------------------------- */
+
+.input-container {
+  position: relative;
+  width: 100%;
+  margin: 10px 0;
+}
+/* Player input styles moved to the input-with-button section */
+
+.player-list {
+  list-style: none;
+  padding: 0;
+  margin-top: 1rem;
+  text-align: center !important;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.player-list li {
+  background: var(--accent-color-dark);
+  color: white;
+  text-align: center !important;;
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.remove-player {
+  background: none;
+  border: none;
+  color: #ccc;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  transition: color 0.2s ease;
+}
+
+.remove-player:hover {
+  color: #ff5c5c;
+}
+
+/* 🧩 Player Input */
+.player-input-label {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--accent-color);
+  margin-bottom: 0.75rem;
+  text-align: center;
+}
+
+.input-with-button {
+  position: relative;
+  display: flex;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.player-input {
+  width: 100%;
+  padding: 1rem 1.25rem;
+  font-size: 1.2rem;
+  border: 2px solid var(--accent-color);
+  border-radius: 12px;
+  outline: none;
+  transition: border-color 0.2s ease;
+  padding-right: 4.5rem; /* Make more room for the button */
+  height: 64px; /* Taller input field */
+  box-sizing: border-box;
+}
+
+.player-input:focus {
+  border-color: var(--accent-color);
+}
+
+/* Submit plus button */
+.submit-plus-button {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background-color: var(--accent-color);
+  border: none;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  font-size: 1.3rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.submit-plus-button:hover {
+  background-color: var(--accent-color-dark);
+  transform: translateY(-50%) scale(1.05);
+}
+
+.submit-plus-button:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.submit-plus-button:disabled {
+  background-color: rgba(0, 0, 0, 0.1);
+  cursor: not-allowed;
+  transform: translateY(-50%);
+}
+
+/* -----------------------------------
+   ⛳ SCORE ENTRY SCREEN
+----------------------------------- */
+
+/* Header structure */
+.game-header {
+  background: var(--accent-color-dark);
+  padding: 0 1rem;
+}
+
+.header-inner {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  border-radius: 0 0 12px 12px;
+}
+
+
+.event-title h2 {
+  margin: 0.75rem;
+  font-size: 1rem;
+  font-weight: 500;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.leaderboard-link {
+  display: block;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.leaderboard-button {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, var(--accent-color), var(--accent-color-dark));
+  color: white;
+  font-weight: 600;
+  padding: 0.8rem 2.5rem 0.8rem 1rem;
+  font-size: 1.1rem;
+  border: none;
+  border-radius: 0 0 12px 12px; /* Only round bottom corners */
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+}
+
+.leaderboard-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.leaderboard-button:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.leaderboard-button::after {
+  content: '\f078';
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  position: absolute;
+  right: 1rem;
+  font-size: 0.8em;
+  transition: transform 0.2s ease;
+}
+
+.leaderboard-button[aria-expanded="true"]::after {
+  transform: rotate(180deg);
+}
+
+.leaderboard-button {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+/* Removed duplicate entry-buttons declaration */
+
+/* Removed add-player-circle styles as we now use the inline plus button */
+
+
+
+.bottom-bar-button {
+  font-family: 'obviously', sans-serif;
+  background: var(--accent-color);
+  color: white;
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding: 1rem;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  border: none;
+  border-radius: 0 0 30px 30px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.3s ease;
+  display: block;
+  box-sizing: border-box;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 0;
+}
+
+.bottom-bar-button:hover {
+  background: var(--accent-color);
+  opacity: 0.9;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  transform: none;
+}
+
+
+
+.bottom-bar-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+
+
+
+.hole-indicator {
+  position: relative;
+  z-index: 2;
+  padding: 1.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.hole-number {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+  font-size: 2.2rem;
+  font-weight: bold;
+  color: white;
+}
+
+.hole-label {
+  font-weight: bold;
+}
+
+.hole-circle {
+  background-color: var(--accent-color);
+  color: white;
+  border-radius: 50%;
+  padding: 0.3rem 0.3rem;
+  margin: 0.5rem;
+  font-size: 2.5rem;
+  display: inline-block;
+  min-width: 3.5rem;
+  text-align: center;
+}
+
+.flag-background {
+  position: absolute;
+  font-size: 18rem;
+  opacity: 0.05;
+  right: 1rem;
+  top: 0.5rem;
+  z-index: 0;
+  pointer-events: none;
+  display: none;
+}
+
+.status-bar {
+  grid-row: 1;
+  display: block;
+  width: 100%;
+  background: var(--accent-color);
+  padding: 1rem 1.5rem 2.75rem;
+  border-radius: 0px 0px 20px 20px;
+  color: white;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  position: relative;
+  z-index: 8;
+}
+
+.status-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+   z-index: 7;
+}
+
+.status-text {
+  position: absolute;
+  width: 100%;
+  text-align: center;
+  font-weight: 500;
+  font-size: 1rem;
+   z-index: 9;
+}
+
+
+/* -----------------------------------
+   🎯 PLAYER CARDS & SCORING
+----------------------------------- */
+
+/* Base player card styles */
+.player-card {
+  border-radius: 12px;
+  margin-bottom: 1rem;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Active player card */
+.player-card-active {
+  background: var(--accent-color-dark);
+  color: white;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Inactive player card */
+.player-card-inactive {
+  background: var(--accent-color-dark);
+  font-weight: 500;
+  padding: 1.25rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+}
+
+.player-card-inactive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Unscored indicator */
+.player-card-unscored {
+  border-left: 4px solid var(--accent-color);
+}
+
+/* Player card styles have been moved to the semantic class structure above */
+
+/* Player header (name and score) */
+.player-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  font-weight: 500;
+  font-size: 1.1rem;
+}
+
+
+/* Player name in current player card */
+.name-centered {
+  font-size: 2.2rem;
+  font-weight: 600;
+  text-align: center;
+  color: white;
+  margin: 0.5rem 0 1rem;
+  line-height: 1.2;
+}
+
+/* Score edit section */
+.score-edit {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+/* Edit button */
+.edit-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.edit-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+/* 🎯 Score Buttons */
+.score-buttons {
+  display: flex;
+  width: 100%;
+  min-width: 100%;
+  padding: 0.5rem 0 1rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  scroll-padding: 0 1rem;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  white-space: nowrap;
+  flex-wrap: nowrap;
+}
+
+.score-buttons::-webkit-scrollbar {
+  display: none;
+}
+
+.score-buttons button {
+  flex: 0 0 calc(16.666% - 0.3rem);
+  min-width: 0;
+  height: 3.5rem;
+  margin: 0 0.15rem;
+  background: var(--accent-color);
+  color: white;
+  font-size: 1.5rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  white-space: nowrap;
+  scroll-snap-align: start;
+}
+
+.score-buttons button:hover {
+  background: var(--accent-color);
+  opacity: 0.9;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.score-buttons button:active {
+  transform: scale(0.95);
+}
+
+/* Ensure text doesn't overflow */
+.name-centered,
+.player-header span,
+.final-rank .name {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+
+
+.score-buttons button:hover {
+  background-color: var(--accent-color-dark);
+}
+
+
+.score-edit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.5rem;
+}
+
+.edit-btn {
+  background: var(--accent-color);
+  border: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.edit-btn i {
+  pointer-events: none;
+}
+
+
+
+/* -----------------------------------
+   🏁 FINAL SCREEN
+----------------------------------- */
+
+.final-screen {
+  background: var(--accent-color-dark);
+  color: white;
+  text-align: center;
+  padding: 2rem;
+  padding-top: 4rem;
+  border-radius: 0px;
+}
+
+.final-screen h1 {
+  font-size: 2.5rem;
+color: white;
+  margin-bottom: 1rem;
+}
+
+
+
+
+.final-rank .badge {
+  margin-right: 0.5rem;
+}
+/* -----------------------------------
+   🏁 FINAL SCREEN TABLE STYLE
+----------------------------------- */
+
+.final-header {
+  position: relative;
+  text-align: center;
+}
+
+.trophy-bg {
+  font-size: 10rem;
+  color: rgba(255, 255, 255, 0.1);
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.final-table {
+  display: flex;
+  flex-direction: column;
+  margin-top: 2rem;
+  gap: 0.5rem;
+}
+
+.final-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f4f4f4;
+  border-radius: 12px;
+  padding: 1rem;
+  font-weight: 600;
+  font-size: 1.2rem;
+}
+
+.final-row.header {
+  background: transparent;
+  font-size: 1rem;
+  opacity: 0.7;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.final-row.even {
+  background: rgba(255, 255, 255, 0.1);
+}
+.final-row.odd {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.cell {
+  flex: 1;
+  text-align: center;
+}
+
+.cell.rank {
+  flex: 0.5;
+  font-weight: bold;
+}
+
+.cell.name {
+  flex: 2;
+  text-align: left;
+  font-weight: bold;
+  font-size: 1.4rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.cell.score-pill {
+  background: var(--accent-color);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 1.2rem;
+  min-width: 40px;
+  text-align: center;
+  flex: 1;
+}
+
+.hio-note {
+  font-size: 0.85rem;
+  font-weight: 500;
+  opacity: 0.8;
+  margin-top: 0.2rem;
+}
+
+.thanks p {
+  color: white;
+}
+
+
+.logo, .org-logo {
+  max-width: 100px;
+  display: block;
+  margin: 0 auto;
+}
+.app-footer {
+  margin-top: 1rem;
+  padding: 2rem;
+  border-radius: 20px 20px 0 0;
+  flex: 0 0 auto;
+  background: var(--accent-color-dark);
+  font-size: 0.9rem;
+  text-align: center;
+  color: white;
+  width: 100%;
+}
+
+.footer-inner {
+  gap: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.footer-copy {
+  font-weight: 500;
+  color: white;
+}
+
+.footer-promo {
+  display: block;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 0.75rem 1rem;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.footer-promo:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  text-decoration: none;
+  color: white;
+}
+
+.footer-promo::after {
+  content: '→';
+  margin-left: 0.5rem;
+  display: inline-block;
+  transition: transform 0.2s ease;
+  font-weight: bold;
+}
+
+.footer-promo:hover::after {
+  transform: translateX(3px);
+}
+
+/* Responsive */
+@media (min-width: 480px) {
+  .bottom-bar-button {
+    font-size: 1.5rem;
+    padding: 1.25rem;
+  }
+  
+  .leaderboard-button {
+    font-size: 1.25rem;
+    padding: 1rem;
+  }
+  
+  .score-buttons {
+    max-width: 100%;
+    padding: 1rem 0.5rem;
+    justify-content: center;
+  }
+  
+  .score-buttons button {
+    flex: 0 0 4.5rem;
+    height: 4rem;
+    font-size: 1.8rem;
+    margin: 0 0.2rem;
+  }
+}

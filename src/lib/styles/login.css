@@ -1,0 +1,243 @@
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: var(--gradient-dark);
+  font-family: var(--font-body);
+  text-align: center;
+}
+
+.logo {
+  width: 25rem;
+  margin-bottom: 4rem;
+}
+
+.login-card {
+  background: var(--gradient-light);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  width: 100%;
+  max-width: 400px;
+  margin-bottom: 1rem;
+}
+
+
+.login-tabs {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid #ddd;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: transparent;
+  overflow: hidden;
+}
+
+/* ✨ The animated purple slider background */
+.bg-slide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 50%;
+  z-index: 0;
+  background: var(--gradient-color);
+  border-radius: var(--radius) var(--radius) 0 0;
+  transform: translateX(0%);
+  will-change: transform;
+  transition: transform 0.3s ease;
+}
+
+.left-radius {
+  border-radius: var(--radius) 0 0 0;
+}
+
+.right-radius {
+  border-radius: 0 var(--radius) 0 0;
+}
+
+/* 🧭 Tab labels */
+.tab {
+  position: relative;
+  flex: 1;
+  padding: 0.75rem;
+  font-weight: 700;
+  font-size: 1.05rem;
+  cursor: pointer;
+  z-index: 1;
+  color: var(--color-accent-purple);
+  transition: color 0.3s ease;
+  text-align: center;
+}
+
+.tab.active {
+  color: white;
+}
+
+.error-banner {
+  background: rgba(255, 0, 0, 0.1);
+  color: #b00020;
+  border: 1px solid #b00020;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  margin: 1rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+
+.login-form {
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  text-align: left;
+}
+
+input {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-gray);
+  font-size: 1rem;
+  background: white;
+  box-shadow: var(--shadow);
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--color-accent-blue);
+  box-shadow: 0 0 0 2px rgba(104, 158, 249, 0.2);
+}
+
+label {
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: -0.5rem;
+  color: #555;
+}
+
+.forgot-link {
+  display: block;
+  margin-top: 1rem;
+  margin-bottom: 2rem;
+  font-size: 0.9rem;
+  color: var(--color-accent-purple);
+  cursor: pointer;
+}
+
+.error-text {
+  color: red;
+  font-size: 0.95rem;
+  margin-top: 1rem;
+}
+
+footer {
+  font-size: 0.85rem;
+  color: white;
+  margin-top: 2rem;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: var(--gradient-light);
+  padding: 2rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  text-align: center;
+  max-width: 400px;
+  width: 90%;
+}
+
+.modal input {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  width: 100%;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-gray);
+}
+
+.modal button {
+  margin-top: 1rem;
+  background: var(--gradient-color);
+  color: white;
+  font-weight: bold;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius);
+}
+
+.close-button {
+  background: none;
+  color: var(--color-accent-purple);
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  text-decoration: underline;
+}
+
+.login-button {
+  margin-top: 1rem;
+}
+
+.link-sent-view {
+  padding: 2rem;
+}
+
+.resend-text {
+   border-bottom: 1px solid black;
+   cursor: pointer;
+   &:hover {
+    border-bottom: 2px solid var(--color-accent-purple);
+    color: var(--color-accent-purple);
+   }
+}
+
+.retry-icon {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  opacity: 0.5;
+  cursor: pointer;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  z-index: 10;
+}
+
+.retry-icon:hover {
+  opacity: 1;
+  transform: rotate(-45deg);
+}
+
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(90px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  opacity: 0; /* Ensure it starts invisible */
+ animation: fadeInUp 2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+

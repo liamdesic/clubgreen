@@ -142,7 +142,7 @@
     padding: 1.5rem;
     border-radius: 0 0 20px 20px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-    z-index: 20;
+    z-index: 30;
     width: 100%;
     max-width: 600px;
   }
@@ -201,7 +201,7 @@
   }
 
   .score-pill {
-    background: #00c853;
+    background: var(--accent-color, #00c853);
     color: white;
     padding: 6px 12px;
     border-radius: 20px;
