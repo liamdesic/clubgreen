@@ -18,6 +18,9 @@
   Settings
 } from 'lucide-svelte';
 
+  // Import page data from server-side load function
+  export let data;
+
 
 
   let events: Event[] = [];
@@ -46,46 +49,53 @@
   }
 
   onMount(async () => {
-    showToast('🚀 Toast test', 'info');
+    showToast('🚀 Dashboard loaded', 'info');
     loading = true;
 
-    // Get current user
-    const { data: { user }, error: userErr } = await supabase.auth.getUser();
-    if (userErr || !user) {
-      error = 'Not logged in';
+    // Use the user data from the server-side load function
+    const user = data.user;
+    console.log('User authenticated:', user.email);
+    
+    try {
+      // Get their organization
+      const { data: orgs, error: orgErr } = await supabase
+        .from('organizations')
+        .select('*')
+        .eq('owner_id', user.id)
+        .limit(1);
+
+      if (orgErr) {
+        throw new Error(orgErr.message);
+      }
+      
+      if (!orgs || orgs.length === 0) {
+        error = 'No organization found';
+        loading = false;
+        return;
+      }
+
+      organization = orgs[0];
+      console.log('Organization loaded:', organization.name);
+
+      // Get events for their org
+      const { data: eventData, error: eventErr } = await supabase
+        .from('events')
+        .select('*')
+        .eq('organization_id', organization.id)
+        .order('created_at', { ascending: false });
+
+      if (eventErr) {
+        throw new Error(eventErr.message);
+      }
+      
+      events = eventData || [];
+      console.log(`Loaded ${events.length} events`);
+    } catch (err: unknown) {
+      console.error('Error loading dashboard data:', err);
+      error = err instanceof Error ? err.message : 'Unknown error';
+    } finally {
       loading = false;
-      return;
     }
-
-    // Get their organization
-    const { data: orgs, error: orgErr } = await supabase
-      .from('organizations')
-      .select('*')
-      .eq('owner_id', user.id)
-      .limit(1);
-
-    if (orgErr || !orgs || orgs.length === 0) {
-      error = 'No organization found';
-      loading = false;
-      return;
-    }
-
-    organization = orgs[0];
-
-    // Get events for their org
-    const { data: eventData, error: eventErr } = await supabase
-      .from('events')
-      .select('*')
-      .eq('organization_id', organization.id)
-      .order('created_at', { ascending: false });
-
-    if (eventErr) {
-      error = eventErr.message;
-    } else {
-      events = eventData;
-    }
-
-    loading = false;
   });
 
   async function signOut() {
@@ -99,6 +109,12 @@ async function createEvent() {
 
   if (!newTitle || (eventType === 'single' && !newDate)) {
     createError = 'Please enter a title and date (if not ongoing).';
+    creating = false;
+    return;
+  }
+
+  if (!organization) {
+    createError = 'No organization found. Please refresh the page.';
     creating = false;
     return;
   }
@@ -294,7 +310,7 @@ async function createEvent() {
   }
   
   .add-card-button:hover {
-   
+    background-color: rgba(0, 0, 0, 0.03);
   }
   
   .add-card-button:focus-visible {
