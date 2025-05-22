@@ -27,13 +27,42 @@ const createSupabaseServer = () => {
   return createClient(supabaseUrl, supabaseAnonKey);
 };
 
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, cookies, request }) => {
   console.log('Server: Checking dashboard authentication');
+  
+  // Check for auth cookies
+  const accessToken = cookies.get('sb-access-token') || '';
+  const refreshToken = cookies.get('sb-refresh-token') || '';
+  
+  console.log('Server: Auth cookies present:', {
+    accessTokenExists: !!accessToken,
+    refreshTokenExists: !!refreshToken
+  });
   
   // Initialize Supabase on the server
   const supabase = createSupabaseServer();
   
-  // Check if the user is authenticated
+  // If we have tokens in cookies, try to set the session
+  if (accessToken && refreshToken) {
+    try {
+      // Set the session using the tokens from cookies
+      const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken
+      });
+      
+      if (sessionData?.session) {
+        console.log('Server: Successfully set session from cookies');
+        return {
+          user: sessionData.session.user
+        };
+      }
+    } catch (e) {
+      console.error('Server: Error setting session from cookies:', e);
+    }
+  }
+  
+  // Fallback to standard getSession
   const { data, error } = await supabase.auth.getSession();
   
   console.log('Server: Auth check result:', data?.session ? 'Authenticated' : 'Not authenticated');
