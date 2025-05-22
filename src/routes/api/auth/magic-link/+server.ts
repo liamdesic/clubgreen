@@ -48,8 +48,26 @@ export const POST: RequestHandler = async ({ request, url }) => {
     console.log('Server: Processing magic link request for:', email);
     
     // Get the redirect URL from the client
-    const redirectTo = url.searchParams.get('redirectTo') || `${url.origin}/dashboard`;
-    console.log('Server: Redirect URL:', redirectTo);
+    // Get the final destination URL from the client, if provided
+    const clientRedirectTo = url.searchParams.get('redirectTo');
+
+    // Detect if running locally or in production
+    const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    const redirectBase = isLocal
+      ? 'http://localhost:5173'
+      : 'https://score.clubgreen.au';
+    
+    // The magic link itself should redirect back to the /login page for token processing.
+    // We append the original clientRedirectTo to the /login URL's query string, so /login knows where to go after processing.
+    let emailVerificationRedirect = `${redirectBase}/login`;
+    if (clientRedirectTo) {
+      emailVerificationRedirect += `?redirectTo=${encodeURIComponent(clientRedirectTo)}`;
+    }
+    
+    console.log('Server: Email Verification Redirect URL (for magic link):', emailVerificationRedirect);
+    if (clientRedirectTo) {
+      console.log('Server: Final destination after login:', clientRedirectTo);
+    }
     
     // Initialize Supabase on the server
     const supabase = createSupabaseServer();
@@ -59,7 +77,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
       email,
       options: {
         shouldCreateUser: true,
-        emailRedirectTo: redirectTo
+        emailRedirectTo: emailVerificationRedirect // Magic link sends user to /login with tokens
       }
     });
     
