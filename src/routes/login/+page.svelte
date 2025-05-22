@@ -56,30 +56,30 @@ async function handleAuth() {
   console.log('Current origin:', window.location.origin);
   console.log('Redirect URL:', `${window.location.origin}/dashboard`);
   
-  // Log Supabase auth availability
-  console.log('Supabase auth available:', supabase && supabase.auth ? 'Yes' : 'No');
-  
   try {
-    // First, check if we can get the current session to verify Supabase connection
-    const { data: sessionData } = await supabase.auth.getSession();
-    console.log('Current session check:', sessionData ? 'Success' : 'No session');
+    // Use our server-side API endpoint instead of calling Supabase directly
+    const redirectTo = `${window.location.origin}/dashboard`;
+    const apiUrl = `/api/auth/magic-link?redirectTo=${encodeURIComponent(redirectTo)}`;
     
-    // Attempt to send magic link
-    console.log('Sending magic link to:', email);
-    const { data: otpData, error: magicErr } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: `${window.location.origin}/dashboard`
-      }
+    console.log('Calling server API endpoint:', apiUrl);
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email })
     });
-
+    
+    const result = await response.json();
+    console.log('Server API response:', result);
+    
     loading = false;
-    console.log('OTP data received:', otpData ? 'Yes' : 'No');
-
-    if (magicErr) {
-      console.error('Magic link error:', magicErr);
-      error = magicErr.message;
+    
+    if (!response.ok || !result.success) {
+      const errorMessage = result.error || 'Failed to send magic link';
+      console.error('Magic link error:', errorMessage);
+      error = errorMessage;
     } else {
       console.log('Magic link sent successfully');
       linkSent = true;
@@ -101,17 +101,28 @@ async function verifyCode() {
   console.log('Code length:', otpCode.length);
 
   try {
-    const { error: verifyErr } = await supabase.auth.verifyOtp({
-      email,
-      token: otpCode,
-      type: 'email'
+    // Use our server-side API endpoint for OTP verification
+    const apiUrl = '/api/auth/verify-otp';
+    
+    console.log('Calling server API endpoint for verification:', apiUrl);
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, token: otpCode })
     });
-
+    
+    const result = await response.json();
+    console.log('Server API verification response:', result);
+    
     loading = false;
-
-    if (verifyErr) {
-      console.error('OTP verification error:', verifyErr);
-      error = 'Invalid or expired code.';
+    
+    if (!response.ok || !result.success) {
+      const errorMessage = result.error || 'Invalid or expired code.';
+      console.error('OTP verification error:', errorMessage);
+      error = errorMessage;
     } else {
       console.log('OTP verification successful, redirecting to dashboard');
       goto('/dashboard');
