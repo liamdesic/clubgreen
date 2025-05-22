@@ -1,7 +1,6 @@
 <script>
   import '$lib/styles/login.css';
   import '$lib/styles/theme.css';
-  import Button from '$lib/components/ui/Button.svelte';
   import { supabase } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
   import { tweened } from 'svelte/motion';
