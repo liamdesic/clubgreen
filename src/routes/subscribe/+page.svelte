@@ -1,46 +1,124 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { loadStripe } from '@stripe/stripe-js';
+  import { browser } from '$app/environment';
   import '../../../lib/styles/subscribe.css';
   
   let stripePromise;
+  let testMode = true; // Enable test mode by default
+  let testEmail = 'test@example.com';
+  let isLoading = false;
+  let error = '';
   
   onMount(() => {
-    // Load Stripe with your publishable key
-    stripePromise = loadStripe(import.meta.env.PUBLIC_STRIPE_PUBLISHABLE_KEY);
+    if (browser) {
+      // Load Stripe with your publishable key
+      stripePromise = loadStripe(import.meta.env.PUBLIC_STRIPE_PUBLISHABLE_KEY);
+      
+      // Check for test mode in URL
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has('testMode')) {
+        testMode = urlParams.get('testMode') === 'true';
+      }
+    }
   });
 
   async function handleSubscribe() {
+    if (testMode) {
+      isLoading = true;
+      console.log('Test subscription with email:', testEmail);
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      window.location.href = '/dashboard?testMode=true&subscribed=true';
+      return;
+    }
+
     try {
+      isLoading = true;
       const stripe = await stripePromise;
       const response = await fetch('/api/create-checkout-session', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ priceId: 'price_xxxxxxxx' }), // Replace with your actual price ID
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          priceId: 'price_xxxxxxxx',
+          email: testEmail,
+          testMode
+        }),
       });
       
       const session = await response.json();
+      if (session.error) throw new Error(session.error);
+      
       await stripe.redirectToCheckout({ sessionId: session.id });
-    } catch (error) {
-      console.error('Error:', error);
+    } catch (err) {
+      console.error('Error:', err);
+      error = err.message || 'Failed to process subscription';
+    } finally {
+      isLoading = false;
     }
   }
 
-  function startTrial() {
-    // This would typically make an API call to your backend
-    console.log('Starting free trial');
-    // Redirect to dashboard after trial starts
-    window.location.href = '/dashboard';
+  async function startTrial() {
+    if (testMode) {
+      isLoading = true;
+      console.log('Starting test trial with email:', testEmail);
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      window.location.href = '/dashboard?testMode=true&trialStarted=true';
+      return;
+    }
+    
+    try {
+      isLoading = true;
+      // Your actual trial start API call would go here
+      const response = await fetch('/api/start-trial', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: testEmail }),
+      });
+      
+      const result = await response.json();
+      if (result.error) throw new Error(result.error);
+      
+      window.location.href = '/dashboard';
+    } catch (err) {
+      console.error('Error:', err);
+      error = err.message || 'Failed to start trial';
+    } finally {
+      isLoading = false;
+    }
   }
 </script>
 
 <div class="subscribe-container">
+  {#if testMode}
+    <div class="test-mode-banner">
+      <h3>🛠️ Test Mode Active</h3>
+      <p>All actions are simulated. No real payments will be processed.</p>
+      <div class="test-email">
+        <label for="test-email">Test Email:</label>
+        <input 
+          type="email" 
+          id="test-email" 
+          bind:value={testEmail} 
+          placeholder="test@example.com"
+          disabled={isLoading}
+        />
+      </div>
+    </div>
+  {/if}
+
   <div class="subscribe-header">
     <h1>Get Started with ldrboard</h1>
     <p>Choose the option that works best for you</p>
   </div>
+  
+  {#if error}
+    <div class="error-message">
+      <p>{error}</p>
+      <button on:click={() => error = ''} class="dismiss-button">×</button>
+    </div>
+  {/if}
   
   <div class="plans-grid">
     <!-- Free Trial Card -->
@@ -58,8 +136,19 @@
         <li>✓ 10 days of free usage</li>
       </ul>
       
-      <button on:click={startTrial} class="plan-button secondary">
-        Start Free Trial
+      <button 
+        on:click={startTrial} 
+        class="plan-button secondary"
+        disabled={isLoading}
+      >
+        {#if isLoading && !testMode}
+          <span class="spinner"></span>
+        {:else}
+          Start Free Trial
+        {/if}
+        {#if testMode}
+          <span class="test-indicator">(Test Mode)</span>
+        {/if}
       </button>
     </div>
     
@@ -77,8 +166,19 @@
         <li>✓ Regular updates & improvements</li>
       </ul>
       
-      <button on:click={handleSubscribe} class="plan-button primary">
-        Subscribe Now
+      <button 
+        on:click={handleSubscribe} 
+        class="plan-button primary"
+        disabled={isLoading}
+      >
+        {#if isLoading && !testMode}
+          <span class="spinner"></span>
+        {:else}
+          Subscribe Now
+        {/if}
+        {#if testMode}
+          <span class="test-indicator">(Test Mode)</span>
+        {/if}
       </button>
     </div>
   </div>
