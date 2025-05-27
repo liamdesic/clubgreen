@@ -5,33 +5,25 @@
   import { supabase } from '$lib/supabaseClient';
 
   export let visible = false;
+  export let eventId = ''; // Added to filter by current event
   const dispatch = createEventDispatcher();
   let leaderboardData = [];
-  let leaderboardSettings = null;
   let loading = false;
 
   async function fetchLeaderboardData() {
-    loading = true;
-
-    // Fetch settings
-    const settingsRes = await supabase
-      .from('leaderboard_settings')
-      .select('*')
-      .eq('published', true)
-      .single();
-
-    if (settingsRes.error) {
-      console.error('❌ Error loading leaderboard settings:', settingsRes.error.message);
-      loading = false;
+    if (!eventId) {
+      console.error('❌ No event ID provided for leaderboard');
       return;
     }
+    
+    loading = true;
 
-    leaderboardSettings = settingsRes.data;
-
-    // Fetch all scores
+    // Fetch scores for the current event
     const { data, error } = await supabase
       .from('scorecard')
-      .select('player_id, name, score, hole_number, hole_in_ones, created_at, published');
+      .select('player_id, name, score, hole_number, hole_in_ones, created_at, published, event_id')
+      .eq('published', true)
+      .eq('event_id', eventId); // Filter by current event
 
     if (error) {
       console.error('❌ Error loading leaderboard:', error.message);
@@ -40,22 +32,9 @@
     }
 
     const playerMap = new Map();
-    const now = new Date();
-    let cutoff = null;
-
-    if (leaderboardSettings.time_filter === 'last_hour') {
-      cutoff = new Date(now.getTime() - 60 * 60000);
-    } else if (leaderboardSettings.time_filter === 'last_2_hours') {
-      cutoff = new Date(now.getTime() - 120 * 60000);
-    } else if (leaderboardSettings.time_filter === 'custom') {
-      const minutes = leaderboardSettings.time_window_minutes || 120;
-      cutoff = new Date(now.getTime() - minutes * 60000);
-    }
 
     for (const row of data) {
       if (!row.published) continue;
-      const createdAt = new Date(row.created_at);
-      if (cutoff && createdAt < cutoff) continue;
 
       const id = row.player_id;
       if (!id) continue;
@@ -74,9 +53,10 @@
       player.holeInOnes += row.hole_in_ones;
     }
 
-    leaderboardData = Array.from(playerMap.values())
-  .sort((a, b) => a.totalScore - b.totalScore)
-  .slice(0, 10);
+    // Sort by total score (ascending - lower is better in golf)
+  leaderboardData = Array.from(playerMap.values())
+    .sort((a, b) => a.totalScore - b.totalScore)
+    .slice(0, 10); // Show top 10 players
 
     loading = false;
   }

@@ -89,6 +89,7 @@
   // Load organization settings
   async function loadOrganizationSettings() {
     try {
+      console.log('🔍 Fetching organization data for slug:', currentOrg);
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
         .select('settings_json')
@@ -97,10 +98,16 @@
         
       if (orgError) throw orgError;
       
+      console.log('✅ Organization data fetched:', orgData);
+      
       if (orgData?.settings_json) {
         organizationSettings = {
-          logo_url: orgData.settings_json.logo_url || ''
+          logo_url: orgData.settings_json.logo_url || '',
+          ad_image_url: orgData.settings_json.ad_image_url || ''
         };
+        console.log('📋 Organization settings loaded:', organizationSettings);
+      } else {
+        console.log('ℹ️ No settings found in organization data');
       }
     } catch (err) {
       console.error('Error loading organization settings:', err);
@@ -445,10 +452,25 @@
   <!-- 📢 SIDEBAR -->
   <div class="sidebar">
   <!-- 📢 Ad Image -->
-  {#if eventSettings.enable_ads && eventSettings.ads_text}
-    <a href={eventSettings.ads_url} class="ad-banner">
-      {eventSettings.ads_text}
-    </a>
+  {#if organizationSettings?.ad_image_url || eventSettings.ads_image_url}
+    <div class="ad-container">
+      <a href={eventSettings.ads_url || '#'} class="ad-banner">
+        <img 
+          src={eventSettings.ads_image_url || organizationSettings.ad_image_url} 
+          alt={eventSettings.ads_text || 'Advertisement'}
+          class="ad-image"
+        />
+        {#if eventSettings.ads_text}
+          <div class="ad-text">{eventSettings.ads_text}</div>
+        {/if}
+      </a>
+    </div>
+  {:else if eventSettings.ads_text}
+    <div class="ad-container">
+      <a href={eventSettings.ads_url || '#'} class="ad-banner text-only">
+        {eventSettings.ads_text}
+      </a>
+    </div>
   {/if}
   <!-- 📲 QR Code -->
   <div class="qr-box">

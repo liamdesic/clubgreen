@@ -44,9 +44,17 @@
         .eq('owner_id', user.id)
         .single();
 
-      if (orgError) throw orgError;
+      if (orgError) {
+        console.error('❌ Error loading organization data:', orgError);
+        throw orgError;
+      }
       
       if (orgData) {
+        console.log('✅ Loaded organization data:', {
+          id: orgData.id,
+          name: orgData.name,
+          hasSettings: !!orgData.settings_json
+        });
         organization = {
           ...orgData,
           settings: {
@@ -56,6 +64,16 @@
         };
         logoUrl = organization.settings.logo_url || '';
         adImageUrl = organization.settings.ad_image_url || '';
+        
+        if (organization.settings.logo_url) {
+          console.log('🖼️ Loaded organization logo URL:', organization.settings.logo_url);
+        } else {
+          console.log('ℹ️ No organization logo found in settings');
+        }
+        
+        if (organization.settings.ad_image_url) {
+          console.log('🖼️ Loaded ad image URL:', organization.settings.ad_image_url);
+        }
       }
 
     } catch (err) {
@@ -146,11 +164,16 @@
         <div class="form-group">
           <label>Organization Logo</label>
           <FileUpload 
+            initialUrl={organization.settings.logo_url}
             label="Upload Logo" 
             folder="organization-logos"
-            on:upload={handleLogoUpload}
+            on:upload={(e) => {
+              logoUrl = e.detail.url;
+              organization.settings.logo_url = e.detail.url;
+              console.log('Logo URL updated:', e.detail.url);
+            }}
           />
-          {#if organization.settings.logo_url && !logoUrl}
+          {#if organization.settings.logo_url}
             <div class="current-file">
               <span>Current: </span>
               <a href={organization.settings.logo_url} target="_blank" rel="noopener noreferrer">
@@ -181,8 +204,9 @@
           <label>Ad Image</label>
           <FileUpload 
             label="Upload Ad Image" 
-            folder="ad-images"
+            folder="ads"
             on:upload={handleAdUpload}
+            initialUrl={organization.settings.ad_image_url}
           />
           {#if organization.settings.ad_image_url && !adImageUrl}
             <div class="current-file">

@@ -5,13 +5,14 @@
 
   export let label = 'Upload File';
   export let folder = 'uploads'; // e.g. logos, ads, qr-codes
+  export let initialUrl = ''; // Add this line to accept initial URL
 
   const dispatch = createEventDispatcher();
 
   let file = null;
   let status = '';
   let size = 0;
-  let url = '';
+  let url = initialUrl || '';
 
   async function handleFileUpload(event) {
     file = event.target.files[0];
@@ -21,32 +22,69 @@
     status = 'uploading';
 
     try {
-      const filename = `${Date.now()}-${file.name}`;
+      // Sanitize filename: replace spaces with underscores and remove special characters
+      const sanitizedFilename = file.name
+        .replace(/[^\w\d.]/g, '_')
+        .replace(/_{2,}/g, '_')
+        .toLowerCase();
+      
+      const filename = `${Date.now()}-${sanitizedFilename}`;
+      const filePath = `${folder}/${filename}`;
+      
+      console.log('Uploading file to:', filePath);
+      
+      // Ensure the bucket exists and is accessible
+      const bucketName = 'public-assets';
+      
+      // First, try to create the bucket if it doesn't exist (requires admin privileges)
+      const { data: bucketData, error: bucketError } = await supabase.storage
+        .createBucket(bucketName, { public: true })
+        .catch(() => ({})); // Ignore error if bucket already exists
+      
+      // Upload the file to the specified folder in the bucket
       const { error: uploadError } = await supabase.storage
-        .from('public-assets')
-        .upload(`${folder}/${filename}`, file, {
+        .from(bucketName)
+        .upload(filePath, file, {
           cacheControl: '3600',
-          upsert: true
+          upsert: true,
+          contentType: file.type || 'image/jpeg',
+          duplex: 'half' // Required for some environments
         });
 
-      if (uploadError) throw new Error(uploadError.message);
+      if (uploadError) {
+        console.error('Upload error details:', uploadError);
+        // If the error is about the bucket not existing, try to create it
+        if (uploadError.message.includes('Bucket not found')) {
+          throw new Error('Storage bucket not found. Please create a public bucket named "public-assets" in your Supabase storage.');
+        }
+        throw new Error(uploadError.message);
+      }
 
-      const { data } = supabase.storage
-        .from('public-assets')
-        .getPublicUrl(`${folder}/${filename}`);
+      // Get public URL - construct it manually to ensure it's correct
+      const { data: { publicUrl } } = supabase.storage
+        .from(bucketName)
+        .getPublicUrl(filePath);
+        
+      const urlData = { publicUrl };
 
-      url = data.publicUrl;
+      if (!urlData?.publicUrl) {
+        throw new Error('Failed to get public URL for uploaded file');
+      }
+
+      url = urlData.publicUrl;
       status = 'uploaded';
+      console.log('File uploaded successfully:', url);
       dispatch('upload', { url });
     } catch (err) {
       status = 'error';
-      console.error('Upload error:', err.message);
+      console.error('Upload error:', err);
+      showToast('Failed to upload file. Please try again.', 'error');
     }
   }
 
   function reset() {
     file = null;
-    url = '';
+    url = initialUrl || '';
     status = '';
     size = 0;
     dispatch('upload', { url: '' });
@@ -79,10 +117,16 @@
     <div class="upload-row">
       <img class="thumb" src={url} alt="Preview" />
       <div class="file-info">
-        <div class="file-name">{file?.name} ({size} KB)</div>
-        <small>Uploaded</small>
+        <div class="file-name">
+          {#if file}
+            {file.name} ({size} KB)
+          {:else}
+            Current logo
+          {/if}
+        </div>
+        <small>{file ? 'Uploaded' : 'Current'}</small>
       </div>
-      <button class="upload-remove" on:click={reset}>✖</button>
+      <button class="upload-remove" on:click={reset} title="Remove">✖</button>
     </div>
   {/if}
 </div>

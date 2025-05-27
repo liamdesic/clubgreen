@@ -259,10 +259,38 @@
     }
   }
 
-  function togglePublishedLocally(playerId: string) {
-    const newStatus = !playerScores.find(p => p.id === playerId)?.published;
-    modifiedScores.set(playerId, newStatus);
-    unsavedChanges = true;
+  async function togglePublishedLocally(playerId: string) {
+    try {
+      const player = playerScores.find(p => p.id === playerId);
+      if (!player) return;
+      
+      const newStatus = !player.published;
+      
+      // Update local state immediately for better UX
+      modifiedScores.set(playerId, newStatus);
+      player.published = newStatus;
+      
+      // Update the database
+      const { error } = await supabase
+        .from('scorecard')
+        .update({ published: newStatus })
+        .eq('player_id', playerId)
+        .eq('event_id', eventUuid);
+        
+      if (error) throw error;
+      
+      showToast(`Score ${newStatus ? 'published' : 'unpublished'} successfully`, 'success');
+    } catch (err) {
+      console.error('Error updating publish status:', err);
+      showToast('Failed to update publish status', 'error');
+      
+      // Revert local changes on error
+      const player = playerScores.find(p => p.id === playerId);
+      if (player) {
+        player.published = !player.published;
+        modifiedScores.set(playerId, player.published);
+      }
+    }
   }
   
   function cancelChanges() {

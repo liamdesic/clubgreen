@@ -11,7 +11,6 @@
   import { cubicOut } from 'svelte/easing';
   import { showToast } from '$lib/toastStore';
   import LeaderboardModal from '$lib/components/LeaderboardModal.svelte';
-  import TiebreakerModal from '$lib/components/TiebreakerModal.svelte';
   import { v4 as uuidv4 } from 'uuid';
   import profanity from 'leo-profanity'; 
   
@@ -34,11 +33,7 @@
   let eventId = '';
   let orgId = '';
   
-  // Tiebreaker state (temporarily disabled)
-  const TIEBREAKER_ENABLED = false; // Set to true to re-enable tiebreaker feature
-  let showTiebreaker = false;
-  let tiedPlayers = [];
-  let isTiebreakerInProgress = false;
+
   
   // Type definitions using JSDoc
   /**
@@ -48,16 +43,8 @@
    * @property {(number|null)[]} scores - Array of scores for each hole
    * @property {number} holeInOnes - Number of hole-in-ones
    * @property {number} totalScore - Total score
-   * @property {number} [tiebreaker_rank] - Optional tiebreaker rank
    */
   
-  /**
-   * @typedef {Object} TiebreakerResult
-   * @property {Player} player - The player
-   * @property {number} score - The tiebreaker score
-   * @property {string} time - Formatted time string
-   */
-
   const loadEventSettings = async () => {
     // Get the event details including settings_json
     const { data: eventData, error: eventError } = await supabase
@@ -336,152 +323,52 @@
   }
 
   // ------ 🏁 FINAL SCORES LOGIC ------
-  /**
-   * Detect ties in the final scores
-   * @param {Player[]} players - Array of players
-   * @returns {Player[]} Array of players who are tied
-   */
-  function detectTies(players) {
-    if (!players || players.length < 2) return [];
-    
-    // Group players by score
-    const scoreGroups = Object.create(null);
-    players.forEach(player => {
-      const score = player.totalScore;
-      if (!scoreGroups[score]) {
-        scoreGroups[score] = [];
-      }
-      scoreGroups[score].push(player);
-    });
-    
-    // Find groups with more than one player
-    return Object.values(scoreGroups)
-      .filter(group => group.length > 1)
-      .flat();
-  }
+  async function showFinalScreen() {
+    // First sort by total score
+    players.sort((a, b) => a.totalScore - b.totalScore);
   
-  /**
-   * Find groups of players who are tied
-   * @param {Array} players - Array of player objects
-   * @returns {Array} Array of arrays containing tied players
-   */
-  function findTiedPlayers(players) {
-    if (!players || players.length < 2) return [];
-    
-    // Group players by score
-    const scoreGroups = {};
-    players.forEach(player => {
-      const score = player.totalScore;
-      if (!scoreGroups[score]) {
-        scoreGroups[score] = [];
-      }
-      scoreGroups[score].push(player);
-    });
-    
-    // Return groups with more than one player (ties)
-    return Object.values(scoreGroups).filter(group => group.length > 1);
-  }
+    // Show final scores
+    showFinal = true;
   
-  /**
-   * Open the tiebreaker modal
-   * @param {Array} playersToTiebreak - Players who need a tiebreaker
-   * @param {Player[]} playersToTiebreak - Players who need a tiebreaker
-   */
-  function openTiebreaker(playersToTiebreak) {
-    tiedPlayers = [...playersToTiebreak];
-    isTiebreakerInProgress = true;
-    showTiebreaker = true;
-  }
-  
-  /**
-   * Handle tiebreaker completion
-   * @param {TiebreakerResult[]} tiebreakerResults - Results from the tiebreaker
-   */
-  function handleTiebreakerComplete(tiebreakerResults) {
-    // Update player rankings based on tiebreaker results
-    tiebreakerResults.forEach((result, index) => {
-      const playerIndex = players.findIndex(p => p.id === result.player.id);
-      if (playerIndex !== -1) {
-        players[playerIndex].tiebreaker_rank = index + 1;
-      }
-    });
-    
-    // Re-sort players based on score and tiebreaker rank
-    players.sort((a, b) => {
-      if (a.totalScore === b.totalScore) {
-        // If scores are equal, use tiebreaker rank
-        return (a.tiebreaker_rank || 0) - (b.tiebreaker_rank || 0);
-      }
-      return a.totalScore - b.totalScore;
-    });
-    
-    isTiebreakerInProgress = false;
-    showTiebreaker = false;
-    
-    // Force update the players array to trigger reactivity
-    players = [...players];
-  }
+    const finalHole = eventSettings?.hole_count || 9;
+    const rowsToInsert = [];
 
-async function showFinalScreen() {
-  // First sort by total score
-  players.sort((a, b) => a.totalScore - b.totalScore);
-  
-  // Check for ties
-  const tiedGroups = findTiedPlayers(players);
-  
-  // If there are ties, show tiebreaker for the first group
-  if (tiedGroups.length > 0 && !isTiebreakerInProgress) {
-    const firstTieGroup = tiedGroups[0];
-    if (firstTieGroup.length >= 2) {
-      // Only handle 2-way ties for now (can be expanded later)
-      const playersToTiebreak = firstTieGroup.slice(0, 2);
-      startTiebreaker(playersToTiebreak);
-      return; // Don't show final screen yet
+    for (const player of players) {
+      for (let hole = 1; hole <= finalHole; hole++) {
+        const strokes = player.scores[hole - 1];
+        if (strokes == null) continue;
+
+        rowsToInsert.push({
+          player_id: player.id,
+          name: player.name,
+          score: strokes,
+          hole_number: hole,
+          hole_in_ones: strokes === 1 ? 1 : 0,
+          event_id: eventId,  // Add event_id from the current event
+          published: true     // Mark as published by default
+        });
+
+      }
     }
-  }
-  
-  // If no ties or tiebreaker completed, show final scores
-  showFinal = true;
-  
-  const finalHole = eventSettings?.hole_count || 9;
-  const rowsToInsert = [];
 
-  for (const player of players) {
-    for (let hole = 1; hole <= finalHole; hole++) {
-      const strokes = player.scores[hole - 1];
-      if (strokes == null) continue;
+    console.log("📝 Prepared rows to insert:", rowsToInsert);
 
-      rowsToInsert.push({
-        player_id: player.id,
-        name: player.name,
-        score: strokes,
-        hole_number: hole,
-        hole_in_ones: strokes === 1 ? 1 : 0,
-        event_id: eventId,  // Add event_id from the current event
-        published: true     // Mark as published by default
-      });
-
-    }
-  }
-
-  console.log("📝 Prepared rows to insert:", rowsToInsert);
-
-  if (rowsToInsert.length > 0) {
-    const { error } = await supabase
-      .from('scorecard')
-      .insert(rowsToInsert)
-      .select();
-    if (error) {
-      console.error('❌ Error inserting final scores:', error);
+    if (rowsToInsert.length > 0) {
+      const { error } = await supabase
+        .from('scorecard')
+        .insert(rowsToInsert)
+        .select();
+      if (error) {
+        console.error('❌ Error inserting final scores:', error);
+      } else {
+        console.log(`✅ Inserted ${rowsToInsert.length} rows to Supabase`);
+      }
     } else {
-      console.log(`✅ Inserted ${rowsToInsert.length} rows to Supabase`);
+      console.warn("⚠️ No scores found to insert.");
     }
-  } else {
-    console.warn("⚠️ No scores found to insert.");
-  }
 
-  showFinal = true;
-}
+    showFinal = true;
+  }
 
   async function nextHole() {
   if (!allScored) return;
@@ -602,37 +489,10 @@ async function showFinalScreen() {
 {#if showLeaderboardModal}
   <LeaderboardModal
     visible={showLeaderboardModal}
+    eventId={eventId}
     on:close={() => showLeaderboardModal = false}
   />
 {/if}
-
-<!-- 🏆 Tiebreaker Modal -->
-<TiebreakerModal 
-  isOpen={showTiebreaker}
-  players={tiedPlayers}
-  onClose={() => showTiebreaker = false}
-  onComplete={handleTiebreakerComplete}
-/>
-
-<style>
-  .tiebreaker-badge {
-    background: var(--accent-color);
-    color: white;
-    font-size: 0.7rem;
-    padding: 0.2rem 0.5rem;
-    border-radius: 10px;
-    margin-left: 0.5rem;
-    display: inline-block;
-    vertical-align: middle;
-  }
-  
-  .tied-rank {
-    color: #666;
-    font-style: italic;
-  }
-</style>
-
-
 
 
 
@@ -800,11 +660,7 @@ async function showFinalScreen() {
       {#each players as player, index}
         <div class="final-row {index % 2 === 0 ? 'even' : 'odd'}">
           <div class="cell rank">
-            {#if index > 0 && player.totalScore === players[index - 1].totalScore}
-              <span class="tied-rank">T{index}</span>
-            {:else}
-              {index + 1}
-            {/if}
+            {index + 1}
           </div>
           <div class="cell name">
             {#if index === 0} 🥇{/if}
@@ -816,9 +672,6 @@ async function showFinalScreen() {
                 <i class="fa-solid fa-fire" style="color: #fc4138;"></i>
                 {player.holeInOnes} hole-in-one{player.holeInOnes > 1 ? 's' : ''}
               </div>
-            {/if}
-            {#if player.tiebreaker_rank === 1}
-              <span class="tiebreaker-badge">TB Winner</span>
             {/if}
           </div>
           <div class="cell score-pill">{player.totalScore}</div>
@@ -842,9 +695,7 @@ async function showFinalScreen() {
     {:else}
       <img src="https://images.squarespace-cdn.com/content/v1/66f47f43360134029ba42149/a7914e99-7939-42b0-b318-c99c685120eb/Asset+5.png?format=1500w" alt="Club Green logo" class="logo" />
     {/if}
-    <div class="footer-copy">
-      © {orgSettings.name || 'Club Green'} {new Date().getFullYear()}
-    </div>
+  
     {#if eventSettings?.scorecard_ad_text && eventSettings?.scorecard_ad_url}
       <a href={eventSettings.scorecard_ad_url} class="footer-promo" target="_blank" rel="noopener noreferrer">
         {eventSettings.scorecard_ad_text}
