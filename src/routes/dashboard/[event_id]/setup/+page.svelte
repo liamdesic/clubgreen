@@ -9,15 +9,13 @@
   import '$lib/styles/theme.css';
   import '$lib/styles/dashboard.css';
   import '$lib/styles/EditEvent.css';
+  import { Plus, Minus } from 'lucide-svelte';
 
   interface Settings {
     event_name: string;
     hole_count: number;
     accent_color: string;
-    show_hole_in_ones: boolean;
-    published: boolean;
-    enable_ads: boolean;
-    ads_text: string;
+    archived: boolean;
     scorecard_ad_text: string;
     scorecard_ad_url: string;
   }
@@ -38,10 +36,7 @@
     event_name: '',
     hole_count: 9,
     accent_color: '#00c853',
-    show_hole_in_ones: true,
-    published: false,
-    enable_ads: false,
-    ads_text: '',
+    archived: false,
     scorecard_ad_text: '',
     scorecard_ad_url: 'https://clubgreen.au'
   };
@@ -112,8 +107,7 @@
       settings = { 
         ...settings, 
         ...(data.settings_json || {}),
-        event_name: data.title || '',
-        published: data.published ?? false
+        event_name: data.title || ''
       };
       
       await loadPlayerScores();
@@ -203,74 +197,77 @@
   async function saveSettings() {
     try {
       saving = true;
+      error = null;
+
+      if (!event) throw new Error('No event loaded');
+
       const { error: updateError } = await supabase
         .from('events')
         .update({
           title: settings.event_name,
-          published: settings.published,
           settings_json: {
-            hole_count: settings.hole_count,
-            accent_color: settings.accent_color,
-            show_hole_in_ones: settings.show_hole_in_ones,
-            enable_ads: settings.enable_ads,
-            ads_text: settings.ads_text,
-            scorecard_ad_text: settings.scorecard_ad_text,
-            scorecard_ad_url: settings.scorecard_ad_url
+            ...settings,
+            event_name: undefined // Remove the duplicate field
           }
         })
         .eq('id', eventUuid);
 
       if (updateError) throw updateError;
 
-      // Update player visibilities
-      const updates = [];
-      for (const [playerId, newStatus] of modifiedScores.entries()) {
-        updates.push(
-          supabase
-            .from('scorecard')
-            .update({ published: newStatus })
-            .eq('player_id', playerId)
-            .eq('event_id', eventUuid)
-        );
-      }
-      
-      if (updates.length > 0) {
-        const results = await Promise.all(updates);
-        const errors = results.filter((r: any) => r.error).map((r: any) => r.error);
-        if (errors.length > 0) {
-          console.error('Some player updates failed:', errors);
-        }
-      }
-
-      modifiedScores.clear();
-      unsavedChanges = false;
       showToast('Settings saved successfully!', 'success');
+      unsavedChanges = false;
     } catch (err: any) {
-      console.error('Failed to save settings:', err);
-      showToast(`Error: ${err.message}`, 'error');
+      console.error('Error saving settings:', err);
       error = err.message;
+      showToast(`Error saving settings: ${err.message}`, 'error');
+    } finally {
+      saving = false;
+    }
+  }
+
+  async function archiveEvent() {
+    if (!confirm('Are you sure you want to archive this event? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      saving = true;
+      error = null;
+      
+      const { error: updateError } = await supabase
+        .from('events')
+        .update({
+          settings_json: {
+            ...settings,
+            archived: true,
+            event_name: undefined
+          }
+        })
+        .eq('id', eventUuid);
+        
+      if (updateError) throw updateError;
+      
+      settings.archived = true;
+      showToast('Event archived successfully', 'success');
+      unsavedChanges = false;
+    } catch (err: any) {
+      console.error('Error archiving event:', err);
+      error = err.message;
+      showToast(`Error archiving event: ${err.message}`, 'error');
     } finally {
       saving = false;
     }
   }
 
   function togglePublishedLocally(playerId: string) {
-    const index = playerScores.findIndex(p => p.id === playerId);
-    if (index === -1) return;
-
-    const updatedPlayer = {
-      ...playerScores[index],
-      published: !playerScores[index].published
-    };
-
-    playerScores = [
-      ...playerScores.slice(0, index),
-      updatedPlayer,
-      ...playerScores.slice(index + 1)
-    ] as PlayerScore[];
-
-    modifiedScores.set(playerId, updatedPlayer.published);
+    const newStatus = !playerScores.find(p => p.id === playerId)?.published;
+    modifiedScores.set(playerId, newStatus);
     unsavedChanges = true;
+  }
+  
+  function cancelChanges() {
+    // Reload the event to discard changes
+    loadEventAndSettings();
   }
 
   onMount(() => {
@@ -327,140 +324,101 @@
     <div class="error">{error}</div>
   {:else}
     <form on:submit|preventDefault={saveSettings} class="event-settings-form">
-      <div class="settings-grid">
-        <!-- Left Column: Event Settings -->
-        <div class="settings-column">
+      <div class="event-sections-wrapper">
+        <section class="event-section">
           <h2>Event Settings</h2>
-          
-          <div class="form-group">
-            <label for="event-name">Event Name</label>
-            <input 
-              id="event-name"
-              type="text" 
-              bind:value={settings.event_name}
-              placeholder="Enter event name"
-              class="form-control"
-            />
-          </div>
+          <label for="event-name" class="form-label">Event Title</label>
+          <input id="event-name" type="text" bind:value={settings.event_name} placeholder="Enter event name" />
 
-          <div class="form-group">
-            <label for="hole-count">Number of Holes</label>
-            <input 
+          <label for="hole-count" class="form-label" style="margin-top: var(--spacing-md);">Number of Holes</label>
+          <div style="display: flex; align-items: center; gap: var(--spacing-lg);">
+            <input
               id="hole-count"
-              type="number" 
-              min="1" 
-              max="18" 
+              class="number-box"
+              type="number"
+              min="1"
               bind:value={settings.hole_count}
-              class="form-control"
+              on:input={() => { settings.hole_count = Math.max(1, +settings.hole_count); unsavedChanges = true; }}
+              style="width: 60px; text-align: center;"
             />
-          </div>
-
-          <div class="form-group checkbox-group">
-            <label class="checkbox-label">
-              <input 
-                type="checkbox" 
-                bind:checked={settings.show_hole_in_ones}
-                class="form-checkbox"
-              />
-              <span>Show Holes-in-One</span>
-            </label>
-          </div>
-
-          <div class="form-group">
-            <label for="accent-color">Accent Color</label>
-            <div class="color-picker">
-              <input 
-                id="accent-color"
-                type="color" 
-                bind:value={settings.accent_color}
-                class="form-color"
-              />
-              <span class="color-value">{settings.accent_color}</span>
+            <div style="display: flex; flex-direction: column; gap: var(--spacing-sm);">
+              <button type="button" class="number-btn" on:click={() => { settings.hole_count = +settings.hole_count + 1; unsavedChanges = true; }} aria-label="Increase holes"><Plus size={28} /></button>
+              <button type="button" class="number-btn" on:click={() => { if (+settings.hole_count > 1) { settings.hole_count = +settings.hole_count - 1; unsavedChanges = true; } }} aria-label="Decrease holes" disabled={+settings.hole_count <= 1}><Minus size={28} /></button>
             </div>
           </div>
 
-          <div class="form-group">
-            <h3>Advertisement Settings</h3>
-            <label class="checkbox-label">
-              <input 
-                type="checkbox" 
-                bind:checked={settings.enable_ads}
-                class="form-checkbox"
-              />
-              <span>Enable Ads</span>
-            </label>
-            
-            {#if settings.enable_ads}
-              <div class="form-group">
-                <label for="ad-text">Ad Text</label>
-                <input 
-                  id="ad-text"
-                  type="text" 
-                  bind:value={settings.ads_text}
-                  placeholder="Enter ad text"
-                  class="form-control"
-                />
-              </div>
-            {/if}
-
-            <div class="form-group">
-              <h3>Scorecard Ad</h3>
-              <div class="form-group">
-                <label for="scorecard-ad-text">Ad Text</label>
-                <input 
-                  id="scorecard-ad-text"
-                  type="text" 
-                  bind:value={settings.scorecard_ad_text}
-                  placeholder="e.g., Want Club Green mini-golf for your event?"
-                  class="form-control"
-                />
-              </div>
-              <div class="form-group">
-                <label for="scorecard-ad-url">Ad Link URL</label>
-                <input 
-                  id="scorecard-ad-url"
-                  type="url" 
-                  bind:value={settings.scorecard_ad_url}
-                  placeholder="https://clubgreen.au"
-                  class="form-control"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div class="form-actions">
+          <label class="form-label" style="margin-top: var(--spacing-md);">Accent Colour</label>
+          <div class="color-picker">
             <button 
-              type="submit" 
-              class="btn btn-primary"
-              disabled={saving}
-            >
-              {saving ? 'Saving...' : 'Save Settings'}
-            </button>
-            
-            <label class="publish-toggle">
-              <span>Publish Event:</span>
-              <label class="switch">
-                <input 
-                  type="checkbox" 
-                  bind:checked={settings.published}
-                />
-                <span class="slider round"></span>
-              </label>
-              <span class="publish-status">
-                {settings.published ? 'Published' : 'Draft'}
+              type="button" 
+              class="color-swatch" 
+              style="background: {settings.accent_color};"
+              on:click={() => document.getElementById('color-input')?.click()}
+              aria-label="Pick a color"
+              title="Click to choose a color"
+            ></button>
+            <input 
+              id="color-input"
+              type="color" 
+              bind:value={settings.accent_color}
+              on:input={() => {
+                unsavedChanges = true;
+                // Update the hex display
+                const hexDisplay = document.querySelector('.hex-display');
+                if (hexDisplay) hexDisplay.textContent = settings.accent_color.toUpperCase();
+              }}
+              style="position: absolute; opacity: 0; width: 1px; height: 1px;"
+              aria-hidden="true"
+            />
+            <div class="hex-input">
+              <span class="hex-prefix">#</span>
+              <input 
+                type="text" 
+                class="hex-value" 
+                value={settings.accent_color.startsWith('#') ? settings.accent_color.slice(1).toUpperCase() : settings.accent_color.toUpperCase()}
+                on:input={(e) => {
+                  const value = e.target.value.toUpperCase().replace(/[^0-9A-F]/g, '');
+                  if (value.length <= 6) {
+                    settings.accent_color = '#' + value;
+                    unsavedChanges = true;
+                  }
+                }}
+                on:blur={() => {
+                  // Ensure we always have a valid color
+                  if (settings.accent_color === '#') {
+                    settings.accent_color = '#000000';
+                  }
+                }}
+                maxlength="6"
+                aria-label="Hex color code"
+                placeholder="RRGGBB"
+              />
+              <span class="hex-display" on:click={() => {
+                const input = document.querySelector('.hex-value');
+                if (input) input.focus();
+              }}>
+                {settings.accent_color.startsWith('#') ? settings.accent_color.slice(1).toUpperCase() : settings.accent_color.toUpperCase()}
               </span>
-            </label>
-          </div>
-        </div>
-
-        <!-- Right Column: Player Management -->
-        <div class="settings-column">
-          <h2>Player Management</h2>
-          
-          {#if playerScores.length === 0}
-            <div class="empty-state">
-              <p>No players found for this event.</p>
             </div>
+          </div>
+
+          <h3 style="margin-top: var(--spacing-lg);">Advertisement Settings</h3>
+          <label for="scorecard-ad-text" class="form-label">Ad Text</label>
+          <input id="scorecard-ad-text" type="text" bind:value={settings.scorecard_ad_text} placeholder="e.g., Want Club Green mini-golf for your event?" />
+          <label for="scorecard-ad-url" class="form-label">Ad Link URL</label>
+          <input id="scorecard-ad-url" type="url" bind:value={settings.scorecard_ad_url} placeholder="https://clubgreen.au" />
+
+          <div class="form-actions" style="margin-top: var(--spacing-md); display: flex; gap: var(--spacing-md);">
+            <button type="submit" class="btn btn-primary" disabled={saving}>{saving ? 'Saving...' : 'Save Settings'}</button>
+            <button type="button" class="btn btn-secondary" on:click={cancelChanges} disabled={!unsavedChanges}>Cancel</button>
+            <button type="button" class="btn btn-danger" on:click={archiveEvent} disabled={saving || settings.archived}>{settings.archived ? 'Archived' : 'Archive Event'}</button>
+          </div>
+        </section>
+        <div class="event-divider"></div>
+        <section class="event-section">
+          <h2>Player Management</h2>
+          {#if playerScores.length === 0}
+            <div class="empty-state"><p>No players found for this event.</p></div>
           {:else}
             <div class="player-table-container">
               <table class="player-table">
@@ -480,11 +438,7 @@
                       <td>{player.holeInOnes || 0}</td>
                       <td>
                         <label class="switch">
-                          <input 
-                            type="checkbox"
-                            checked={player.published}
-                            on:change={() => togglePublishedLocally(player.id)}
-                          />
+                          <input type="checkbox" checked={player.published} on:change={() => togglePublishedLocally(player.id)} />
                           <span class="slider round"></span>
                         </label>
                       </td>
@@ -494,7 +448,7 @@
               </table>
             </div>
           {/if}
-        </div>
+        </section>
       </div>
     </form>
   {/if}

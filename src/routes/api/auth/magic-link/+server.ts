@@ -4,36 +4,31 @@ import type { RequestHandler } from './$types';
 
 // Create a Supabase client on the server side
 const createSupabaseServer = () => {
-  // Access environment variables using SvelteKit's env module
-  // We need to dynamically import these since they're only available at runtime
-  let supabaseUrl = '';
-  let supabaseAnonKey = '';
-  
-  try {
-    // Try to access the environment variables from various places
-    supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL || 
-                 import.meta.env.VITE_SUPABASE_URL || 
-                 process.env.PUBLIC_SUPABASE_URL || 
-                 '';
-                 
-    supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || 
-                     import.meta.env.VITE_SUPABASE_ANON_KEY || 
-                     process.env.PUBLIC_SUPABASE_ANON_KEY || 
+  // In SvelteKit, environment variables are available in import.meta.env
+  // The Vite config makes sure these are properly exposed
+  const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL || 
+                     import.meta.env.VITE_SUPABASE_URL || 
                      '';
-  } catch (e) {
-    console.error('Server: Error accessing environment variables:', e);
-  }
-  
+                     
+  const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || 
+                       import.meta.env.VITE_SUPABASE_ANON_KEY || 
+                       '';
+
   console.log('Server: Supabase URL available:', !!supabaseUrl);
   console.log('Server: Supabase Anon Key available:', !!supabaseAnonKey);
-  console.log('Server: Environment variable sources checked:', 
-    'import.meta.env.PUBLIC_*, import.meta.env.VITE_*, process.env.PUBLIC_*');
   
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error('Server: Missing Supabase environment variables');
+    console.error('Server: Make sure your .env file is properly set up with PUBLIC_SUPABASE_URL and PUBLIC_SUPABASE_ANON_KEY');
   }
   
-  return createClient(supabaseUrl, supabaseAnonKey);
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: false,
+      detectSessionInUrl: false
+    }
+  });
 };
 
 export const POST: RequestHandler = async ({ request, url }) => {
