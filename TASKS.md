@@ -53,6 +53,74 @@
   - [ ] Adjust layout for different screen sizes
   - [ ] Ensure touch targets are appropriately sized
 
+## 💰 4. Stripe Billing Integration
+
+### Database Updates
+- [x] Add `subscriptions` table:
+  - `id` (UUID, primary key)
+  - `organization_id` (UUID, foreign key to organizations)
+  - `stripe_customer_id` (text)
+  - `stripe_subscription_id` (text, nullable)
+  - `status` (text: 'trialing' | 'active' | 'past_due' | 'canceled' | 'unpaid')
+  - `current_period_end` (timestamp with time zone)
+  - `trial_ends_at` (timestamp with time zone)
+  - `created_at` (timestamp with time zone)
+  - `updated_at` (timestamp with time zone)
+
+- [x] Add `payment_up_to_date` (boolean) to `organizations` table
+- [x] Create RLS policies for subscription data
+
+### Stripe Setup
+- [ ] Create Stripe account and get API keys
+- [ ] Set up Stripe webhook endpoint
+- [ ] Create subscription plans in Stripe dashboard
+- [ ] Add Stripe.js and Stripe Node.js client
+
+### UI Components
+- [ ] Create `/pricing` page with plan options
+- [ ] Create subscription management component in organization settings
+- [ ] Add payment method form
+- [ ] Implement trial banner/notification
+- [ ] Add payment success/failure pages
+
+### Backend Implementation
+- [ ] Create Stripe webhook handler for:
+  - `customer.subscription.created`
+  - `customer.subscription.updated`
+  - `customer.subscription.deleted`
+  - `invoice.payment_succeeded`
+  - `invoice.payment_failed`
+
+- [ ] Implement subscription service with methods for:
+  - Creating a customer
+  - Starting a trial
+  - Creating a subscription
+  - Updating payment method
+  - Canceling subscription
+  - Handling webhook events
+
+### Trial Flow
+- [ ] Set `payment_up_to_date = true` for new organizations
+- [ ] Set `trial_ends_at` to now + 10 days for new organizations
+- [ ] Show trial status and expiration in UI
+- [ ] Send trial expiration reminders (3 days, 1 day before)
+
+### Access Control
+- [ ] Add middleware to check subscription status on protected routes
+- [ ] Restrict access to scorecard/leaderboard based on `payment_up_to_date`
+- [ ] Show upgrade prompts for expired trials/accounts
+
+### Testing
+- [ ] Test subscription flow with test cards
+- [ ] Test trial expiration
+- [ ] Test failed payment handling
+- [ ] Test webhook delivery
+
+### Documentation
+- [ ] Add billing section to README
+- [ ] Document environment variables
+- [ ] Add Stripe webhook setup instructions
+
 ## 📋 Backlog
 
 ### 🎯 Scorecard Improvements

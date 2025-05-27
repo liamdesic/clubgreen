@@ -14,6 +14,7 @@
   let organization = {
     id: '',
     name: 'Organization',
+    slug: '',
     settings: {
       logo_url: '',
       accent_color: '#00c853',
@@ -22,6 +23,9 @@
       billing_email: ''
     }
   };
+  
+  // Track if slug has been manually edited
+  let isSlugManuallyEdited = false;
 
   // File upload states
   let logoUrl = '';
@@ -98,8 +102,30 @@
     try {
       saving = true;
       
+      // Validate slug format
+      const slugRegex = /^[a-z0-9-]+$/;
+      if (!slugRegex.test(organization.slug)) {
+        showToast('Slug can only contain lowercase letters, numbers, and hyphens', 'error');
+        return;
+      }
+      
+      // Check if slug is already taken
+      const { data: existingOrg } = await supabase
+        .from('organizations')
+        .select('id')
+        .eq('slug', organization.slug)
+        .neq('id', organization.id)
+        .single();
+        
+      if (existingOrg) {
+        showToast('This URL is already taken. Please choose a different one.', 'error');
+        return;
+      }
+      
       // Prepare the update data
       const updateData = {
+        name: organization.name,
+        slug: organization.slug,
         settings_json: {
           ...organization.settings,
           logo_url: logoUrl || organization.settings.logo_url,
@@ -156,6 +182,47 @@
   {:else}
     <div class="settings-form">
       <h1>Organization Settings</h1>
+      
+      <!-- Organization Info Section -->
+      <div class="settings-section">
+        <h2>Organization Information</h2>
+        
+        <div class="form-group">
+          <label for="org-name">Organization Name</label>
+          <input
+            type="text"
+            id="org-name"
+            bind:value={organization.name}
+            placeholder="Enter organization name"
+            on:input={() => {
+              // Auto-generate slug if it hasn't been manually edited
+              if (!isSlugManuallyEdited) {
+                organization.slug = organization.name
+                  .toLowerCase()
+                  .replace(/[^\w\s-]/g, '') // Remove special chars
+                  .replace(/\s+/g, '-')     // Replace spaces with -
+                  .replace(/-+/g, '-')      // Replace multiple - with single -
+                  .substring(0, 50);        // Limit length
+              }
+            }}
+          />
+        </div>
+        
+        <div class="form-group">
+          <label for="org-slug">Organization URL</label>
+          <div class="input-with-prefix">
+            <span class="prefix">clubgreen.app/</span>
+            <input
+              type="text"
+              id="org-slug"
+              bind:value={organization.slug}
+              placeholder="your-org"
+              on:input={() => isSlugManuallyEdited = true}
+            />
+          </div>
+          <small class="hint">Used in your organization's URL. Only letters, numbers, and hyphens are allowed.</small>
+        </div>
+      </div>
       
       <!-- Branding Section -->
       <div class="settings-section">
@@ -258,6 +325,40 @@
 </div>
 
 <style>
+  .input-with-prefix {
+    display: flex;
+    align-items: center;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  
+  .input-with-prefix .prefix {
+    padding: 0.5rem 0.75rem;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 0.9em;
+    border-right: 1px solid #e2e8f0;
+    white-space: nowrap;
+  }
+  
+  .input-with-prefix input {
+    flex: 1;
+    border: none;
+    padding: 0.5rem 0.75rem;
+    font-size: 1em;
+    outline: none;
+    min-width: 0; /* Allow input to shrink below content size */
+  }
+  
+  .hint {
+    display: block;
+    margin-top: 0.25rem;
+    color: #64748b;
+    font-size: 0.85em;
+  }
+  
   :global(body) {
     background: var(--light-gradient);
     min-height: 100vh;
