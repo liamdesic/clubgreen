@@ -1,5 +1,77 @@
 # 🏌️ Mini-Golf Leaderboard - Project Tasks
 
+## 🔐 Supabase Auth Implementation
+**Goal:** Switch to Supabase's default auth flow and add email/password authentication
+
+### ✅ Prerequisites
+- [ ] Set up Supabase Auth settings in the dashboard
+  - [ ] Increase refresh token expiration to at least 90 days (or as long as users should stay logged in)
+  - [ ] Set the password reset redirect URL to point to `/reset-password` page
+
+### ✅ 1. Update Supabase Client - COMPLETED
+**File:** `src/lib/supabaseClient.ts`
+- [x] Remove `CustomStorage` class implementation
+- [x] Update Supabase client initialization to use default session handling
+- [x] Remove all manual cookie management code
+- [x] Remove any direct token handling logic
+
+### 📝 2. Update Login Page
+**File:** `src/routes/login/+page.svelte`
+- [ ] Add email/password login form
+- [ ] Add email/password signup form
+- [ ] Implement form validation
+- [ ] Add loading states and error handling
+- [ ] Add "Forgot password?" functionality
+- [ ] Style forms to match existing design system
+
+### 🔑 3. Implement Auth Methods
+- [ ] Email/Password Sign Up
+  - [ ] Add form submission handler
+  - [ ] Call `supabase.auth.signUp({ email, password })`
+  - [ ] Handle success/error states
+  - [ ] Block sign up if an account already exists for this org/email
+  - [ ] Show friendly error message if signup is blocked
+  - [ ] Add email confirmation flow
+
+- [ ] Email/Password Login
+  - [ ] Add form submission handler
+  - [ ] Call `supabase.auth.signInWithPassword({ email, password })`
+  - [ ] Handle success/error states
+  - [ ] Redirect to dashboard on success
+
+- [ ] Password Reset
+  - [ ] Add "Forgot password?" link
+  - [ ] Implement password reset request
+  - [ ] Create password reset page at `/reset-password`
+  - [ ] Handle password update flow
+  - [ ] Ensure Supabase dashboard has the correct reset password redirect URL set
+
+### 🔒 4. Single Account per Org
+- [ ] Add organization check during signup
+- [ ] Prevent multiple accounts for same organization
+- [ ] Add appropriate error messages
+
+### 🔍 5. Add Auth Status Logging
+- [ ] Add console logging of auth status on every page
+  - [ ] Log when user is authenticated and display their email
+  - [ ] Log when user is not authenticated
+  - [ ] Include timestamp in logs for debugging
+  - [ ] Add this to the root layout or a shared component
+
+### 🧪 6. Testing
+- [ ] Test signup flow
+- [ ] Test login flow
+- [ ] Test password reset flow
+- [ ] Test session persistence
+- [ ] Test multiple browser sessions
+- [ ] Test error scenarios
+
+### 🧹 6. Cleanup
+- [ ] Remove unused authentication code
+- [ ] Remove custom cookie handling
+- [ ] Update documentation
+- [ ] Verify all auth-related functionality works
+
 ## ✅ Completed
 - [x] QR code generation (client-side, dynamic URLs)
 - [x] Scorecard pulls dynamic event + score data via slug
@@ -71,39 +143,78 @@
 - [x] Create RLS policies for subscription data
 
 ### Stripe Setup
-- [ ] Create Stripe account and get API keys
-- [ ] Set up Stripe webhook endpoint
-- [ ] Create subscription plans in Stripe dashboard
-- [ ] Add Stripe.js and Stripe Node.js client
+- [x] Create Stripe account and get API keys
+- [x] Set up Stripe webhook endpoint
+- [x] Create product and price in Stripe dashboard:
+  - Name: "ldrboard Standard"
+  - Price: $20 AUD/month
+  - No trial period (handled in code)
+- [x] Add Stripe.js and Stripe Node.js client
 
 ### UI Components
-- [ ] Create `/pricing` page with plan options
-- [ ] Create subscription management component in organization settings
-- [ ] Add payment method form
-- [ ] Implement trial banner/notification
-- [ ] Add payment success/failure pages
+- [x] Create `/subscribe` page with:
+  - [x] Free trial option (no credit card)
+    - [x] Connect to `/api/start-trial` endpoint
+    - [x] Add loading states and error handling
+  - [x] Subscribe now option (with credit card)
+    - [x] Connect to `/api/create-checkout` endpoint
+    - [x] Add loading states and error handling
+  - [x] Test mode support
+- [ ] Create subscription management component in dashboard
+- [ ] Add payment method collection flow (pre-trial end)
+- [ ] Implement trial status banner with countdown
+- [ ] Add payment success/failure handling
 
 ### Backend Implementation
-- [ ] Create Stripe webhook handler for:
-  - `customer.subscription.created`
-  - `customer.subscription.updated`
-  - `customer.subscription.deleted`
-  - `invoice.payment_succeeded`
-  - `invoice.payment_failed`
+- [x] Create API endpoints:
+  - [x] `POST /api/start-trial` - Starts no-credit-card trial
+  - [x] `POST /api/create-checkout` - Creates paid subscription
+  - [x] `GET /api/billing-portal` - Manages billing
+  - [x] `POST /api/webhook` - Handles Stripe events
 
-- [ ] Implement subscription service with methods for:
-  - Creating a customer
-  - Starting a trial
-  - Creating a subscription
-  - Updating payment method
-  - Canceling subscription
-  - Handling webhook events
+- [x] Implement webhook handlers for:
+  - [x] `customer.subscription.created` - Track new subscriptions
+  - [x] `customer.subscription.updated` - Handle status changes
+  - [x] `customer.subscription.deleted` - Clean up canceled subs
+  - [x] `invoice.payment_succeeded` - Update payment status
+  - [x] `invoice.payment_failed` - Handle payment issues
+  - [x] `customer.subscription.trial_will_end` - Send reminder (3 days before)
 
-### Trial Flow
-- [ ] Set `payment_up_to_date = true` for new organizations
-- [ ] Set `trial_ends_at` to now + 10 days for new organizations
-- [ ] Show trial status and expiration in UI
-- [ ] Send trial expiration reminders (3 days, 1 day before)
+### No-Credit-Card Trial Flow
+- [ ] **Trial Start**:
+  - Create Stripe customer without payment method
+  - Create subscription with `trial_period_days: 14`
+  - Set `status: 'trialing'` in database
+  - Set `trial_ends_at` to now + 14 days
+  - Send welcome email with trial details
+
+- [ ] **During Trial**:
+  - Show trial status in dashboard
+  - Display days remaining
+  - Add "Add Payment Method" button
+  - Send reminders at 7, 3, and 1 day(s) before end
+
+- [ ] **Before Trial End**:
+  - Require payment method to continue
+  - Show warning banner in dashboard
+  - Send email reminders
+
+- [ ] **After Trial**:
+  - If payment method added: Convert to paid
+  - If no payment method: Set status to 'canceled'
+  - Send appropriate notifications
+
+### Paid Subscription Flow
+- [ ] **Subscribe Now**:
+  - Collect payment method during checkout
+  - Create subscription with `trial_period_days: 0`
+  - Set status to 'active' immediately
+  - Grant full access
+
+- [ ] **Subscription Management**:
+  - Allow plan changes
+  - Handle payment method updates
+  - Enable cancellation (with grace period)
 
 ### Access Control
 - [ ] Add middleware to check subscription status on protected routes

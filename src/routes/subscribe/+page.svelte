@@ -1,24 +1,52 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { loadStripe } from '@stripe/stripe-js';
+  import { loadStripe, type Stripe } from '@stripe/stripe-js';
   import { browser } from '$app/environment';
-  import '../../../lib/styles/subscribe.css';
+  import '$lib/styles/base.css';
+  import '$lib/styles/theme.css';
+  import '$lib/styles/subscribe.css';
   
-  let stripePromise;
-  let testMode = true; // Enable test mode by default
+  let stripePromise: Promise<Stripe | null>;
+  let testMode = false; // Disable test mode by default
   let testEmail = 'test@example.com';
   let isLoading = false;
   let error = '';
   
-  onMount(() => {
+  onMount(async () => {
     if (browser) {
-      // Load Stripe with your publishable key
-      stripePromise = loadStripe(import.meta.env.PUBLIC_STRIPE_PUBLISHABLE_KEY);
-      
-      // Check for test mode in URL
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.has('testMode')) {
+      try {
+        // Get the publishable key from environment
+        const publishableKey = import.meta.env.PUBLIC_STRIPE_PUBLISHABLE_KEY;
+        
+        console.log('Stripe publishable key:', 
+          publishableKey ? `${publishableKey.substring(0, 8)}...` : 'Not found');
+        
+        if (!publishableKey) {
+          throw new Error('Missing Stripe publishable key');
+        }
+        
+        if (!publishableKey.startsWith('pk_')) {
+          throw new Error('Invalid Stripe publishable key format');
+        }
+        
+        // Load Stripe with your publishable key
+        stripePromise = loadStripe(publishableKey);
+        
+        console.log('Stripe.js loaded successfully');
+        
+        // Enable test mode only if explicitly set in URL
+        const urlParams = new URLSearchParams(window.location.search);
         testMode = urlParams.get('testMode') === 'true';
+        
+        // If in test mode, update URL to show test mode is active
+        if (testMode && !window.location.search.includes('testMode=true')) {
+          const newUrl = new URL(window.location.href);
+          newUrl.searchParams.set('testMode', 'true');
+          window.history.replaceState({}, '', newUrl);
+        }
+      } catch (err) {
+        console.error('Failed to initialize Stripe:', err);
+        error = 'Failed to initialize payment system. Please try again later.';
       }
     }
   });
@@ -26,65 +54,140 @@
   async function handleSubscribe() {
     if (testMode) {
       isLoading = true;
+      error = '';
       console.log('Test subscription with email:', testEmail);
-      // Simulate API call
+      // Simulate API call with a slight delay for better UX
       await new Promise(resolve => setTimeout(resolve, 1000));
       window.location.href = '/dashboard?testMode=true&subscribed=true';
       return;
     }
 
     try {
+      console.log('Starting subscription process...');
       isLoading = true;
-      const stripe = await stripePromise;
-      const response = await fetch('/api/create-checkout-session', {
+      error = '';
+      
+      if (!stripePromise) {
+        const errorMsg = 'Failed to load Stripe';
+        console.error(errorMsg);
+        throw new Error(errorMsg);
+      }
+      
+      console.log('Sending request to create-checkout endpoint...');
+      // Call our create-checkout endpoint
+      const response = await fetch('/api/create-checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          priceId: 'price_xxxxxxxx',
-          email: testEmail,
-          testMode
-        }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        credentials: 'include' // Ensure cookies are sent with the request
       });
       
-      const session = await response.json();
-      if (session.error) throw new Error(session.error);
+      console.log('Received response status:', response.status);
       
-      await stripe.redirectToCheckout({ sessionId: session.id });
+      let result;
+      try {
+        result = await response.json();
+        console.log('Response data:', JSON.stringify(result, null, 2));
+      } catch (parseError) {
+        console.error('Failed to parse JSON response:', parseError);
+        throw new Error('Invalid response from server');
+      }
+      
+      if (!response.ok) {
+        const errorMsg = result?.message || 
+                        result?.error?.message || 
+                        `Server returned ${response.status} status`;
+        console.error('Server error response:', errorMsg);
+        throw new Error(errorMsg);
+      }
+      
+      if (!result?.url) {
+        const errorMsg = 'No redirect URL received from server';
+        console.error(errorMsg, { result });
+        throw new Error(errorMsg);
+      }
+      
+      console.log('Redirecting to Stripe Checkout...');
+      // Redirect to Stripe Checkout
+      window.location.href = result.url;
+      
     } catch (err) {
-      console.error('Error:', err);
-      error = err.message || 'Failed to process subscription';
+      console.error('Checkout process failed:', {
+        error: err,
+        message: err.message,
+        stack: err.stack
+      });
+      
+      error = err instanceof Error 
+        ? `Failed to start checkout: ${err.message}` 
+        : 'An unexpected error occurred';
+        
+      // Show more detailed error in development
+      if (import.meta.env.DEV) {
+        error += '\n\n' + (err.stack || '');
+      }
     } finally {
       isLoading = false;
+      // Only reset loading state if there was an error
+      // (otherwise we're redirecting)
+      if (error) {
+        isLoading = false;
+      }
     }
   }
 
   async function startTrial() {
     if (testMode) {
       isLoading = true;
+      error = '';
       console.log('Starting test trial with email:', testEmail);
-      // Simulate API call
+      // Simulate API call with a slight delay for better UX
       await new Promise(resolve => setTimeout(resolve, 1000));
-      window.location.href = '/dashboard?testMode=true&trialStarted=true';
+      window.location.href = '/dashboard?testMode=true&trial_started=true';
       return;
     }
     
     try {
       isLoading = true;
-      // Your actual trial start API call would go here
+      error = '';
+      
       const response = await fetch('/api/start-trial', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: testEmail }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
       });
       
       const result = await response.json();
-      if (result.error) throw new Error(result.error);
       
-      window.location.href = '/dashboard';
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to start trial');
+      }
+      
+      // Show success state before redirect
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Redirect to dashboard with success state
+      window.location.href = '/dashboard?trial_started=true';
+      
     } catch (err) {
-      console.error('Error:', err);
-      error = err.message || 'Failed to start trial';
+      console.error('Trial start error:', err);
+      error = err instanceof Error ? 
+        `Failed to start trial: ${err.message}` : 
+        'An unexpected error occurred';
+      
+      // Auto-dismiss error after 5 seconds
+      if (error) {
+        setTimeout(() => {
+          error = '';
+        }, 5000);
+      }
     } finally {
+      // Keep loading state during redirect
+      if (!error) return;
       isLoading = false;
     }
   }
@@ -138,16 +241,23 @@
       
       <button 
         on:click={startTrial} 
+        class:loading={isLoading}
         class="plan-button secondary"
         disabled={isLoading}
+        aria-busy={isLoading}
       >
-        {#if isLoading && !testMode}
-          <span class="spinner"></span>
+        {#if isLoading}
+          <span class="spinner" aria-hidden="true"></span>
+          {#if testMode}
+            <span>Starting Test Trial...</span>
+          {:else}
+            <span>Starting Your Trial...</span>
+          {/if}
         {:else}
           Start Free Trial
-        {/if}
-        {#if testMode}
-          <span class="test-indicator">(Test Mode)</span>
+          {#if testMode}
+            <span class="test-indicator">(Test Mode)</span>
+          {/if}
         {/if}
       </button>
     </div>
@@ -168,16 +278,23 @@
       
       <button 
         on:click={handleSubscribe} 
+        class:loading={isLoading}
         class="plan-button primary"
         disabled={isLoading}
+        aria-busy={isLoading}
       >
-        {#if isLoading && !testMode}
-          <span class="spinner"></span>
+        {#if isLoading}
+          <span class="spinner" aria-hidden="true"></span>
+          {#if testMode}
+            <span>Preparing Checkout...</span>
+          {:else}
+            <span>Preparing Your Subscription...</span>
+          {/if}
         {:else}
           Subscribe Now
-        {/if}
-        {#if testMode}
-          <span class="test-indicator">(Test Mode)</span>
+          {#if testMode}
+            <span class="test-indicator">(Test Mode)</span>
+          {/if}
         {/if}
       </button>
     </div>

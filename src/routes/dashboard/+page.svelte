@@ -8,26 +8,21 @@
   import { supabase } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
   import {
-  CloudUpload,
-  Link,
-  Calendar,
-  Pencil,
-  QrCode,
-  Plus,
-  User,
-  Settings
-} from 'lucide-svelte';
+    CloudUpload, Link, Calendar, Pencil, QrCode, Plus, User, Settings
+  } from 'lucide-svelte';
 
-  // Import page data from server-side load function
-  export let data;
+  // --- DATA FROM SERVER ---
+  export let data: {
+    user: any;
+    organizations: Organization[];
+    events: Event[];
+  };
 
-
-
-  let events: Event[] = [];
-  let eventDate = '';
-  let loading = true;
+  // --- STATE ---
+  let organization: Organization | null = data.organizations?.[0] ?? null;
+  let events: Event[] = data.events ?? [];
+  let loading = false;
   let error = '';
-  let organization: Organization | null = null;
 
   let showCreateModal = false;
   let newTitle = '';
@@ -35,135 +30,82 @@
   let eventType: 'single' | 'ongoing' = 'single';
   let creating = false;
   let createError = '';
+
   let selectedEvent: Event | null = null;
   let showQrModal = false;
 
+  // --- UTILS ---
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  // --- MODALS ---
   function openQrModal(event: Event) {
     selectedEvent = event;
     showQrModal = true;
   }
-
   function closeQrModal() {
     showQrModal = false;
     selectedEvent = null;
   }
 
-  onMount(async () => {
-    showToast('🚀 Dashboard loaded', 'info');
-    loading = true;
-
-    // Use the user data from the server-side load function
-    const user = data.user;
-    console.log('User authenticated:', user.email);
-    
-    try {
-      // Get their organization
-      const { data: orgs, error: orgErr } = await supabase
-        .from('organizations')
-        .select('*')
-        .eq('owner_id', user.id)
-        .limit(1);
-
-      if (orgErr) {
-        throw new Error(orgErr.message);
-      }
-      
-      if (!orgs || orgs.length === 0) {
-        error = 'No organization found';
-        loading = false;
-        return;
-      }
-
-      organization = orgs[0];
-      console.log('Organization loaded:', organization.name);
-
-      // Get events for their org
-      const { data: eventData, error: eventErr } = await supabase
-        .from('events')
-        .select('*')
-        .eq('organization_id', organization.id)
-        .order('created_at', { ascending: false });
-
-      if (eventErr) {
-        throw new Error(eventErr.message);
-      }
-      
-      events = eventData || [];
-      console.log(`Loaded ${events.length} events`);
-    } catch (err: unknown) {
-      console.error('Error loading dashboard data:', err);
-      error = err instanceof Error ? err.message : 'Unknown error';
-    } finally {
-      loading = false;
-    }
-  });
-
+  // --- SIGN OUT ---
   async function signOut() {
-  await supabase.auth.signOut();
-  goto('/login');
-}
-
-async function createEvent() {
-  creating = true;
-  createError = '';
-
-  if (!newTitle || (eventType === 'single' && !newDate)) {
-    createError = 'Please enter a title and date (if not ongoing).';
-    creating = false;
-    return;
+    await supabase.auth.signOut();
+    goto('/login');
   }
 
-  if (!organization) {
-    createError = 'No organization found. Please refresh the page.';
-    creating = false;
-    return;
-  }
+  // --- EVENT CREATION ---
+  async function createEvent() {
+    createError = '';
+    creating = true;
 
-  const slug = newTitle
-    .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9\-]/g, '');
-
-  const event_date = eventType === 'single' ? newDate : null;
-
-  const { error: insertErr } = await supabase.from('events').insert({
-    title: newTitle,
-    slug,
-    event_date,
-    organization_id: organization.id
-  });
-
-  if (insertErr) {
-    createError = insertErr.message;
-  } else {
-    showCreateModal = false;
-    
-    // Re-fetch events to get the new event with its ID
-    const { data: refreshed } = await supabase
-      .from('events')
-      .select('*')
-      .eq('organization_id', organization.id)
-      .order('created_at', { ascending: false });
-      
-    events = refreshed;
-    
-    // Open edit panel for the newly created event and show success toast
-    if (refreshed && refreshed.length > 0) {
-      const newEvent = refreshed[0];
-      showToast(`🎉 ${newEvent.title} event created!`, 'success');
-      // Redirect to the new event's setup page
-      window.location.href = `/dashboard/${newEvent.id}/setup`;
+    if (!newTitle || (eventType === 'single' && !newDate)) {
+      createError = 'Please enter a title and date (if not ongoing).';
+      creating = false;
+      return;
     }
-    
+    if (!organization) {
+      createError = 'No organization found. Please refresh the page.';
+      creating = false;
+      return;
+    }
+
+    const slug = newTitle.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
+    const event_date = eventType === 'single' ? newDate : null;
+
+    const { data: createdEvents, error: insertErr } = await supabase
+      .from('events')
+      .insert([{ title: newTitle, slug, event_date, organization_id: organization.id }])
+      .select()
+      .order('created_at', { ascending: false });
+
+    if (insertErr) {
+      createError = insertErr.message;
+      creating = false;
+      return;
+    }
+
+    // Success
+    showCreateModal = false;
+    if (createdEvents && createdEvents.length > 0) {
+      const newEvent = createdEvents[0];
+      showToast(`🎉 ${newEvent.title} event created!`, 'success');
+      goto(`/dashboard/${newEvent.id}/setup`); // SPA navigation
+    }
+    // Reset form
     newTitle = '';
     newDate = '';
     eventType = 'single';
+    creating = false;
   }
 
-  creating = false;
-}
-
+  // --- INITIAL CLIENT-SIDE DATA FETCH (OPTIONAL) ---
+  onMount(() => {
+    showToast('🚀 Dashboard loaded', 'info');
+    // You can move org/event loading to SSR if preferred.
+  });
 </script>
+
 
 <div class="dashboard-wrapper">
   <!-- Header -->

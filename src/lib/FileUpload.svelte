@@ -3,9 +3,11 @@
   import { supabase } from '$lib/supabaseClient';
   import { CloudUpload } from 'lucide-svelte';
 
+  export let id = `file-upload-${Math.random().toString(36).substr(2, 9)}`;
   export let label = 'Upload File';
   export let folder = 'uploads'; // e.g. logos, ads, qr-codes
   export let initialUrl = ''; // Add this line to accept initial URL
+  export let ariaDescribedBy = '';
 
   const dispatch = createEventDispatcher();
 
@@ -33,13 +35,23 @@
       
       console.log('Uploading file to:', filePath);
       
-      // Ensure the bucket exists and is accessible
+      // Define the bucket name
       const bucketName = 'public-assets';
       
-      // First, try to create the bucket if it doesn't exist (requires admin privileges)
-      const { data: bucketData, error: bucketError } = await supabase.storage
-        .createBucket(bucketName, { public: true })
-        .catch(() => ({})); // Ignore error if bucket already exists
+      // First, check if the bucket exists by listing buckets
+      const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+      const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
+      
+      // Only try to create the bucket if it doesn't exist
+      if (!bucketExists) {
+        const { error: createError } = await supabase.storage
+          .createBucket(bucketName, { public: true })
+          .catch(() => ({}));
+          
+        if (createError && !createError.message.includes('already exists')) {
+          console.warn('Error creating bucket:', createError);
+        }
+      }
       
       // Upload the file to the specified folder in the bucket
       const { error: uploadError } = await supabase.storage
@@ -98,8 +110,16 @@
     <div class="upload-empty">
       <CloudUpload size="32" color="#888" />
       <p>Drag file here or</p>
-      <button type="button" class="upload-browse">Browse files</button>
-      <input type="file" class="upload-input" on:change={handleFileUpload} />
+      <label for={id} class="upload-browse">
+        {label}
+      </label>
+      <input
+        id={id}
+        type="file"
+        class="upload-input"
+        on:change={handleFileUpload}
+        aria-describedby={ariaDescribedBy}
+      />
       <small>Only .jpg, .png, .svg · Max 5MB</small>
     </div>
   {:else if status === 'uploading'}
