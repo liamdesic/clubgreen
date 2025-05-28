@@ -1,7 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { supabase } from '$lib/supabaseClient';
-  import ProgressBar from '$lib/components/ProgressBar.svelte';
   import FileUpload from '$lib/FileUpload.svelte';
   import '$lib/styles/onboarding.css';
 
@@ -91,8 +90,6 @@
   </div>
 
   <div class="onboarding-card">
-    <ProgressBar currentStep={1} totalSteps={3} />
-    
     {#if error}
       <div class="error-message">
         <div class="error-icon">
