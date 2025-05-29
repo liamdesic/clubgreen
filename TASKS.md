@@ -71,26 +71,111 @@
 - [x] Create RLS policies for subscription data
 
 ### Stripe Setup
-- [ ] Create Stripe account and get API keys
-- [ ] Set up Stripe webhook endpoint
-- [ ] Create subscription plans in Stripe dashboard
-- [ ] Add Stripe.js and Stripe Node.js client
+- [x] Create Stripe account and get API keys
+- [x] Set up Stripe webhook endpoint
+- [x] Create subscription plan in Stripe dashboard with 14-day trial
+- [x] Add Stripe.js and Stripe Node.js client
+- [x] Implement server-side webhook handler
+- [x] Create checkout session endpoint with trial support
+
+### Testing Stripe Integration
+
+#### 1. Local Testing Setup
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+#### 2. Test Subscription Flow
+1. **Test Mode**:
+   - Visit `/pricing`
+   - Click "Start Free Trial" or "Upgrade Now"
+   - The flow will use Stripe's test mode automatically
+
+2. **Test Cards**:
+   - Success: 4242 4242 4242 4242
+   - Authentication Required: 4000 0025 0000 3155
+   - Decline: 4000 0000 0000 0002
+   - Fill in other details with any valid future date and CVC
+   - Complete the checkout
+   - Verify webhook events in Stripe Dashboard
+   - Check database for subscription record
+
+3. **Webhook Testing**:
+   - Use Stripe CLI to forward webhooks:
+     ```bash
+     stripe listen --forward-to localhost:5173/api/webhooks/stripe
+     ```
+   - Test webhook events with Stripe CLI:
+     ```bash
+     stripe trigger payment_intent.succeeded
+     ```
+
+#### 3. Verify Subscription Status
+- Check `subscriptions` table for new records
+- Verify `organizations.payment_up_to_date` updates correctly
+- Test trial period behavior
+- Test payment failure scenarios
+
+### Subscription Flow Implementation
+
+#### 1. Account Creation & Authentication
+- [x] **Signup Flow**:
+  - User signs up with email
+  - Receives magic link
+  - Automatically starts 14-day trial
+  - Trial status managed by Stripe Checkout
+
+#### 2. Trial Status Management
+- [ ] **Frontend**: Trial Banner Component
+  - [ ] Create persistent banner showing trial status
+  - [ ] Display "🎉 Your 14-day free trial has begun! [Upgrade Now]" on first login
+  - [ ] Show "⏳ X days left in trial. [Upgrade Now]" on subsequent logins
+  - [ ] Banner should be visible on all authenticated routes
+
+#### 3. Upgrade Flow
+- [ ] **Frontend**: Upgrade Button
+  - [ ] Add [Upgrade Now] button to trial banner
+  - [ ] Connect to Stripe Checkout with:
+    ```typescript
+    const response = await fetch('/api/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        priceId: import.meta.env.STRIPE_PRICE_ID,
+        email: userEmail,
+        organizationId: currentOrgId
+      })
+    });
+    const { sessionId } = await response.json();
+    const stripe = await loadStripe(import.meta.env.PUBLIC_STRIPE_PUBLISHABLE_KEY);
+    await stripe.redirectToCheckout({ sessionId });
+    ```
+  - [ ] Handle successful/failed payment flows via webhooks
+
+#### 4. Webhook Handlers (Implemented)
+- [x] `customer.subscription.created`: Create subscription record
+- [x] `customer.subscription.updated`: Update trial/status in database
+- [x] `customer.subscription.deleted`: Handle subscription cancellation
+- [x] `invoice.payment_succeeded`: Update payment status
+- [x] `invoice.payment_failed`: Handle payment failures
+  - [ ] `invoice.payment_failed`: Notify user and update status
+
+#### 6. Post-Trial Experience
+- [ ] **Frontend**: Post-Trial UI
+  - [ ] Show upgrade prompt if trial expires without subscription
+  - [ ] Restrict access to premium features if needed
+  - [ ] Display current subscription status in user settings
 
 ### UI Components
-- [ ] Create `/pricing` page with plan options
+- [ ] Create simple `/pricing` page with plan options (optional, can link directly to Stripe Checkout)
 - [ ] Create subscription management component in organization settings
-- [ ] Add payment method form
-- [ ] Implement trial banner/notification
-- [ ] Add payment success/failure pages
+- [ ] Handle Stripe Checkout redirects for success/failure
 
 ### Backend Implementation
-- [ ] Create Stripe webhook handler for:
-  - `customer.subscription.created`
-  - `customer.subscription.updated`
-  - `customer.subscription.deleted`
-  - `invoice.payment_succeeded`
-  - `invoice.payment_failed`
-
 - [ ] Implement subscription service with methods for:
   - Creating a customer
   - Starting a trial
@@ -98,6 +183,8 @@
   - Updating payment method
   - Canceling subscription
   - Handling webhook events
+  - Checking trial status
+  - Calculating days remaining in trial
 
 ### Trial Flow
 - [ ] Set `payment_up_to_date = true` for new organizations
@@ -105,10 +192,39 @@
 - [ ] Show trial status and expiration in UI
 - [ ] Send trial expiration reminders (3 days, 1 day before)
 
-### Access Control
-- [ ] Add middleware to check subscription status on protected routes
-- [ ] Restrict access to scorecard/leaderboard based on `payment_up_to_date`
-- [ ] Show upgrade prompts for expired trials/accounts
+### Access Control & Edge Cases
+- [ ] **Authentication States**:
+  - [ ] Handle unauthenticated users trying to access paid features
+  - [ ] Handle users with expired sessions
+  - [ ] Handle multiple tabs with different auth states
+
+- [ ] **Subscription States**:
+  - [ ] Handle trial expiration
+  - [ ] Handle payment failures after trial
+  - [ ] Handle canceled subscriptions
+  - [ ] Handle past due subscriptions
+  - [ ] Handle users who cancel and resubscribe
+  - [ ] Handle users who upgrade/downgrade plans
+
+- [ ] **Payment Flow**:
+  - [ ] Handle Stripe Checkout session expiration
+  - [ ] Handle abandoned checkouts
+  - [ ] Handle failed payments
+  - [ ] Handle chargebacks
+  - [ ] Handle refunds
+
+- [ ] **Technical Edge Cases**:
+  - [ ] Handle webhook delivery failures
+  - [ ] Handle race conditions in subscription updates
+  - [ ] Handle network failures during critical operations
+  - [ ] Handle duplicate webhook events
+
+- [ ] **User Experience**:
+  - [ ] Show loading states during async operations
+  - [ ] Provide clear error messages
+  - [ ] Allow users to retry failed operations
+  - [ ] Show subscription status clearly in UI
+  - [ ] Send email notifications for important subscription events
 
 ### Testing
 - [ ] Test subscription flow with test cards
