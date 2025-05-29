@@ -1,80 +1,61 @@
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
-import { createClient } from '@supabase/supabase-js';
+import { createServerClient } from '$lib/supabase/server';
 
-// Create a Supabase client on the server side
-const createSupabaseServer = () => {
-  // Try to access the environment variables from various places
-  let supabaseUrl = '';
-  let supabaseAnonKey = '';
-  
-  try {
-    supabaseUrl = process.env.PUBLIC_SUPABASE_URL || 
-                 import.meta.env.PUBLIC_SUPABASE_URL || 
-                 import.meta.env.VITE_SUPABASE_URL || 
-                 '';
-                 
-    supabaseAnonKey = process.env.PUBLIC_SUPABASE_ANON_KEY || 
-                     import.meta.env.PUBLIC_SUPABASE_ANON_KEY || 
-                     import.meta.env.VITE_SUPABASE_ANON_KEY || 
-                     '';
-  } catch (e) {
-    console.error('Server: Error accessing environment variables:', e);
+export const load: PageServerLoad = async ({ url, cookies }) => {
+  const supabase = createServerClient(cookies);
+  const { data: { session } } = await supabase.auth.getSession();
+
+  // 1. Check if logged in
+  if (!session) {
+    const redirectTo =
+      url.pathname === '/dashboard' ? '' : `?redirectTo=${encodeURIComponent(url.pathname)}`;
+    throw redirect(303, `/login${redirectTo}`);
   }
-  
-  console.log('Server: Supabase URL available for auth check:', !!supabaseUrl);
-  
-  return createClient(supabaseUrl, supabaseAnonKey);
-};
 
-export const load: PageServerLoad = async ({ locals, url, cookies, request }) => {
-  console.log('Server: Checking dashboard authentication');
-  
-  // Check for auth cookies
-  const accessToken = cookies.get('sb-access-token') || '';
-  const refreshToken = cookies.get('sb-refresh-token') || '';
-  
-  console.log('Server: Auth cookies present:', {
-    accessTokenExists: !!accessToken,
-    refreshTokenExists: !!refreshToken
-  });
-  
-  // Initialize Supabase on the server
-  const supabase = createSupabaseServer();
-  
-  // If we have tokens in cookies, try to set the session
-  if (accessToken && refreshToken) {
-    try {
-      // Set the session using the tokens from cookies
-      const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken
-      });
-      
-      if (sessionData?.session) {
-        console.log('Server: Successfully set session from cookies');
-        return {
-          user: sessionData.session.user
-        };
-      }
-    } catch (e) {
-      console.error('Server: Error setting session from cookies:', e);
+  // 2. Get user's organizations
+  const { data: organizations, error: orgError } = await supabase
+    .from('organizations')
+    .select('*')
+    .eq('owner_id', session.user.id);
+
+  // 3. If error fetching orgs, log error and return empty arrays
+  if (orgError) {
+    console.error('Error fetching organizations:', orgError);
+    return {
+      organizations: [],
+      user: session.user,
+      events: []
+    };
+  }
+
+  // 4. Redirect to onboarding if user has NO organization
+  if (!organizations || organizations.length === 0) {
+    throw redirect(303, '/onboarding');
+  }
+
+  // 5. Get events for the first organization
+  let events: any[] = [];
+  const orgId = organizations[0]?.id;
+
+  if (orgId) {
+    const { data: orgEvents, error: eventsError } = await supabase
+      .from('events')
+      .select('*')
+      .eq('organization_id', orgId)
+      .order('event_date', { ascending: false });
+
+    if (!eventsError) {
+      events = orgEvents || [];
+    } else {
+      console.error('Error fetching events:', eventsError);
     }
   }
-  
-  // Fallback to standard getSession
-  const { data, error } = await supabase.auth.getSession();
-  
-  console.log('Server: Auth check result:', data?.session ? 'Authenticated' : 'Not authenticated');
-  
-  if (error || !data.session) {
-    console.log('Server: Redirecting to login due to no session');
-    // Redirect to login page if not authenticated
-    throw redirect(303, `/login?redirectTo=${url.pathname}`);
-  }
-  
-  // User is authenticated, continue to the page
+
+  // 6. Return all data
   return {
-    user: data.session.user
+    organizations,
+    user: session.user,
+    events
   };
 };
