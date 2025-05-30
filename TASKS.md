@@ -1,5 +1,32 @@
 # 🏌️ Mini-Golf Leaderboard - Project Tasks
 
+## 🔍 Environment Variable Consistency Check
+
+### Search Patterns to Verify
+- [ ] Search for `process.env` - Should not be used in SvelteKit
+- [ ] Search for `import.meta.env` - Only for build-time public variables
+- [ ] Search for `$env/static/private` - For private build-time variables
+- [ ] Search for `$env/static/public` - For public build-time variables
+- [ ] Search for `$env/dynamic/private` - For private runtime variables
+- [ ] Search for `$env/dynamic/public` - For public runtime variables
+- [ ] Search for `VITE_` prefix - Should be migrated to `PUBLIC_`
+- [ ] Search for direct `env.` usage - Should reference the correct env import
+
+### Files to Check
+- [ ] `src/routes/api/webhooks/stripe/+server.ts` - Fixed env reference
+- [ ] `src/lib/server/stripe/client.ts` - Uses dynamic private env
+- [ ] `src/hooks.server.ts` - Uses static public env
+- [ ] `src/lib/supabase/server.ts` - Uses import.meta.env
+- [ ] `src/lib/supabaseClient.ts` - Uses import.meta.env
+- [ ] `vite.config.ts` - Handles env variable exposure
+
+### Verification Steps
+1. [ ] Ensure all private variables use `$env/static/private` or `$env/dynamic/private`
+2. [ ] Ensure all public variables use `$env/static/public` or `$env/dynamic/public`
+3. [ ] Verify no direct `process.env` usage remains
+4. [ ] Check for any remaining `VITE_` prefixes that should be `PUBLIC_`
+5. [ ] Test all environment-dependent features after changes
+
 ## 🔄 Environment Variable Standardization
 - [ ] **Codebase Audit**
   - [ ] Search for all instances of `VITE_` in the codebase

@@ -33,10 +33,11 @@ export async function POST({ request }) {
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(payload, signature, env.STRIPE_WEBHOOK_SECRET);
-  } catch (err) {
+    event = stripe.webhooks.constructEvent(payload, signature, privateEnv.STRIPE_WEBHOOK_SECRET);
+  } catch (err: unknown) {
     console.error('Webhook signature verification failed:', err);
-    throw error(400, `Webhook Error: ${err.message}`);
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+    throw error(400, `Webhook Error: ${errorMessage}`);
   }
 
   console.log(`Processing webhook event: ${event.type}`);
@@ -200,11 +201,12 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
   }
 
   // Update subscription status to past_due
-  if (invoice.subscription) {
-    const subscription = typeof invoice.subscription === 'string'
-      ? await stripe.subscriptions.retrieve(invoice.subscription)
-      : invoice.subscription;
+  const subscriptionId = typeof invoice.subscription === 'string' 
+    ? invoice.subscription 
+    : invoice.subscription?.id;
 
+  if (subscriptionId) {
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     await handleSubscriptionChange(subscription);
   }
 
