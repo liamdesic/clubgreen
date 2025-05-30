@@ -1,10 +1,10 @@
 import { error, json } from '@sveltejs/kit';
 import Stripe from 'stripe';
-import { SECRET_STRIPE_KEY, STRIPE_WEBHOOK_SECRET } from '$env/static/private';
+import { STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET } from '$env/static/private';
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Stripe with the latest API version
-const stripe = new Stripe(SECRET_STRIPE_KEY, {
+const stripe = new Stripe(STRIPE_SECRET_KEY, {
   apiVersion: '2024-09-30.acacia'
 });
 
