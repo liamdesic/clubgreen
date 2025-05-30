@@ -77,15 +77,41 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
     ? subscription.customer 
     : subscription.customer.id;
 
-  // Update the organization with subscription details
+  if (!customerId) {
+    console.error('No customer ID found in subscription:', subscription.id);
+    return;
+  }
+
+  console.log('Processing subscription for customer ID:', customerId);
+
+  // First, try to find the organization by stripe_customer_id
   const { data: org, error: orgError } = await supabaseAdmin
     .from('organizations')
     .select('id, stripe_customer_id')
     .eq('stripe_customer_id', customerId)
-    .single();
+    .maybeSingle();
 
-  if (orgError || !org) {
-    console.error('Organization not found for customer:', customerId, orgError);
+  if (orgError) {
+    console.error('Error fetching organization:', orgError);
+    return;
+  }
+
+  if (!org) {
+    // If no org found with this customer ID, log all organizations for debugging
+    console.log('No organization found with stripe_customer_id:', customerId);
+    
+    // Get all organizations for debugging (limit to 10 to avoid too much output)
+    const { data: allOrgs, error: allOrgsError } = await supabaseAdmin
+      .from('organizations')
+      .select('id, stripe_customer_id, name')
+      .limit(10);
+    
+    if (!allOrgsError) {
+      console.log('Existing organizations in database:', allOrgs);
+    } else {
+      console.error('Error fetching organizations:', allOrgsError);
+    }
+    
     return;
   }
 
