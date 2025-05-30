@@ -218,14 +218,28 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
   if (!invoice.subscription) return;
   
-  if (invoice.billing_reason === 'subscription_create') {
-    // The subscription is created and payment was successful
-    const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+  // Get the subscription details
+  const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+  
+  // If this is the first payment (trial or otherwise), update the subscription
+  if (invoice.billing_reason === 'subscription_create' || invoice.billing_reason === 'subscription_update') {
+    // If coming from trial, end the trial immediately
+    if (subscription.status === 'trialing') {
+      // Update the subscription to end trial immediately
+      await stripe.subscriptions.update(subscription.id, {
+        trial_end: 'now',
+        proration_behavior: 'none' // Don't prorate the current period
+      });
+    }
+    
+    // Update our records with the latest subscription state
+    await handleSubscriptionChange(subscription);
+  } else if (invoice.billing_reason === 'subscription_cycle' || !invoice.billing_reason) {
+    // For recurring payments or when reason is not specified
     await handleSubscriptionChange(subscription);
   }
   
-  // Handle other payment success scenarios if needed
-  console.log(`Payment succeeded for invoice ${invoice.id}`);
+  console.log(`Payment succeeded for invoice ${invoice.id} (${invoice.billing_reason})`);
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
