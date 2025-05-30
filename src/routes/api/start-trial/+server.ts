@@ -77,13 +77,18 @@ export const POST: RequestHandler = async ({ locals }) => {
     }
 
     // Save to database
+    const trialEndsAt = new Date((subscription.trial_end || 0) * 1000).toISOString();
+    const currentPeriodEnd = new Date((subscription.current_period_end || 0) * 1000).toISOString();
+    
+    console.log('Saving subscription to database with trial_end:', trialEndsAt);
+    
     const { error: dbError } = await locals.supabase.from('subscriptions').upsert({
       organization_id: orgData.id,
       stripe_customer_id: customer.id,
       stripe_subscription_id: subscription.id,
       status: 'trialing',
-      trial_ends_at: new Date((subscription.trial_end || 0) * 1000).toISOString(),
-      current_period_end: new Date((subscription.current_period_end || 0) * 1000).toISOString(),
+      trial_ends_at: trialEndsAt,
+      current_period_end: currentPeriodEnd,
     });
 
     if (dbError) {
@@ -91,15 +96,21 @@ export const POST: RequestHandler = async ({ locals }) => {
       throw error(500, 'Failed to save subscription');
     }
 
-    // Update organization payment status
+    // Update organization with subscription and trial details
     const { error: orgUpdateError } = await locals.supabase
       .from('organizations')
       .update({ 
         payment_up_to_date: true,
         stripe_customer_id: customer.id,
-        stripe_subscription_id: subscription.id
+        stripe_subscription_id: subscription.id,
+        trial_ends_at: trialEndsAt,
+        subscription_status: 'trialing',
+        current_period_end: currentPeriodEnd,
+        updated_at: new Date().toISOString()
       })
       .eq('id', orgData.id);
+      
+    console.log('Updated organization with trial information, trial ends at:', trialEndsAt);
 
     if (orgUpdateError) {
       console.error('Error updating organization:', orgUpdateError);

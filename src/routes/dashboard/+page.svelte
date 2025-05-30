@@ -35,14 +35,24 @@
   $: {
     if (data.organizations?.[0]) {
       console.log('🏢 [dashboard] Initializing organization from server data');
+      
+      // Set trial_ends_at to 14 days from now if not set
+      const trialEndsAt = data.organizations[0].trial_ends_at || 
+        new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+      
       organization = {
         id: data.organizations[0].id,
         name: data.organizations[0].name,
         slug: data.organizations[0].slug,
-        trial_ends_at: data.organizations[0].trial_ends_at,
+        trial_ends_at: trialEndsAt,
         settings_json: data.organizations[0].settings_json || {}
       };
-      console.log('✅ [dashboard] Organization initialized:', organization);
+      
+      console.log('✅ [dashboard] Organization initialized:', {
+        ...organization,
+        hasTrialEndsAt: !!organization.trial_ends_at,
+        trialEndsAtValue: organization.trial_ends_at
+      });
     } else {
       console.log('ℹ️ [dashboard] No organization data received from server');
     }
@@ -377,13 +387,14 @@
     </div>
     <img src="/logos/ldrb-logo-colourlight.svg" alt="ldrboard logo" class="dashboard-logo" />
     <div class="header-right">
-      {#if organization?.trial_ends_at}
-        <TrialStatus 
-          trialEndsAt={organization.trial_ends_at} 
-          organizationId={organization.id} 
-        />
-      {/if}
-      {#if organization}
+      <div class="header-pills">
+        {#if organization?.trial_ends_at}
+          <TrialStatus 
+            trialEndsAt={organization.trial_ends_at} 
+            organizationId={organization.id} 
+          />
+        {/if}
+        {#if organization}
         <a 
           href="/dashboard/settings"
           class="user-pill" 

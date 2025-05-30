@@ -12,6 +12,14 @@
   let isTrialActive = false;
   let loading = true;
 
+  // Debug log when props change
+  $: console.log('🔄 TrialStatus props updated:', {
+    trialEndsAt,
+    organizationId,
+    hasTrialEndsAt: !!trialEndsAt,
+    currentTime: new Date().toISOString()
+  });
+
   // Format the trial end date
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -33,22 +41,35 @@
   // Handle upgrade button click
   const handleUpgrade = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-        body: { organizationId }
+      const response = await fetch('/api/create-checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ organizationId })
       });
       
-      if (error) throw error;
-      if (data?.url) {
-        window.location.href = data.url;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create checkout session');
+      }
+      
+      const { url } = await response.json();
+      if (url) {
+        window.location.href = url;
       }
     } catch (error) {
       console.error('Error redirecting to checkout:', error);
-      showToast('Failed to load checkout page. Please try again.', 'error');
+      showToast(error.message || 'Failed to load checkout page. Please try again.', 'error');
     }
   };
 
   onMount(() => {
-    console.log('TrialStatus component mounted');
+    console.log('🎯 TrialStatus component mounted with:', {
+      trialEndsAt,
+      organizationId,
+      currentTime: new Date().toISOString()
+    });
     console.log('Trial ends at:', trialEndsAt);
     
     if (trialEndsAt) {
@@ -81,40 +102,57 @@
 {/if}
 
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+  
   .trial-status {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    background: var(--color-surface-2);
-    border: 1px solid var(--color-border);
+    gap: 6px;
+    background: rgba(249, 115, 22, 0.1); /* Semi-transparent orange */
+    border: 1px solid rgba(249, 115, 22, 0.2);
     border-radius: 20px;
-    padding: 6px 12px;
-    font-size: 14px;
-    margin-right: 12px;
-    color: var(--color-text);
+    padding: 4px 12px 4px 8px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: white; /* Darker orange for text */
+    margin-right: 8px;
+    transition: all 0.2s ease;
+    line-height: 1.2;
+  }
+  
+  .trial-status:hover {
+    background: rgba(249, 115, 22, 0.15);
+    border-color: rgba(249, 115, 22, 0.3);
   }
   
   .trial-icon {
-    color: var(--color-primary);
+    color: #ea580c; /* Orange-600 */
+    width: 14px;
+    height: 14px;
   }
   
   .trial-text {
     font-weight: 500;
+    letter-spacing: -0.01em;
   }
   
   .upgrade-button {
-    background: var(--color-primary);
+    background: #ea580c; /* Orange-600 */
     color: white;
     border: none;
-    border-radius: 16px;
+    border-radius: 12px;
     padding: 2px 10px;
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: all 0.2s ease;
+    margin-left: 2px;
+    letter-spacing: -0.01em;
   }
   
   .upgrade-button:hover {
-    background: var(--color-primary-dark);
+    background: #c2410c; /* Orange-700 */
+    transform: translateY(-1px);
   }
 </style>

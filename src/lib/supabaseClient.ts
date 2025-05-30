@@ -1,3 +1,5 @@
+// check supabase-tables.md at project root for supabase table schemas
+
 import { createBrowserClient } from '@supabase/ssr';
 import { browser } from '$app/environment';
 import type { Database } from './database.types';
