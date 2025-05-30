@@ -125,18 +125,30 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
     organization_id: org.id
   };
 
-  // Upsert subscription data
-  const { error: subError } = await supabaseAdmin
-    .from('subscriptions')
-    .upsert({
-      ...subscriptionData,
-      created_at: new Date(subscription.created * 1000).toISOString()
-    })
-    .eq('organization_id', org.id);
+  try {
+    // First, try to insert the subscription
+    const { error: insertError } = await supabaseAdmin
+      .from('subscriptions')
+      .insert({
+        ...subscriptionData,
+        created_at: new Date(subscription.created * 1000).toISOString()
+      });
 
-  if (subError) {
-    console.error('Error updating subscription:', subError);
-    throw subError;
+    // If insert fails with unique violation, try to update the existing record
+    if (insertError?.code === '23505') {
+      console.log('Subscription already exists, updating record');
+      const { error: updateError } = await supabaseAdmin
+        .from('subscriptions')
+        .update(subscriptionData)
+        .eq('stripe_customer_id', customerId);
+      
+      if (updateError) throw updateError;
+    } else if (insertError) {
+      throw insertError;
+    }
+  } catch (error) {
+    console.error('Error in subscription upsert:', error);
+    throw error;
   }
 
   // Update organization's payment status

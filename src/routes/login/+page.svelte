@@ -38,18 +38,27 @@
   // Process the authentication token if it exists in the URL hash
   // Handle auth state changes
   const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-    console.log('Auth state changed:', event);
+    console.log('🔑 [AUTH] Auth state changed:', event);
+    console.log('🔑 [AUTH] Session exists:', !!session);
     
     if (event === 'SIGNED_IN' && session?.access_token) {
+      console.log('✅ [AUTH] User signed in, verifying session...');
+      console.log('🔑 [AUTH] Access token exists:', !!session.access_token);
+      
       try {
         // Verify the session by getting the user
+        console.log('🔍 [AUTH] Verifying session with Supabase...');
         const { data: { user }, error } = await supabase.auth.getUser(session.access_token);
         
         if (error || !user) {
-          console.error('Session verification failed:', error);
+          console.error('❌ [AUTH] Session verification failed:', error);
+          console.log('🚪 [AUTH] Signing out due to verification failure...');
           await supabase.auth.signOut();
           return;
         }
+        
+        console.log('✅ [AUTH] Session verified for user:', user.email);
+        console.log('🔑 [AUTH] User ID:', user.id);
         
         console.log('User verified, redirecting to:', finalRedirectTo);
         // Ensure the session is properly set in the browser
@@ -231,23 +240,32 @@
 
   // Handle form submission (both login and signup)
   async function handleAuth() {
-    console.group('Authentication Flow');
-    console.log('Mode:', mode);
-    console.log('Email:', email);
+    console.group('🔐 [AUTH] Authentication Flow');
+    console.log('📱 Mode:', mode);
+    console.log('📧 Email:', email);
     
     // Basic validation
     if (!email) {
       error = 'Please enter your email';
-      console.error('Validation error: Email is required');
+      console.error('❌ [AUTH] Validation error: Email is required');
       console.groupEnd();
       return;
     }
 
-    if (mode === 'signup' && password !== confirmPassword) {
-      error = 'Passwords do not match';
-      console.error('Validation error: Passwords do not match');
-      console.groupEnd();
-      return;
+    if (mode === 'signup') {
+      if (password !== confirmPassword) {
+        error = 'Passwords do not match';
+        console.error('❌ [AUTH] Validation error: Passwords do not match');
+        console.groupEnd();
+        return;
+      }
+      
+      if (password.length < 6) {
+        error = 'Password must be at least 6 characters';
+        console.error('❌ [AUTH] Validation error: Password too short');
+        console.groupEnd();
+        return;
+      }
     }
     
     error = '';
@@ -257,39 +275,72 @@
       let result;
       
       if (mode === 'login') {
-        console.log('Attempting email/password login');
+        console.log('🔑 [AUTH] Attempting email/password login');
         result = await supabase.auth.signInWithPassword({
           email,
           password
         });
+        console.log('✅ [AUTH] Login attempt completed');
       } else {
-        console.log('Attempting email/password signup');
-        result = await supabase.auth.signUp({
+        console.log('👤 [SIGNUP] Starting signup process for:', email);
+        const signUpOptions = {
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/auth/callback`
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+            data: {
+              full_name: email.split('@')[0] // Add some basic user data
+            }
           }
-        });
+        };
+        console.log('📝 [SIGNUP] Signup options:', JSON.stringify({
+          ...signUpOptions,
+          password: '***' // Don't log actual password
+        }));
+        
+        result = await supabase.auth.signUp(signUpOptions);
+        console.log('✅ [SIGNUP] Signup request completed');
       }
       
-      console.log('Auth result:', result);
+      console.log('📋 [AUTH] Auth result:', {
+        user: result.data?.user ? {
+          id: result.data.user.id,
+          email: result.data.user.email,
+          email_confirmed: result.data.user.email_confirmed_at ? true : false
+        } : null,
+        session: !!result.data?.session,
+        error: result.error
+      });
       
       if (result.error) {
-        console.error('Authentication error:', result.error);
+        console.error('❌ [AUTH] Authentication error:', result.error);
         throw result.error;
       }
       
       // If signup, check if email confirmation is needed
-      if (mode === 'signup' && result.data?.user?.identities?.length === 0) {
-        console.log('User already exists, showing login option');
-        error = 'An account with this email already exists. Please log in instead.';
-        mode = 'login';
-        return;
+      if (mode === 'signup') {
+        if (result.data?.user?.identities?.length === 0) {
+          console.log('ℹ️ [SIGNUP] User already exists, showing login option');
+          error = 'An account with this email already exists. Please log in instead.';
+          mode = 'login';
+          return;
+        } else if (result.data?.user) {
+          console.log('🎉 [SIGNUP] New user created successfully:', {
+            userId: result.data.user.id,
+            emailConfirmed: !!result.data.user.email_confirmed_at
+          });
+          
+          // If email is not confirmed, show message to check email
+          if (!result.data.user.email_confirmed_at) {
+            console.log('📧 [SIGNUP] Email confirmation required, showing check email message');
+            step = 'check-email';
+            return;
+          }
+        }
       }
       
       // If we get here, authentication was successful
-      console.log('Authentication successful, redirecting to:', finalRedirectTo);
+      console.log('✅ [AUTH] Authentication successful, redirecting to:', finalRedirectTo);
       goto(finalRedirectTo, { replaceState: true });
       
     } catch (err) {
@@ -342,6 +393,53 @@
       error = err instanceof Error ? err.message : 'An unexpected error occurred';
     } finally {
       loading = false;
+    }
+  }
+  
+  // Handle email sign in
+  async function handleEmailSignIn() {
+    console.log('📧 [AUTH] Starting email sign in process');
+    
+    if (!email) {
+      error = 'Please enter your email';
+      console.error('❌ [AUTH] No email provided');
+      return;
+    }
+
+    loading = true;
+    error = '';
+    console.log('⏳ [AUTH] Sending magic link to:', email);
+    
+    try {
+      const redirectUrl = window.location.origin + '/login';
+      console.log('🔄 [AUTH] Setting redirect URL to:', redirectUrl);
+      
+      const { error: signInError } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: redirectUrl,
+        },
+      });
+
+      if (signInError) {
+        console.error('❌ [AUTH] Failed to send magic link:', signInError);
+        throw signInError;
+      }
+      
+      console.log('✅ [AUTH] Magic link sent successfully to:', email);
+      linkSent = true;
+      step = 'link-sent';
+      console.log('📬 [AUTH] UI updated to show link sent state');
+    } catch (err) {
+      console.error('❌ [AUTH] Error in handleEmailSignIn:', {
+        error: err,
+        message: err.message,
+        email: email
+      });
+      error = err.message || 'Failed to send magic link';
+    } finally {
+      loading = false;
+      console.log('🏁 [AUTH] Email sign in process completed');
     }
   }
   

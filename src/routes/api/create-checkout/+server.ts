@@ -43,25 +43,69 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
       name: orgData.name 
     });
 
-    // Create or get Stripe customer
-    console.log('Creating Stripe customer...');
-    const customer = await stripe.customers.create({
-      email: user.email || undefined,
-      name: user.user_metadata?.full_name || '',
-      metadata: {
-        userId: user.id,
-        organizationId: orgData.id
-      },
-      address: {
-        line1: '123 Main St',
-        city: 'Anytown',
-        state: 'CA',
-        postal_code: '12345',
-        country: 'US',
-      },
-    });
+    // Check for existing Stripe customer
+    console.log('Checking for existing Stripe customer...');
+    let customer;
     
-    console.log('Stripe customer created:', customer.id);
+    // First, check if organization already has a Stripe customer ID
+    const { data: orgWithCustomer, error: orgFetchError } = await locals.supabase
+      .from('organizations')
+      .select('stripe_customer_id')
+      .eq('id', orgData.id)
+      .single();
+    
+    if (orgFetchError) {
+      console.error('Error fetching organization:', orgFetchError);
+      throw error(500, 'Failed to fetch organization details');
+    }
+    
+    if (orgWithCustomer?.stripe_customer_id) {
+      // Use existing customer
+      console.log('Using existing Stripe customer:', orgWithCustomer.stripe_customer_id);
+      try {
+        customer = await stripe.customers.retrieve(orgWithCustomer.stripe_customer_id);
+        console.log('Retrieved existing customer:', customer.id);
+      } catch (stripeError) {
+        console.error('Error retrieving Stripe customer, creating new one:', stripeError);
+        // Fall through to create a new customer
+      }
+    }
+    
+    // If no customer found, create a new one
+    if (!customer) {
+      console.log('Creating new Stripe customer...');
+      customer = await stripe.customers.create({
+        email: user.email || undefined,
+        name: user.user_metadata?.full_name || '',
+        metadata: {
+          userId: user.id,
+          organizationId: orgData.id
+        },
+        address: {
+          line1: '123 Main St',
+          city: 'Anytown',
+          state: 'CA',
+          postal_code: '12345',
+          country: 'US',
+        },
+      });
+      
+      console.log('New Stripe customer created:', customer.id);
+      
+      // Update organization with the new customer ID
+      const { error: updateError } = await locals.supabase
+        .from('organizations')
+        .update({ 
+          stripe_customer_id: customer.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orgData.id);
+        
+      if (updateError) {
+        console.error('Failed to update organization with Stripe customer ID:', updateError);
+        // Continue anyway, as the checkout can still proceed
+      }
+    }
 
     // Create checkout session
     console.log('Creating checkout session...');
@@ -75,16 +119,25 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
         },
       ],
       mode: 'subscription',
-      success_url: `${url.origin}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${url.origin}/dashboard?session_id={CHECKOUT_SESSION_ID}&customer_id=${customer.id}`,
       cancel_url: `${url.origin}/pricing`,
       allow_promotion_codes: true,
+      metadata: {
+        organizationId: orgData.id,
+        userId: user.id,
+        customerId: customer.id,
+      },
       subscription_data: {
         trial_period_days: 14,
         metadata: {
           organizationId: orgData.id,
+          userId: user.id,
+          customerId: customer.id,
         },
       },
     });
+    
+    console.log('Checkout session created with customer ID:', customer.id);
 
     if (!checkoutSession.url) {
       throw new Error('Failed to create checkout session: No URL returned');

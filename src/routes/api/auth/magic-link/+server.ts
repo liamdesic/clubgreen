@@ -26,29 +26,39 @@ const createSupabaseServer = () => {
 };
 
 export const POST: RequestHandler = async ({ request, url }) => {
+  console.log('🔑 [AUTH] Starting magic link request processing');
+  console.log('🌐 Request URL:', url.toString());
+  
   try {
     // Parse the request body
-    const { email } = await request.json();
+    const body = await request.json();
+    const { email } = body;
+    
+    console.log('📧 [AUTH] Parsed request body:', { email: email ? '*****' + email.substring(5) : 'none' });
     
     if (!email) {
+      console.error('❌ [AUTH] No email provided in request');
       return json({ success: false, error: 'Email is required' }, { status: 400 });
     }
 
-    console.log('Server: Processing magic link request for:', email);
+    console.log('🔗 [AUTH] Processing magic link request for:', email);
     
     // Get the redirect URL from the client
-    // Get the final destination URL from the client, if provided
     const clientRedirectTo = url.searchParams.get('redirectTo');
+    console.log('🔄 [AUTH] Client redirect URL:', clientRedirectTo || 'none');
 
     // Detect if running locally or in production
     const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
     const redirectBase = isLocal
       ? 'http://localhost:5173'
-      : 'https://score.clubgreen.au';
+      : 'https://www.ldrboard.co';
+    
+    console.log('🌍 [AUTH] Environment:', isLocal ? 'Local' : 'Production');
+    console.log('🏠 [AUTH] Using base URL:', redirectBase);
     
     // The magic link itself should redirect back to the /login page for token processing.
-    // We append the original clientRedirectTo to the /login URL's query string, so /login knows where to go after processing.
     let emailVerificationRedirect = `${redirectBase}/login`;
+    console.log('🔗 [AUTH] Email verification redirect URL:', emailVerificationRedirect);
     if (clientRedirectTo) {
       emailVerificationRedirect += `?redirectTo=${encodeURIComponent(clientRedirectTo)}`;
     }
