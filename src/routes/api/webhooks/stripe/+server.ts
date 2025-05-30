@@ -115,9 +115,14 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
     return;
   }
 
+  // Determine if the trial has ended
+  const now = Math.floor(Date.now() / 1000);
+  const trialHasEnded = subscription.trial_end ? subscription.trial_end <= now : true;
+  const effectiveStatus = trialHasEnded && subscription.status === 'trialing' ? 'active' : subscription.status;
+
   const subscriptionData = {
     stripe_subscription_id: subscription.id,
-    status: subscription.status,
+    status: effectiveStatus,
     current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
     trial_ends_at: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
     updated_at: new Date().toISOString(),
@@ -220,23 +225,34 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
   
   // Get the subscription details
   const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+  let updatedSubscription = subscription;
   
   // If this is the first payment (trial or otherwise), update the subscription
   if (invoice.billing_reason === 'subscription_create' || invoice.billing_reason === 'subscription_update') {
     // If coming from trial, end the trial immediately
     if (subscription.status === 'trialing') {
+      console.log(`Ending trial for subscription: ${subscription.id}`);
       // Update the subscription to end trial immediately
-      await stripe.subscriptions.update(subscription.id, {
+      updatedSubscription = await stripe.subscriptions.update(subscription.id, {
         trial_end: 'now',
-        proration_behavior: 'none' // Don't prorate the current period
+        proration_behavior: 'none', // Don't prorate the current period
+        payment_behavior: 'default_incomplete',
+        payment_settings: { save_default_payment_method: 'on_subscription' },
+        expand: ['latest_invoice.payment_intent']
+      });
+      
+      console.log('Trial ended, subscription updated:', {
+        id: updatedSubscription.id,
+        status: updatedSubscription.status,
+        trial_end: updatedSubscription.trial_end
       });
     }
     
     // Update our records with the latest subscription state
-    await handleSubscriptionChange(subscription);
+    await handleSubscriptionChange(updatedSubscription);
   } else if (invoice.billing_reason === 'subscription_cycle' || !invoice.billing_reason) {
     // For recurring payments or when reason is not specified
-    await handleSubscriptionChange(subscription);
+    await handleSubscriptionChange(updatedSubscription);
   }
   
   console.log(`Payment succeeded for invoice ${invoice.id} (${invoice.billing_reason})`);
