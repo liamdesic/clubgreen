@@ -117,7 +117,8 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
     });
     
     // Return a more detailed error to the client in development
-    const clientErrorMessage = process.env.NODE_ENV === 'development' 
+    const isDev = import.meta.env.DEV;
+    const clientErrorMessage = isDev
       ? `${errorMessage}${errorStack ? '\n' + errorStack : ''}`
       : 'Failed to create checkout session. Please try again.';
       

@@ -1,37 +1,49 @@
 import { json } from '@sveltejs/kit';
+import { 
+  PUBLIC_STRIPE_PUBLISHABLE_KEY,
+  PUBLIC_SUPABASE_URL,
+  PUBLIC_SUPABASE_ANON_KEY,
+  VITE_STRIPE_PUBLISHABLE_KEY,
+  VITE_SUPABASE_URL,
+  VITE_SUPABASE_ANON_KEY
+} from '$env/static/public';
+import {
+  STRIPE_SECRET_KEY,
+  STRIPE_WEBHOOK_SECRET,
+  STRIPE_PRICE_ID,
+  SUPABASE_SERVICE_ROLE_KEY
+} from '$env/static/private';
 import type { RequestHandler } from './$types';
 
 // Helper to get environment variables safely
 function getEnvVars() {
-  const env = process.env || {};
-  const filteredVars: Record<string, string> = {};
+  const publicVars = {
+    PUBLIC_STRIPE_PUBLISHABLE_KEY: PUBLIC_STRIPE_PUBLISHABLE_KEY ? '***' + PUBLIC_STRIPE_PUBLISHABLE_KEY.slice(-4) : 'Not set',
+    PUBLIC_SUPABASE_URL: PUBLIC_SUPABASE_URL || 'Not set',
+    PUBLIC_SUPABASE_ANON_KEY: PUBLIC_SUPABASE_ANON_KEY ? '***' + PUBLIC_SUPABASE_ANON_KEY.slice(-4) : 'Not set',
+    VITE_STRIPE_PUBLISHABLE_KEY: VITE_STRIPE_PUBLISHABLE_KEY ? '***' + VITE_STRIPE_PUBLISHABLE_KEY.slice(-4) : 'Not set',
+    VITE_SUPABASE_URL: VITE_SUPABASE_URL || 'Not set',
+    VITE_SUPABASE_ANON_KEY: VITE_SUPABASE_ANON_KEY ? '***' + VITE_SUPABASE_ANON_KEY.slice(-4) : 'Not set'
+  };
+
+  const privateVars = {
+    STRIPE_SECRET_KEY: STRIPE_SECRET_KEY ? '***' + STRIPE_SECRET_KEY.slice(-4) : 'Not set',
+    STRIPE_WEBHOOK_SECRET: STRIPE_WEBHOOK_SECRET ? '***' + STRIPE_WEBHOOK_SECRET.slice(-4) : 'Not set',
+    STRIPE_PRICE_ID: STRIPE_PRICE_ID || 'Not set',
+    SUPABASE_SERVICE_ROLE_KEY: SUPABASE_SERVICE_ROLE_KEY ? '***' + SUPABASE_SERVICE_ROLE_KEY.slice(-4) : 'Not set'
+  };
   
-  // Get all environment variables that match our criteria
-  Object.entries(env).forEach(([key, value]) => {
-    if (
-      key.includes('STRIPE') || 
-      key.includes('PUBLIC') || 
-      key.includes('VITE') ||
-      key === 'NODE_ENV' ||
-      key === 'MODE'
-    ) {
-      // Mask sensitive values
-      if (key.includes('KEY') || key.includes('SECRET') || key.includes('TOKEN')) {
-        filteredVars[key] = value ? `***${value.slice(-4)}` : 'Not set';
-      } else {
-        filteredVars[key] = value || 'Not set';
-      }
-    }
-  });
-  
-  return filteredVars;
+  return {
+    ...publicVars,
+    ...privateVars
+  };
 }
 
 export const GET: RequestHandler = async () => {
   return json({
-    nodeEnv: process.env.NODE_ENV || 'development',
-    publicStripeKey: process.env.PUBLIC_STRIPE_PUBLISHABLE_KEY 
-      ? `***${process.env.PUBLIC_STRIPE_PUBLISHABLE_KEY.slice(-4)}` 
+    nodeEnv: import.meta.env.MODE || 'development',
+    publicStripeKey: PUBLIC_STRIPE_PUBLISHABLE_KEY 
+      ? `***${PUBLIC_STRIPE_PUBLISHABLE_KEY.slice(-4)}` 
       : 'Not set',
     allEnv: getEnvVars()
   });

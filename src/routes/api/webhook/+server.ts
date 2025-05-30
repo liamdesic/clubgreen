@@ -1,6 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import { stripe } from '$lib/server/stripe/client';
 import { supabase } from '$lib/supabaseClient';
+import { STRIPE_WEBHOOK_SECRET } from '$env/static/private';
 import type { RequestHandler } from './$types';
 
 // Helper to get raw body
@@ -12,9 +13,7 @@ export const POST: RequestHandler = async ({ request }) => {
   try {
     const body = await getRawBody(request);
     const signature = request.headers.get('stripe-signature') || '';
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-    if (!webhookSecret) {
+    if (!STRIPE_WEBHOOK_SECRET) {
       throw new Error('STRIPE_WEBHOOK_SECRET is not set');
     }
 

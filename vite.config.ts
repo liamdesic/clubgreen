@@ -11,7 +11,6 @@ export default defineConfig(({ mode }) => {
     console.log('Environment variables loaded:', {
       PUBLIC_STRIPE_PUBLISHABLE_KEY: env.PUBLIC_STRIPE_PUBLISHABLE_KEY ? '***' + 
         env.PUBLIC_STRIPE_PUBLISHABLE_KEY.slice(-4) : 'Not set',
-      NODE_ENV: process.env.NODE_ENV,
       MODE: mode
     });
   }
@@ -19,7 +18,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [sveltekit(), commonjs()],
     // Server configuration
-    server: process.env.NODE_ENV === 'development' ? {
+    server: mode === 'development' ? {
       fs: {
         strict: false
       }
@@ -33,12 +32,8 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.PUBLIC_SUPABASE_ANON_KEY': JSON.stringify(env.PUBLIC_SUPABASE_ANON_KEY || ''),
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || env.PUBLIC_SUPABASE_URL || ''),
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || env.PUBLIC_SUPABASE_ANON_KEY || ''),
-      'process.env.PUBLIC_SUPABASE_URL': JSON.stringify(env.PUBLIC_SUPABASE_URL || ''),
-      'process.env.PUBLIC_SUPABASE_ANON_KEY': JSON.stringify(env.PUBLIC_SUPABASE_ANON_KEY || ''),
-      
       // Stripe
       'import.meta.env.PUBLIC_STRIPE_PUBLISHABLE_KEY': JSON.stringify(env.PUBLIC_STRIPE_PUBLISHABLE_KEY || ''),
-      'process.env.PUBLIC_STRIPE_PUBLISHABLE_KEY': JSON.stringify(env.PUBLIC_STRIPE_PUBLISHABLE_KEY || ''),
       
       // App mode
       'import.meta.env.MODE': JSON.stringify(mode)
