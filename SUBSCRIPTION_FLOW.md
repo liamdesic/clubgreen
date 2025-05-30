@@ -43,6 +43,78 @@ This document outlines the complete subscription flow for the ClubGreen applicat
 - [ ] All API endpoints return expected responses
 - [ ] Webhook signatures are validated
 
+## Trial Creation Flow
+
+### 1. Onboarding Process
+
+#### Organization Creation
+1. User signs up and verifies their email via magic link
+2. User is redirected to the onboarding page (`/onboarding`)
+3. User fills out organization details (name, URL slug, logo)
+4. On form submission:
+   - Organization is created in the database
+   - `organizations` table is updated with the new record
+   - User is set as the organization owner
+
+#### Automatic Trial Activation
+After successful organization creation:
+1. The system calls `POST /api/start-trial`
+2. The endpoint:
+   - Creates a new Stripe customer
+   - Sets up a subscription with a 14-day trial
+   - Updates the organization's `payment_up_to_date` status
+   - Returns the subscription details
+
+### 2. API Endpoint: `POST /api/start-trial`
+
+**Request:**
+```typescript
+// No body required - uses authenticated user's session
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "subscriptionId": "sub_123456789",
+  "status": "trialing",
+  "trialEnd": 1688160000
+}
+```
+
+**Error Responses:**
+- `401 Unauthorized` - User not authenticated
+- `404 Not Found` - Organization not found for user
+- `500 Internal Server Error` - Failed to create trial
+
+### 3. Database Updates
+
+**organizations table:**
+```sql
+UPDATE organizations 
+SET payment_up_to_date = true
+WHERE id = :organizationId;
+```
+
+**subscriptions table:**
+```sql
+INSERT INTO subscriptions (
+  organization_id,
+  stripe_customer_id,
+  stripe_subscription_id,
+  status,
+  trial_ends_at,
+  current_period_end
+) VALUES (
+  :organizationId,
+  :customerId,
+  :subscriptionId,
+  'trialing',
+  :trialEnd,
+  :periodEnd
+);
+```
+
 ## Supabase Auth Flow
 
 ### 1. Authentication Process

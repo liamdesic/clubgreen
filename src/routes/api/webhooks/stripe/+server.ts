@@ -1,23 +1,38 @@
 import { error, json } from '@sveltejs/kit';
 import Stripe from 'stripe';
 import { SECRET_STRIPE_KEY, STRIPE_WEBHOOK_SECRET } from '$env/static/private';
-import { supabase } from '$lib/supabaseClient';
+import { createClient } from '@supabase/supabase-js';
 
+// Initialize Stripe with the latest API version
 const stripe = new Stripe(SECRET_STRIPE_KEY, {
   apiVersion: '2024-09-30.acacia'
 });
 
+// Initialize Supabase Admin Client for server-side operations
+const supabaseAdmin = createClient(
+  process.env.PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
 export async function POST({ request }) {
   const payload = await request.text();
-  const sig = request.headers.get('stripe-signature')!;
+  const signature = request.headers.get('stripe-signature');
+  
+  if (!signature) {
+    console.error('Missing Stripe signature');
+    throw error(400, 'Missing Stripe signature');
+  }
+
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(payload, sig, STRIPE_WEBHOOK_SECRET);
+    event = stripe.webhooks.constructEvent(payload, signature, STRIPE_WEBHOOK_SECRET);
   } catch (err) {
     console.error('Webhook signature verification failed:', err);
-    throw error(400, 'Invalid signature');
+    throw error(400, `Webhook Error: ${err.message}`);
   }
+
+  console.log(`Processing webhook event: ${event.type}`);
 
   try {
     switch (event.type) {
@@ -34,74 +49,173 @@ export async function POST({ request }) {
       case 'invoice.payment_failed':
         await handlePaymentFailed(event.data.object as Stripe.Invoice);
         break;
+      default:
+        console.log(`Unhandled event type: ${event.type}`);
     }
+    
     return json({ received: true });
   } catch (err) {
-    console.error('Error handling webhook:', err);
+    console.error('Error handling webhook:', {
+      error: err,
+      eventType: event.type,
+      eventId: event.id
+    });
     throw error(500, 'Error processing webhook');
   }
 }
 
 async function handleSubscriptionChange(subscription: Stripe.Subscription) {
-  const { data: org } = await supabase
+  const customerId = typeof subscription.customer === 'string' 
+    ? subscription.customer 
+    : subscription.customer.id;
+
+  // Update the organization with subscription details
+  const { data: org, error: orgError } = await supabaseAdmin
     .from('organizations')
-    .select('id')
-    .eq('stripe_customer_id', subscription.customer as string)
+    .select('id, stripe_customer_id')
+    .eq('stripe_customer_id', customerId)
     .single();
 
-  if (!org) return;
+  if (orgError || !org) {
+    console.error('Organization not found for customer:', customerId, orgError);
+    return;
+  }
 
   const subscriptionData = {
     stripe_subscription_id: subscription.id,
     status: subscription.status,
     current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
     trial_ends_at: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
+    stripe_customer_id: customerId,
+    organization_id: org.id
   };
 
-  await supabase
+  // Upsert subscription data
+  const { error: subError } = await supabaseAdmin
     .from('subscriptions')
     .upsert({
       ...subscriptionData,
-      organization_id: org.id,
-      stripe_customer_id: subscription.customer as string,
       created_at: new Date(subscription.created * 1000).toISOString()
     })
     .eq('organization_id', org.id);
 
+  if (subError) {
+    console.error('Error updating subscription:', subError);
+    throw subError;
+  }
+
   // Update organization's payment status
-  await supabase
+  const { error: orgUpdateError } = await supabaseAdmin
     .from('organizations')
     .update({
-      payment_up_to_date: ['trialing', 'active'].includes(subscription.status)
+      payment_up_to_date: ['trialing', 'active'].includes(subscription.status),
+      updated_at: new Date().toISOString()
     })
     .eq('id', org.id);
+
+  if (orgUpdateError) {
+    console.error('Error updating organization payment status:', orgUpdateError);
+    throw orgUpdateError;
+  }
+
+  console.log(`Updated subscription ${subscription.id} for organization ${org.id}`);
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  await supabase
+  const customerId = typeof subscription.customer === 'string' 
+    ? subscription.customer 
+    : subscription.customer?.id;
+
+  if (!customerId) {
+    console.error('No customer ID found in subscription:', subscription.id);
+    return;
+  }
+
+  const { data: org, error: orgError } = await supabaseAdmin
+    .from('organizations')
+    .select('id')
+    .eq('stripe_customer_id', customerId)
+    .single();
+
+  if (orgError || !org) {
+    console.error('Organization not found for customer:', customerId, orgError);
+    return;
+  }
+
+  const { error: updateError } = await supabaseAdmin
     .from('subscriptions')
     .update({
       status: 'canceled',
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      canceled_at: new Date().toISOString()
     })
     .eq('stripe_subscription_id', subscription.id);
+
+  if (updateError) {
+    console.error('Error canceling subscription:', updateError);
+    throw updateError;
+  }
+
+  // Update organization's payment status
+  await supabaseAdmin
+    .from('organizations')
+    .update({
+      payment_up_to_date: false,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', org.id);
+
+  console.log(`Canceled subscription ${subscription.id} for organization ${org.id}`);
 }
 
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
+  if (!invoice.subscription) return;
+  
   if (invoice.billing_reason === 'subscription_create') {
     // The subscription is created and payment was successful
-    await handleSubscriptionChange(await stripe.subscriptions.retrieve(invoice.subscription as string));
+    const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+    await handleSubscriptionChange(subscription);
   }
+  
   // Handle other payment success scenarios if needed
+  console.log(`Payment succeeded for invoice ${invoice.id}`);
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
-  await supabase
-    .from('subscriptions')
-    .update({
-      status: 'past_due',
-      updated_at: new Date().toISOString()
-    })
-    .eq('stripe_subscription_id', invoice.subscription as string);
+  const customerId = typeof invoice.customer === 'string' 
+    ? invoice.customer 
+    : invoice.customer?.id;
+
+  if (!customerId) {
+    console.error('No customer ID found in invoice:', invoice.id);
+    return;
+  }
+
+  // Update subscription status to past_due
+  if (invoice.subscription) {
+    const subscription = typeof invoice.subscription === 'string'
+      ? await stripe.subscriptions.retrieve(invoice.subscription)
+      : invoice.subscription;
+
+    await handleSubscriptionChange(subscription);
+  }
+
+  // Notify user about payment failure
+  console.log(`Payment failed for invoice ${invoice.id} (customer: ${customerId})`);
+
+  // Update subscription status to past_due in the database
+  if (invoice.subscription) {
+    const subscriptionId = typeof invoice.subscription === 'string' 
+      ? invoice.subscription 
+      : invoice.subscription.id;
+
+    await supabaseAdmin
+      .from('subscriptions')
+      .update({
+        status: 'past_due',
+        updated_at: new Date().toISOString()
+      })
+      .eq('stripe_subscription_id', subscriptionId);
+  }
 }

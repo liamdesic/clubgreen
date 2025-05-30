@@ -1,35 +1,35 @@
 import { json, error } from '@sveltejs/kit';
 import { stripe } from '$lib/server/stripe/client';
-import { supabase } from '$lib/supabaseClient';
+import { STRIPE_PRICE_ID } from '$env/static/private';
 import type { RequestHandler } from './$types';
 
-export const POST: RequestHandler = async ({ request, locals: { getSession }, url }) => {
+export const POST: RequestHandler = async ({ request, locals, url }) => {
   try {
     console.log('Starting checkout process...');
     
     // Verify required environment variables
-    const stripePriceId = process.env.STRIPE_PRICE_ID;
-    if (!stripePriceId) {
+    if (!STRIPE_PRICE_ID) {
       throw new Error('STRIPE_PRICE_ID is not set in environment variables');
     }
     
-    console.log('Using Stripe Price ID:', stripePriceId);
+    console.log('Using Stripe Price ID:', STRIPE_PRICE_ID);
     
-    const session = await getSession();
-    if (!session) {
-      throw error(401, 'Unauthorized: No session found');
+    // Get the authenticated user from locals
+    const { user } = await locals.getSession();
+    if (!user) {
+      throw error(401, 'Unauthorized: Please log in');
     }
     
-    console.log('User session found:', { 
-      userId: session.user?.id, 
-      email: session.user?.email 
+    console.log('Authenticated user:', { 
+      userId: user.id, 
+      email: user.email 
     });
 
     // Fetch organization
-    const { data: orgData, error: orgError } = await supabase
+    const { data: orgData, error: orgError } = await locals.supabase
       .from('organizations')
       .select('id, name')
-      .eq('owner_id', session.user.id)
+      .eq('owner_id', user.id)
       .single();
 
     if (orgError || !orgData) {
@@ -43,83 +43,84 @@ export const POST: RequestHandler = async ({ request, locals: { getSession }, ur
       name: orgData.name 
     });
 
-    try {
-      // Create or get Stripe customer
-      console.log('Creating Stripe customer...');
-      const customer = await stripe.customers.create({
-        email: session.user.email,
-        name: session.user.user_metadata?.full_name || '',
-        metadata: {
-          userId: session.user.id,
-          organizationId: orgData.id,
-          organizationName: orgData.name
-        }
-      });
-      
-      console.log('Stripe customer created:', customer.id);
-
-      // Create checkout session
-      console.log('Creating checkout session...');
-      const checkoutSession = await stripe.checkout.sessions.create({
-        payment_method_types: ['card'],
-        line_items: [
-          {
-            price: stripePriceId,
-            quantity: 1,
-          },
-        ],
-        mode: 'subscription',
-        success_url: `${url.origin}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${url.origin}/subscribe?canceled=true`,
-        customer: customer.id,
-        subscription_data: {
-          trial_period_days: 0, // No trial for direct subscription
-          metadata: {
-            organizationId: orgData.id,
-            organizationName: orgData.name
-          }
-        },
-        allow_promotion_codes: true,
-      });
-
-      if (!checkoutSession.url) {
-        throw new Error('Failed to create checkout session: No URL returned');
-      }
-      
-      console.log('Checkout session created successfully:', {
-        sessionId: checkoutSession.id,
-        url: checkoutSession.url.replace(/\?.*$/, '') // Remove query params from URL in logs
-      });
-      
-      return json({ 
-        url: checkoutSession.url,
-        sessionId: checkoutSession.id
-      });
-      
-    } catch (stripeError) {
-      console.error('Stripe API Error:', {
-        message: stripeError.message,
-        type: stripeError.type,
-        code: stripeError.code,
-        statusCode: stripeError.statusCode,
-        raw: stripeError.raw
-      });
-      throw new Error(`Stripe error: ${stripeError.message}`);
-    }
+    // Create or get Stripe customer
+    console.log('Creating Stripe customer...');
+    const customer = await stripe.customers.create({
+      email: user.email || undefined,
+      name: user.user_metadata?.full_name || '',
+      metadata: {
+        userId: user.id,
+        organizationId: orgData.id
+      },
+      address: {
+        line1: '123 Main St',
+        city: 'Anytown',
+        state: 'CA',
+        postal_code: '12345',
+        country: 'US',
+      },
+    });
     
-  } catch (err) {
+    console.log('Stripe customer created:', customer.id);
+
+    // Create checkout session
+    console.log('Creating checkout session...');
+    const checkoutSession = await stripe.checkout.sessions.create({
+      customer: customer.id,
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: STRIPE_PRICE_ID,
+          quantity: 1,
+        },
+      ],
+      mode: 'subscription',
+      success_url: `${url.origin}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${url.origin}/pricing`,
+      allow_promotion_codes: true,
+      subscription_data: {
+        trial_period_days: 14,
+        metadata: {
+          organizationId: orgData.id,
+        },
+      },
+    });
+
+    if (!checkoutSession.url) {
+      throw new Error('Failed to create checkout session: No URL returned');
+    }
+
+    console.log('Checkout session created successfully:', {
+      sessionId: checkoutSession.id,
+      url: checkoutSession.url.replace(/\?.*$/, '') // Remove query params from URL in logs
+    });
+    
+    return json({ 
+      url: checkoutSession.url,
+      sessionId: checkoutSession.id
+    });
+    
+  } catch (err: unknown) {
+    // Type guard to check if error is an instance of Error
+    const errorMessage = err instanceof Error 
+      ? err.message 
+      : 'An unknown error occurred';
+      
+    const errorStack = err instanceof Error ? err.stack : undefined;
+    const errorStatus = (err as any)?.status || 500;
+    
     console.error('Checkout process failed:', {
       error: err,
-      message: err.message,
-      stack: err.stack,
-      status: err.status
+      message: errorMessage,
+      stack: errorStack,
+      status: errorStatus
     });
     
     // Return a more detailed error to the client in development
-    const errorMessage = process.env.NODE_ENV === 'development' 
-      ? `${err.message}\n${err.stack}` 
+    const clientErrorMessage = process.env.NODE_ENV === 'development' 
+      ? `${errorMessage}${errorStack ? '\n' + errorStack : ''}`
       : 'Failed to create checkout session. Please try again.';
       
-    throw error(err.status || 500, errorMessage);
+    throw error(errorStatus, clientErrorMessage);
   }
 };

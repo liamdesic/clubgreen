@@ -8,6 +8,35 @@
 
 ## 🛠️ In Progress
 
+### 💳 Stripe Integration & Billing
+- [x] **Automatic Trial on Organization Creation**
+  - [x] Create Stripe customer during organization creation
+  - [x] Set up 14-day trial subscription
+  - [x] Handle duplicate organization slugs
+  - [x] Proper environment variable setup
+  - [x] Error handling and user feedback
+  - [x] Store Stripe customer and subscription IDs
+
+- [ ] **Billing Portal & Subscription Management**
+  - [ ] Create customer portal for subscription management
+  - [ ] Display current plan and trial status
+  - [ ] Add payment method functionality
+  - [ ] Handle subscription lifecycle (trial end, cancellation, renewal)
+  - [ ] Send trial end notifications
+
+- [ ] **Webhook Handlers**
+  - [ ] Handle `customer.subscription.updated` for trial end
+  - [ ] Handle `invoice.payment_succeeded` for successful payments
+  - [ ] Handle `invoice.payment_failed` for payment issues
+  - [ ] Update organization status based on subscription state
+
+- [ ] **Billing Settings Page**
+  - [ ] Display current subscription status
+  - [ ] Show next billing date and amount
+  - [ ] Add upgrade/downgrade options
+  - [ ] Display billing history
+  - [ ] Add payment method management
+
 ### 🔄 1. Account & Event Settings Refactor
 **Route:** `/dashboard/organization/settings`
 - [x] Create organization settings page
@@ -19,39 +48,6 @@
   - [x] Implement accent color picker
   - [x] Add billing email field
   - [ ] Add organization name editing
-
-### 🎨 2. Leaderboard Restyling
-- [x] **QR Code Generation**
-  - [x] Generate QR code natively for scorecard URL
-  - [x] Display in designated box with animations
-  - [x] Dynamic color based on event settings
-- [x] **Theme & Styling**
-  - [x] Implement dynamic accent color theming across leaderboard and scorecard
-  - [x] Update CSS variables in leaderboard.css and scorecard.css
-  - [x] Add dynamic dark accent color variant
-  - [x] Ensure color contrast meets accessibility standards
-  - [x] Update header and background styles to use new color scheme
-- [ ] **Header**
-  - [x] Add logo in top left corner
-  - [x] Show event title and date
-  - [x] Style header with dynamic accent color
-  - [ ] Add responsive behavior for mobile devices
-- [ ] **Dynamic Score Display**
-  - [ ] Keep left score box static (positions 1-4)
-  - [ ] Implement rotation for right score box (5-10, 11-15, 16-20)
-  - [ ] Set 4-second interval for rotation
-  - [ ] Add smooth transitions between rotations
-  - [ ] Ensure score display is readable with new color scheme
-- [ ] **Visual Hierarchy**
-  - [ ] Add top 3 medal styling (🥇, 🥈, 🥉)
-  - [ ] Show hole-in-ones count
-  - [ ] Highlight current rotation group
-  - [ ] Style score pills with accent color
-  - [ ] Add subtle hover effects for interactive elements
-- [ ] **Responsive Design**
-  - [ ] Optimize for mobile and iPad
-  - [ ] Adjust layout for different screen sizes
-  - [ ] Ensure touch targets are appropriately sized
 
 ## 💰 4. Stripe Billing Integration
 
@@ -91,8 +87,8 @@ npm run dev
 
 #### 2. Test Subscription Flow
 1. **Test Mode**:
-   - Visit `/pricing`
-   - Click "Start Free Trial" or "Upgrade Now"
+   - Sign up and finish onboarding
+   - Click 
    - The flow will use Stripe's test mode automatically
 
 2. **Test Cards**:
@@ -237,27 +233,20 @@ npm run dev
 - [ ] Document environment variables
 - [ ] Add Stripe webhook setup instructions
 
-## 📋 Backlog
+### 🔒 Row Level Security (RLS) Setup
+- [ ] **Events Table**
+  - [ ] Enable RLS on events table
+  - [ ] Create policy for organization members to view events
+  - [ ] Create policy for organization admins to manage events
+  - [ ] Add test cases for RLS policies
+  - [ ] Document RLS policies in supabase-tables.md
 
-### 🎯 Scorecard Improvements
-
-#### Player Input & Management
-- [ ] **Enhanced Player Name Input**
-  - [x] Add form submission on mobile keyboard 'enter'
-  - [x] Implement 18-character limit for player names with toast notification
-  - [x] Add profanity filter using a prebuilt library
-  - [?] Add input validation feedback
-
-#### Gameplay Experience
-- [x] **Flexible Player Selection** ✅
-  - [x] Player Selection Flow
-  - [x] Interaction Guidelines
-  - [x] Score Recording Logic
-  - [x] Game State Management
-
-#### Visual Enhancements
-- [x] **Player Transition Animations** ✅
-  > *Skipped animations for performance and simplicity*
+- [ ] **Organizations Table**
+  - [ ] Enable RLS on organizations table
+  - [ ] Create policy for organization owners to manage their organization
+  - [ ] Create policy for organization members to view organization details
+  - [ ] Add test cases for RLS policies
+  - [ ] Document RLS policies in supabase-tables.md
 
 ### 🧹 3. MVP Polish
 - [ ] **CSS Cleanup & Consistency**
@@ -270,6 +259,7 @@ npm run dev
   - [ ] Standardize accent color usage
     - Replace hardcoded colors with CSS variables
     - Ensure consistent hover/focus states
+    [ ] Add a sign out on Org settings
 
 - [ ] Skeleton loaders for:
   - Events dashboard

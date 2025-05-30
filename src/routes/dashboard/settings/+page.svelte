@@ -34,12 +34,35 @@
   // Initialize organization data
   async function loadOrganization() {
     try {
+      console.log('🔍 [settings] Starting to load organization...');
       loading = true;
-      const { data: { user } } = await supabase.auth.getUser();
       
-      if (!user) {
-        throw new Error('User not authenticated');
+      // Get the current session
+      console.log('🔑 [settings] Getting session...');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('❌ [settings] Error getting session:', sessionError);
+        throw new Error('Failed to get session');
       }
+      
+      if (!session?.access_token) {
+        console.log('ℹ️ [settings] No active session found');
+        throw new Error('No active session');
+      }
+      
+      console.log('🔑 [settings] Session found, verifying user...');
+      
+      // Verify the session by getting the user
+      const { data: { user }, error: userError } = await supabase.auth.getUser(session.access_token);
+      
+      if (userError || !user) {
+        console.error('❌ [settings] Session verification failed:', userError);
+        await supabase.auth.signOut();
+        throw new Error('Session verification failed');
+      }
+      
+      console.log('✅ [settings] User verified:', user.email);
 
       // Get organization data
       const { data: orgData, error: orgError } = await supabase
@@ -320,6 +343,19 @@
           {saving ? 'Saving...' : 'Save Settings'}
         </button>
       </div>
+      
+      <div class="danger-zone">
+        <h3>Danger Zone</h3>
+        <button 
+          class="button danger" 
+          on:click|preventDefault={async () => {
+            await supabase.auth.signOut();
+            window.location.href = '/login';
+          }}
+        >
+          Sign Out
+        </button>
+      </div>
     </div>
   {/if}
 </div>
@@ -477,9 +513,32 @@
   }
   
   .form-actions {
+    margin-top: 2rem;
     display: flex;
     justify-content: flex-end;
-    margin-top: 1.5rem;
+  }
+  
+  .danger-zone {
+    margin-top: 4rem;
+    padding-top: 2rem;
+    border-top: 1px solid #f0f0f0;
+  }
+  
+  .danger-zone h3 {
+    color: #dc2626;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+  }
+  
+  .button.danger {
+    background-color: #dc2626;
+    color: white;
+    border: 1px solid #dc2626;
+  }
+  
+  .button.danger:hover {
+    background-color: #b91c1c;
+    border-color: #b91c1c;
   }
   
   .button {

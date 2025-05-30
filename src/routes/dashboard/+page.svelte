@@ -10,6 +10,7 @@
   import {
     CloudUpload, Link, Calendar, Pencil, QrCode, Plus, User, Settings
   } from 'lucide-svelte';
+  import TrialStatus from '$lib/TrialStatus.svelte';
 
   // --- DATA FROM SERVER ---
   export let data: {
@@ -18,11 +19,39 @@
     events: Event[];
   };
 
+  console.log('📦 [dashboard] Received data from server:', {
+    user: data.user ? { id: data.user.id, email: data.user.email } : null,
+    organizationCount: data.organizations?.length || 0,
+    eventCount: data.events?.length || 0
+  });
+
   // --- STATE ---
-  let organization: Organization | null = data.organizations?.[0] ?? null;
-  let events: Event[] = data.events ?? [];
+  let organization: Organization | null = null;
+  let events: Event[] = [];
   let loading = false;
   let error = '';
+
+  // Initialize data from server
+  $: {
+    if (data.organizations?.[0]) {
+      console.log('🏢 [dashboard] Initializing organization from server data');
+      organization = {
+        id: data.organizations[0].id,
+        name: data.organizations[0].name,
+        slug: data.organizations[0].slug,
+        trial_ends_at: data.organizations[0].trial_ends_at,
+        settings_json: data.organizations[0].settings_json || {}
+      };
+      console.log('✅ [dashboard] Organization initialized:', organization);
+    } else {
+      console.log('ℹ️ [dashboard] No organization data received from server');
+    }
+    
+    if (data.events) {
+      events = data.events;
+      console.log(`📅 [dashboard] Loaded ${events.length} events`);
+    }
+  }
 
   let showCreateModal = false;
   let newTitle = '';
@@ -56,53 +85,285 @@
 
   // --- EVENT CREATION ---
   async function createEvent() {
+    const startTime = Date.now();
+    console.log('🚀 [createEvent] Starting event creation...');
     createError = '';
     creating = true;
 
-    if (!newTitle || (eventType === 'single' && !newDate)) {
-      createError = 'Please enter a title and date (if not ongoing).';
+    const logStep = (step: string) => {
+      const timeElapsed = Date.now() - startTime;
+      console.log(`⏱️ [createEvent][${timeElapsed}ms] ${step}`);
+    };
+
+    try {
+      logStep('Verifying user authentication...');
+      const authStart = Date.now();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      logStep(`Auth check completed in ${Date.now() - authStart}ms`);
+      
+      if (authError || !user) {
+        const errorMsg = 'Your session has expired. Please log in again.';
+        console.error('❌ [createEvent] Authentication error:', {
+          error: authError,
+          hasUser: !!user,
+          userId: user?.id
+        });
+        showToast(errorMsg, 'error');
+        
+        // Add a small delay to ensure toast is visible
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        logStep('Signing out user...');
+        await supabase.auth.signOut();
+        logStep('Redirecting to login...');
+        goto('/login');
+        return;
+      }
+
+      // Validate inputs
+      logStep('Validating inputs...');
+      
+      if (!newTitle) {
+        const errorMsg = 'Please enter an event title';
+        console.error('❌ [createEvent] Validation error:', errorMsg);
+        createError = errorMsg;
+        creating = false;
+        logStep(`Validation failed: ${errorMsg}`);
+        return;
+      }
+      
+      if (eventType === 'single' && !newDate) {
+        const errorMsg = 'Please select a date for the event';
+        console.error('❌ [createEvent] Validation error:', errorMsg);
+        createError = errorMsg;
+        creating = false;
+        logStep(`Validation failed: ${errorMsg}`);
+        return;
+      }
+      
+      if (!organization?.id) {
+        const errorMsg = 'No organization found. Please refresh the page.';
+        console.error('❌ [createEvent] Organization error:', errorMsg);
+        console.log('Current organization state:', organization);
+        createError = errorMsg;
+        creating = false;
+        logStep(`Validation failed: ${errorMsg}`);
+        return;
+      }
+      
+      logStep('Input validation passed');
+
+      console.log('🔍 [createEvent] Creating event with:', {
+        title: newTitle,
+        eventType,
+        hasDate: !!newDate,
+        organizationId: organization.id
+      });
+
+      logStep('Preparing event data...');
+      
+      // Generate slug and format date
+      const slug = newTitle.toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9\-]/g, '');
+        
+      const event_date = eventType === 'single' ? newDate : null;
+      const eventData = { 
+        title: newTitle, 
+        slug, 
+        event_date, 
+        organization_id: organization.id,
+        settings_json: {},
+        created_at: new Date().toISOString(),
+        published: false
+      };
+
+      logStep('Event data prepared');
+      console.log('📝 [createEvent] Prepared data:', eventData);
+
+      try {
+        logStep('Starting database insert...');
+        const insertStart = Date.now();
+        
+        // Log the exact query we're about to make
+        console.log('🔍 [createEvent] Supabase insert query:', {
+          table: 'events',
+          data: eventData,
+          select: '*',
+          order: { column: 'created_at', ascending: false }
+        });
+        
+        let { data: createdEvents, error: insertErr } = await supabase
+          .from('events')
+          .insert([eventData])
+          .select('*')
+          .order('created_at', { ascending: false });
+          
+        logStep(`Database insert completed in ${Date.now() - insertStart}ms`);
+        
+        if (insertErr) {
+          console.error('❌ [createEvent] Database insert error details:', {
+            code: insertErr.code,
+            details: insertErr.details,
+            hint: insertErr.hint,
+            message: insertErr.message
+          });
+        }
+
+        // If direct insert fails with RLS error, try with RPC
+        if (insertErr?.code === '42501' || insertErr?.message?.includes('permission denied')) {
+          logStep('Direct insert failed with RLS, trying RPC...');
+          console.log('⚠️ [createEvent] Direct insert failed with RLS, trying RPC...');
+          
+          try {
+            const rpcStart = Date.now();
+            const { data: rpcResult, error: rpcError } = await supabase
+              .rpc('create_event', { event_data: eventData });
+              
+            logStep(`RPC call completed in ${Date.now() - rpcStart}ms`);
+            
+            if (rpcError) {
+              console.error('❌ [createEvent] RPC error details:', {
+                code: rpcError.code,
+                message: rpcError.message,
+                details: rpcError.details,
+                hint: rpcError.hint
+              });
+              throw rpcError;
+            }
+            
+            console.log('✅ [createEvent] Event created via RPC:', rpcResult);
+            createdEvents = rpcResult ? [rpcResult] : null;
+            
+          } catch (rpcError) {
+            console.error('🔥 [createEvent] RPC failed with error:', {
+              error: rpcError,
+              name: rpcError?.name,
+              message: rpcError?.message,
+              stack: rpcError?.stack
+            });
+            throw new Error(`RPC failed: ${rpcError.message}`);
+          }
+        } else if (insertErr) {
+          throw insertErr;
+        }
+
+        if (!createdEvents || createdEvents.length === 0) {
+          throw new Error('No event was created. Please try again.');
+        }
+
+        const newEvent = createdEvents[0];
+        console.log('✅ [createEvent] Event created successfully:', newEvent);
+        
+        // Show success message
+        showToast(`🎉 ${newEvent.title} event created!`, 'success');
+        
+        // Reset form
+        newTitle = '';
+        newDate = '';
+        eventType = 'single';
+        showCreateModal = false;
+        
+        // Navigate to event setup
+        console.log(`🔄 [createEvent] Navigating to /dashboard/${newEvent.id}/setup`);
+        goto(`/dashboard/${newEvent.id}/setup`);
+        
+      } catch (error) {
+        console.error('❌ [createEvent] Error creating event:', {
+          error,
+          name: error?.name,
+          message: error?.message,
+          code: error?.code,
+          details: error?.details,
+          hint: error?.hint
+        });
+        
+        createError = error.message || 'Failed to create event. Please try again.';
+        showToast(createError, 'error');
+      }
+      
+    } catch (error) {
+      console.error('🔥 [createEvent] Unexpected error:', error);
+      createError = 'An unexpected error occurred. Please try again.';
+    } finally {
+      console.log('🏁 [createEvent] Operation completed');
       creating = false;
-      return;
     }
-    if (!organization) {
-      createError = 'No organization found. Please refresh the page.';
-      creating = false;
-      return;
-    }
-
-    const slug = newTitle.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
-    const event_date = eventType === 'single' ? newDate : null;
-
-    const { data: createdEvents, error: insertErr } = await supabase
-      .from('events')
-      .insert([{ title: newTitle, slug, event_date, organization_id: organization.id }])
-      .select()
-      .order('created_at', { ascending: false });
-
-    if (insertErr) {
-      createError = insertErr.message;
-      creating = false;
-      return;
-    }
-
-    // Success
-    showCreateModal = false;
-    if (createdEvents && createdEvents.length > 0) {
-      const newEvent = createdEvents[0];
-      showToast(`🎉 ${newEvent.title} event created!`, 'success');
-      goto(`/dashboard/${newEvent.id}/setup`); // SPA navigation
-    }
-    // Reset form
-    newTitle = '';
-    newDate = '';
-    eventType = 'single';
-    creating = false;
   }
 
-  // --- INITIAL CLIENT-SIDE DATA FETCH (OPTIONAL) ---
-  onMount(() => {
-    showToast('🚀 Dashboard loaded', 'info');
-    // You can move org/event loading to SSR if preferred.
+  // --- INITIAL CLIENT-SIDE AUTH VERIFICATION ---
+  onMount(async () => {
+    console.log('🚀 [dashboard] Client-side mount started');
+    console.log('🔍 [dashboard] Initial data state:', {
+      hasUser: !!data.user,
+      organizationCount: data.organizations?.length || 0
+    });
+    
+    try {
+      console.log('🔄 [dashboard] Verifying authentication...');
+      const authStartTime = Date.now();
+      
+      // Verify the user's session is still valid
+      const { data: authData, error } = await supabase.auth.getUser();
+      const authEndTime = Date.now();
+      
+      console.log(`⏱️ [dashboard] Auth check took ${authEndTime - authStartTime}ms`);
+      
+      if (error || !authData?.user) {
+        console.error('❌ [dashboard] Client-side auth verification failed:', {
+          error: error?.message,
+          hasUser: !!authData?.user,
+          userId: authData?.user?.id
+        });
+        
+        showToast('Session expired. Please log in again.', 'error');
+        
+        // Add a small delay before redirecting to ensure the toast is visible
+        setTimeout(async () => {
+          console.log('🔒 [dashboard] Signing out and redirecting to login...');
+          await supabase.auth.signOut();
+          goto('/login');
+        }, 1000);
+        
+        return;
+      }
+      
+      const { user } = authData;
+      console.log('✅ [dashboard] Client-side auth verified:', {
+        email: user.email,
+        userId: user.id,
+        isAuthenticated: true
+      });
+      
+      showToast('Dashboard loaded', 'success');
+      
+      // Debug organization data
+      console.log('🏢 [dashboard] Organization data:', {
+        hasOrganizations: data.organizations?.length > 0,
+        count: data.organizations?.length || 0,
+        firstOrg: data.organizations?.[0] ? {
+          id: data.organizations[0].id,
+          name: data.organizations[0].name,
+          slug: data.organizations[0].slug
+        } : null
+      });
+      
+      // Check if we have data but no organization
+      if (data.user && (!data.organizations || data.organizations.length === 0)) {
+        console.log('ℹ️ [dashboard] User has no organizations, redirecting to onboarding');
+        goto('/onboarding');
+      } else {
+        console.log('🏁 [dashboard] Client-side initialization complete');
+      }
+      
+    } catch (error) {
+      console.error('🔥 [dashboard] Error during client-side initialization:', {
+        error: error?.message,
+        name: error?.name,
+        stack: error?.stack
+      });
+      showToast('An error occurred. Please refresh the page.', 'error');
+    }
   });
 </script>
 
@@ -112,18 +373,37 @@
     <div class="dashboard-main">
   <header class="dashboard-header">
     <div class="dashboard-title">
-   <h2>Your Events</h2> 
-  </div>
+      <h2>Your Events</h2> 
+    </div>
     <img src="/logos/ldrb-logo-colourlight.svg" alt="ldrboard logo" class="dashboard-logo" />
-   <a 
-     href="/dashboard/settings"
-     class="user-pill" 
-     aria-label="Account settings"
-   >
-    <User size="16" />
-    <span>{organization?.name}</span>
-    <Settings size="16" class="gear-button" title="Settings" />
-  </a>
+    <div class="header-right">
+      {#if organization?.trial_ends_at}
+        <TrialStatus 
+          trialEndsAt={organization.trial_ends_at} 
+          organizationId={organization.id} 
+        />
+      {/if}
+      {#if organization}
+        <a 
+          href="/dashboard/settings"
+          class="user-pill" 
+          aria-label="Account settings"
+        >
+          <User size="16" />
+          <span>{organization.name || 'My Organization'}</span>
+          <Settings size="16" class="gear-button" title="Settings" />
+        </a>
+      {:else if loading}
+        <div class="user-pill">
+          <div class="skeleton-loader" style="width: 120px; height: 24px;"></div>
+        </div>
+      {:else}
+        <a href="/dashboard/settings" class="user-pill">
+          <User size="16" />
+          <span>Set Up Organization</span>
+        </a>
+      {/if}
+    </div>
 
 
   </header>

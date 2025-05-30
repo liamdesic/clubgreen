@@ -38,16 +38,27 @@
   // Process the authentication token if it exists in the URL hash
   // Handle auth state changes
   const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-    console.log('Auth state changed:', event, session?.user?.email);
+    console.log('Auth state changed:', event);
     
-    if (event === 'SIGNED_IN' && session) {
-      console.log('User signed in, redirecting to:', finalRedirectTo);
-      
-      // Ensure the session is properly set in the browser
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Force a full page reload to ensure all auth state is properly set
-      window.location.href = finalRedirectTo;
+    if (event === 'SIGNED_IN' && session?.access_token) {
+      try {
+        // Verify the session by getting the user
+        const { data: { user }, error } = await supabase.auth.getUser(session.access_token);
+        
+        if (error || !user) {
+          console.error('Session verification failed:', error);
+          await supabase.auth.signOut();
+          return;
+        }
+        
+        console.log('User verified, redirecting to:', finalRedirectTo);
+        // Ensure the session is properly set in the browser
+        await new Promise(resolve => setTimeout(resolve, 100));
+        // Force a full page reload to ensure all auth state is properly set
+        window.location.href = finalRedirectTo;
+      } catch (err) {
+        console.error('Error verifying session:', err);
+      }
     } else if (event === 'SIGNED_OUT') {
       console.log('User signed out, cleaning up...');
       // Clear any existing tokens to prevent issues
@@ -69,11 +80,13 @@
     }
 
     // Check if user is already signed in
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (user && !error) {
       console.log('User already signed in, redirecting to:', finalRedirectTo);
       window.location.href = finalRedirectTo;
       return;
+    } else if (error) {
+      console.error('Error getting user:', error);
     }
     
     // Try multiple methods to detect the hash
@@ -174,12 +187,13 @@
         
         console.log('Session set successfully:', data.session ? 'Yes' : 'No');
         
-        // Verify the session was actually set
-        const { data: sessionData } = await supabase.auth.getSession();
-        console.log('Session verified:', sessionData.session ? 'Yes' : 'No');
+        // Verify the user is properly authenticated
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        console.log('User verified:', user ? `Yes (${user.email})` : 'No');
         
-        if (!sessionData.session) {
-          throw new Error('Failed to establish session after setting tokens');
+        if (userError || !user) {
+          console.error('Failed to verify user:', userError);
+          throw new Error('Failed to authenticate user after setting tokens');
         }
         
         // Clear the hash and redirect to the final destination

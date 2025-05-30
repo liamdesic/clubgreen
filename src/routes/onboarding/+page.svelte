@@ -9,15 +9,28 @@
   let organizationSlug = '';
   let logoUrl = '';
   let isSubmitting = false;
+  let isStartingTrial = false;
   let error = '';
+  let successMessage = '';
   
   // Generate slug from organization name
-  $: if (organizationName) {
-    organizationSlug = organizationName
+  function generateSlug(name: string, randomSuffix: boolean = false): string {
+    let slug = name
       .toLowerCase()
       .replace(/[^\w\s-]/g, '')
       .replace(/\s+/g, '-')
       .substring(0, 30);
+      
+    if (randomSuffix) {
+      const randomString = Math.random().toString(36).substring(2, 6);
+      slug = `${slug}-${randomString}`;
+    }
+    
+    return slug;
+  }
+  
+  $: if (organizationName) {
+    organizationSlug = generateSlug(organizationName);
   }
 
   // Handle logo upload
@@ -59,7 +72,8 @@
             owner_id: user.id,
             settings_json: {
               logo_url: logoUrl
-            }
+            },
+            payment_up_to_date: false
           }
         ])
         .select()
@@ -67,8 +81,39 @@
 
       if (orgError) throw orgError;
 
-      // Force a hard redirect to refresh the session
-      window.location.href = '/dashboard';
+      // Update the displayed slug in case it was modified
+      organizationSlug = orgData.slug;
+      
+      // Start the free trial
+      isStartingTrial = true;
+      successMessage = 'Organization created! Starting your free trial...';
+      
+      try {
+        const response = await fetch('/api/start-trial', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        const result = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to start trial');
+        }
+        
+        // Update success message before redirecting
+        successMessage = 'Trial started successfully! Redirecting to dashboard...';
+        
+        // Wait a moment to show the success message
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Redirect to dashboard
+        window.location.href = '/dashboard';
+      } catch (trialError) {
+        console.error('Trial start error:', trialError);
+        throw new Error(`Organization created, but we couldn't start your trial: ${trialError.message}. Please contact support.`);
+      }
     } catch (err) {
       console.error('Error during onboarding:', err);
       error = err.message || 'An error occurred during onboarding. Please try again.';
@@ -98,6 +143,20 @@
           </svg>
         </div>
         <p class="error-text">{error}</p>
+      </div>
+    {:else if successMessage}
+      <div class="success-message">
+        <div class="success-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+          </svg>
+        </div>
+        <p class="success-text">
+          {successMessage}
+          {#if isStartingTrial}
+            <span class="loading-dots">...</span>
+          {/if}
+        </p>
       </div>
     {/if}
 

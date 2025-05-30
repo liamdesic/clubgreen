@@ -34,13 +34,24 @@ if (browser) {
 
   // Add auth state change listener for debugging in development
   if (import.meta.env.DEV) {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       const timestamp = new Date().toISOString();
-      if (session?.user) {
-        console.log(`[${timestamp}] Auth state changed: ${event} - User: ${session.user.email}`);
-      } else {
-        console.log(`[${timestamp}] Auth state changed: ${event} - No user session`);
+      
+      // Skip if no session
+      if (!session) {
+        console.log(`[${timestamp}] Auth state changed: ${event} - No session`);
+        return;
       }
+      
+      // Verify the session by getting the user
+      const { data: { user }, error } = await supabase.auth.getUser(session.access_token);
+      
+      if (error || !user) {
+        console.log(`[${timestamp}] Auth state changed: ${event} - Session verification failed`);
+        return;
+      }
+      
+      console.log(`[${timestamp}] Auth state changed: ${event} - Verified user: ${user.email}`);
     });
 
     // Cleanup subscription on HMR updates
