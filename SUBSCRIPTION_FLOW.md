@@ -15,12 +15,39 @@ This document outlines the complete subscription flow for the ClubGreen applicat
 ## Validation Checklist
 
 ### Environment Variables
-- [ ] `PUBLIC_SUPABASE_URL` is set and correct
-- [ ] `PUBLIC_SUPABASE_ANON_KEY` is set and valid
-- [ ] `STRIPE_SECRET_KEY` is set and has proper permissions
-- [ ] `STRIPE_WEBHOOK_SECRET` is set and matches Stripe dashboard
-- [ ] `STRIPE_PRICE_ID` is set to a valid Stripe price ID
-- [ ] `NEXT_PUBLIC_SITE_URL` is set for proper redirects
+
+#### Supabase Configuration
+- [x] `PUBLIC_SUPABASE_URL` - Supabase project URL
+- [x] `PUBLIC_SUPABASE_ANON_KEY` - Public anonymous key for client-side operations
+- [x] `VITE_SUPABASE_URL` - Same as PUBLIC_SUPABASE_URL (for Vite)
+- [x] `VITE_SUPABASE_ANON_KEY` - Same as PUBLIC_SUPABASE_ANON_KEY (for Vite)
+- [x] `VITE_SUPABASE_REDIRECT_URL` - Callback URL for authentication
+- [x] `VITE_LOCAL_DEV` - Set to true for local development
+- [x] `SUPABASE_SERVICE_ROLE_KEY` - Service role key for admin operations
+
+#### Stripe Configuration
+- [x] `PUBLIC_STRIPE_PUBLISHABLE_KEY` - Stripe publishable key (client-side)
+- [x] `VITE_STRIPE_PUBLISHABLE_KEY` - Same as PUBLIC_STRIPE_PUBLISHABLE_KEY (for Vite)
+- [x] `STRIPE_SECRET_KEY` - Secret key for server-side Stripe operations
+- [x] `STRIPE_WEBHOOK_SECRET` - Webhook signing secret
+- [x] `STRIPE_PRICE_ID` - ID of the Stripe price/plan
+- [x] `VITE_STRIPE_PRICE_ID` - Same as STRIPE_PRICE_ID (for Vite)
+- [ ] `NEXT_PUBLIC_SITE_URL` - Site URL for proper redirects (not set)
+
+PUBLIC_SUPABASE_URL=
+PUBLIC_SUPABASE_ANON_KEY=
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+VITE_SUPABASE_REDIRECT_URL=
+VITE_LOCAL_DEV=true
+SUPABASE_SERVICE_ROLE_KEY=
+
+PUBLIC_STRIPE_PUBLISHABLE_KEY=
+VITE_STRIPE_PUBLISHABLE_KEY=
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_PRICE_ID=
+VITE_STRIPE_PRICE_ID=
 
 ### Authentication Flow
 - [ ] Magic link login works end-to-end
