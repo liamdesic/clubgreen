@@ -1,9 +1,9 @@
 import { error, json } from '@sveltejs/kit';
 import Stripe from 'stripe';
-import { SECRET_STRIPE_KEY, STRIPE_PRICE_ID } from '$env/static/private';
+import { STRIPE_SECRET_KEY, STRIPE_PRICE_ID } from '$env/static/private';
 import { supabase } from '$lib/supabaseClient';
 
-const stripe = new Stripe(SECRET_STRIPE_KEY, {
+const stripe = new Stripe(STRIPE_SECRET_KEY, {
   apiVersion: '2024-09-30.acacia'
 });
 
