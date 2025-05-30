@@ -115,10 +115,42 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
     return;
   }
 
-  // Determine if the trial has ended
+  // Log current subscription state
+  console.log('Current subscription state:', {
+    subscription_id: subscription.id,
+    status: subscription.status,
+    trial_end: subscription.trial_end,
+    current_period_end: subscription.current_period_end,
+    customer: customerId,
+    organization: org.id
+  });
+
+  // Determine subscription status
   const now = Math.floor(Date.now() / 1000);
   const trialHasEnded = subscription.trial_end ? subscription.trial_end <= now : true;
-  const effectiveStatus = trialHasEnded && subscription.status === 'trialing' ? 'active' : subscription.status;
+  
+  // If invoice is paid, always mark as active regardless of trial status
+  const latestInvoice = subscription.latest_invoice as Stripe.Invoice | null;
+  const isPaid = latestInvoice?.paid === true;
+  
+  // Determine effective status
+  let effectiveStatus = subscription.status;
+  if (isPaid && subscription.status === 'trialing') {
+    effectiveStatus = 'active';
+  } else if (trialHasEnded && subscription.status === 'trialing') {
+    effectiveStatus = 'active';
+  }
+
+  console.log('Subscription status:', {
+    now,
+    trial_end: subscription.trial_end,
+    trialHasEnded,
+    isPaid,
+    original_status: subscription.status,
+    effective_status: effectiveStatus,
+    invoice_status: latestInvoice?.status,
+    invoice_paid: latestInvoice?.paid
+  });
 
   const subscriptionData = {
     stripe_subscription_id: subscription.id,
@@ -127,8 +159,16 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
     trial_ends_at: subscription.trial_end ? new Date(subscription.trial_end * 1000).toISOString() : null,
     updated_at: new Date().toISOString(),
     stripe_customer_id: customerId,
-    organization_id: org.id
+    organization_id: org.id,
+    // Add metadata for debugging
+    metadata: {
+      ...subscription.metadata,
+      is_trial_upgrade: subscription.metadata?.is_trial_upgrade || 'false',
+      last_updated: new Date().toISOString()
+    }
   };
+  
+  console.log('Updating subscription with data:', subscriptionData);
 
   try {
     // First, try to insert the subscription
@@ -156,11 +196,19 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
     throw error;
   }
 
-  // Update organization's payment status
+  // Update organization's payment status based on effective status
+  const paymentUpToDate = ['active', 'trialing'].includes(effectiveStatus);
+  
+  console.log('Updating organization payment status:', {
+    organization_id: org.id,
+    payment_up_to_date: paymentUpToDate,
+    effective_status: effectiveStatus
+  });
+
   const { error: orgUpdateError } = await supabaseAdmin
     .from('organizations')
     .update({
-      payment_up_to_date: ['trialing', 'active'].includes(subscription.status),
+      payment_up_to_date: paymentUpToDate,
       updated_at: new Date().toISOString()
     })
     .eq('id', org.id);
@@ -168,6 +216,8 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
   if (orgUpdateError) {
     console.error('Error updating organization payment status:', orgUpdateError);
     throw orgUpdateError;
+  } else {
+    console.log('Successfully updated organization payment status');
   }
 
   console.log(`Updated subscription ${subscription.id} for organization ${org.id}`);
@@ -223,39 +273,83 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
   if (!invoice.subscription) return;
   
-  // Get the subscription details
-  const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
-  let updatedSubscription = subscription;
-  
-  // If this is the first payment (trial or otherwise), update the subscription
-  if (invoice.billing_reason === 'subscription_create' || invoice.billing_reason === 'subscription_update') {
-    // If coming from trial, end the trial immediately
-    if (subscription.status === 'trialing') {
-      console.log(`Ending trial for subscription: ${subscription.id}`);
-      // Update the subscription to end trial immediately
-      updatedSubscription = await stripe.subscriptions.update(subscription.id, {
+  console.log('Payment succeeded for invoice:', {
+    id: invoice.id,
+    billing_reason: invoice.billing_reason,
+    subscription: invoice.subscription,
+    paid: invoice.paid,
+    status: invoice.status
+  });
+
+  // Get the subscription with expanded latest invoice
+  const subscription = await stripe.subscriptions.retrieve(
+    invoice.subscription as string,
+    { expand: ['latest_invoice.payment_intent'] }
+  );
+
+  console.log('Retrieved subscription:', {
+    id: subscription.id,
+    status: subscription.status,
+    trial_end: subscription.trial_end,
+    latest_invoice: subscription.latest_invoice
+  });
+
+  // If this is a payment during trial, end the trial and activate immediately
+  if (subscription.status === 'trialing' && invoice.paid) {
+    console.log('Processing trial upgrade for subscription:', subscription.id);
+    
+    try {
+      // End trial and activate subscription
+      const updatedSubscription = await stripe.subscriptions.update(subscription.id, {
         trial_end: 'now',
-        proration_behavior: 'none', // Don't prorate the current period
+        proration_behavior: 'none',
         payment_behavior: 'default_incomplete',
         payment_settings: { save_default_payment_method: 'on_subscription' },
         expand: ['latest_invoice.payment_intent']
       });
-      
+
       console.log('Trial ended, subscription updated:', {
         id: updatedSubscription.id,
         status: updatedSubscription.status,
         trial_end: updatedSubscription.trial_end
       });
+
+      // Force update the organization's payment status
+      const customerId = typeof updatedSubscription.customer === 'string' 
+        ? updatedSubscription.customer 
+        : updatedSubscription.customer?.id;
+
+      if (customerId) {
+        const { data: org } = await supabaseAdmin
+          .from('organizations')
+          .select('id')
+          .eq('stripe_customer_id', customerId)
+          .single();
+
+        if (org) {
+          await supabaseAdmin
+            .from('organizations')
+            .update({
+              payment_up_to_date: true,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', org.id);
+          
+          console.log('Organization payment status updated to paid for org:', org.id);
+        }
+      }
+
+      // Update subscription in our database
+      await handleSubscriptionChange(updatedSubscription);
+      return;
+    } catch (error) {
+      console.error('Error updating subscription to end trial:', error);
+      throw error;
     }
-    
-    // Update our records with the latest subscription state
-    await handleSubscriptionChange(updatedSubscription);
-  } else if (invoice.billing_reason === 'subscription_cycle' || !invoice.billing_reason) {
-    // For recurring payments or when reason is not specified
-    await handleSubscriptionChange(updatedSubscription);
   }
   
-  console.log(`Payment succeeded for invoice ${invoice.id} (${invoice.billing_reason})`);
+  // For non-trial subscriptions or if not paid yet
+  await handleSubscriptionChange(subscription);
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {

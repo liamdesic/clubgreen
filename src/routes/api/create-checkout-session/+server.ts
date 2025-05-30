@@ -50,7 +50,7 @@ export async function POST({ request, locals }) {
       }
     }
 
-    // Create checkout session with immediate charging
+    // Create checkout session that immediately ends trial
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       payment_method_types: ['card'],
@@ -59,16 +59,20 @@ export async function POST({ request, locals }) {
         quantity: 1,
       }],
       mode: 'subscription',
-      success_url: `${new URL(request.url).origin}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${new URL(request.url).origin}/dashboard?session_id={CHECKOUT_SESSION_ID}&upgraded=true`,
       cancel_url: `${new URL(request.url).origin}/pricing?canceled=true`,
       subscription_data: {
-        description: 'Your subscription will start immediately after payment',
+        trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
+        payment_behavior: 'default_incomplete',
       },
-      allow_promotion_codes: true,
       payment_intent_data: {
         setup_future_usage: 'off_session',
       },
       billing_address_collection: 'required',
+      metadata: {
+        organization_id: organizationId || 'unknown',
+        is_trial_upgrade: 'true'
+      }
     });
 
     return json({ sessionId: session.id });
