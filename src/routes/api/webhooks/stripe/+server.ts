@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import Stripe from 'stripe';
-import { STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET } from '$env/static/private';
+import { STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Stripe with the latest API version
@@ -10,8 +10,8 @@ const stripe = new Stripe(STRIPE_SECRET_KEY, {
 
 // Initialize Supabase Admin Client for server-side operations
 const supabaseAdmin = createClient(
-  process.env.PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  PUBLIC_SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY
 );
 
 export async function POST({ request }) {
