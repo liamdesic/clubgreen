@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import Button from '$lib/components/Button.svelte';
+  import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
   
   let error = '';
   let supabaseStatus = 'Checking...';
@@ -22,8 +23,8 @@
     // Check environment variables
     try {
       envVars = {
-        supabaseUrl: import.meta.env.VITE_SUPABASE_URL ? '✅ Set' : '❌ Missing',
-        supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing'
+        supabaseUrl: PUBLIC_SUPABASE_URL ? '✅ Set' : '❌ Missing',
+        supabaseAnonKey: PUBLIC_SUPABASE_ANON_KEY ? '✅ Set' : '❌ Missing'
       };
     } catch (e) {
       error = `Error checking env vars: ${e.message}`;
@@ -60,8 +61,8 @@
     
     <h3>Environment Variables</h3>
     <ul>
-      <li>VITE_SUPABASE_URL: {envVars.supabaseUrl}</li>
-      <li>VITE_SUPABASE_ANON_KEY: {envVars.supabaseAnonKey}</li>
+      <li>PUBLIC_SUPABASE_URL: {envVars.supabaseUrl}</li>
+      <li>PUBLIC_SUPABASE_ANON_KEY: {envVars.supabaseAnonKey}</li>
     </ul>
     
     {#if error}

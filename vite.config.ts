@@ -23,18 +23,15 @@ export default defineConfig(({ mode }) => {
         strict: false
       }
     } : {},
-    // Expose all VITE_ and PUBLIC_ prefixed environment variables
-    envPrefix: ['VITE_', 'PUBLIC_'],
+    // Only expose PUBLIC_ prefixed environment variables
+    envPrefix: 'PUBLIC_',
     // Explicitly define the env variables to expose to the client
     define: {
       // Supabase
       'import.meta.env.PUBLIC_SUPABASE_URL': JSON.stringify(env.PUBLIC_SUPABASE_URL || ''),
       'import.meta.env.PUBLIC_SUPABASE_ANON_KEY': JSON.stringify(env.PUBLIC_SUPABASE_ANON_KEY || ''),
-      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || env.PUBLIC_SUPABASE_URL || ''),
-      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY || env.PUBLIC_SUPABASE_ANON_KEY || ''),
       // Stripe
       'import.meta.env.PUBLIC_STRIPE_PUBLISHABLE_KEY': JSON.stringify(env.PUBLIC_STRIPE_PUBLISHABLE_KEY || ''),
-      
       // App mode
       'import.meta.env.MODE': JSON.stringify(mode)
     }

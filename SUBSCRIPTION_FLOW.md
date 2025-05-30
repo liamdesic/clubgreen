@@ -19,35 +19,35 @@ This document outlines the complete subscription flow for the ClubGreen applicat
 #### Supabase Configuration
 - [x] `PUBLIC_SUPABASE_URL` - Supabase project URL
 - [x] `PUBLIC_SUPABASE_ANON_KEY` - Public anonymous key for client-side operations
-- [x] `VITE_SUPABASE_URL` - Same as PUBLIC_SUPABASE_URL (for Vite)
-- [x] `VITE_SUPABASE_ANON_KEY` - Same as PUBLIC_SUPABASE_ANON_KEY (for Vite)
-- [x] `VITE_SUPABASE_REDIRECT_URL` - Callback URL for authentication
-- [x] `VITE_LOCAL_DEV` - Set to true for local development
+- [x] `PUBLIC_SUPABASE_REDIRECT_URL` - Callback URL for authentication
 - [x] `SUPABASE_SERVICE_ROLE_KEY` - Service role key for admin operations
 
 #### Stripe Configuration
 - [x] `PUBLIC_STRIPE_PUBLISHABLE_KEY` - Stripe publishable key (client-side)
-- [x] `VITE_STRIPE_PUBLISHABLE_KEY` - Same as PUBLIC_STRIPE_PUBLISHABLE_KEY (for Vite)
+- [x] `PUBLIC_STRIPE_PRICE_ID` - ID of the Stripe price/plan (client-side)
 - [x] `STRIPE_SECRET_KEY` - Secret key for server-side Stripe operations
 - [x] `STRIPE_WEBHOOK_SECRET` - Webhook signing secret
-- [x] `STRIPE_PRICE_ID` - ID of the Stripe price/plan
-- [x] `VITE_STRIPE_PRICE_ID` - Same as STRIPE_PRICE_ID (for Vite)
-- [ ] `NEXT_PUBLIC_SITE_URL` - Site URL for proper redirects (not set)
 
-PUBLIC_SUPABASE_URL=
-PUBLIC_SUPABASE_ANON_KEY=
-VITE_SUPABASE_URL=
-VITE_SUPABASE_ANON_KEY=
-VITE_SUPABASE_REDIRECT_URL=
-VITE_LOCAL_DEV=true
-SUPABASE_SERVICE_ROLE_KEY=
+#### Local Development
+- [x] `NODE_ENV` - Set to 'development' for local development
 
-PUBLIC_STRIPE_PUBLISHABLE_KEY=
-VITE_STRIPE_PUBLISHABLE_KEY=
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
-STRIPE_PRICE_ID=
-VITE_STRIPE_PRICE_ID=
+Example `.env` file:
+```
+# Supabase
+PUBLIC_SUPABASE_URL=your_supabase_url
+PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+PUBLIC_SUPABASE_REDIRECT_URL=your_redirect_url
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# Stripe
+PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
+PUBLIC_STRIPE_PRICE_ID=your_stripe_price_id
+STRIPE_SECRET_KEY=your_stripe_secret_key
+STRIPE_WEBHOOK_SECRET=your_webhook_secret
+
+# Environment
+NODE_ENV=development
+```
 
 ### Authentication Flow
 - [ ] Magic link login works end-to-end

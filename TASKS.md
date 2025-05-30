@@ -1,5 +1,31 @@
 # 🏌️ Mini-Golf Leaderboard - Project Tasks
 
+## 🔄 Environment Variable Standardization
+- [ ] **Codebase Audit**
+  - [ ] Search for all instances of `VITE_` in the codebase
+  - [ ] Document all files using Vite-specific environment variables
+  - [ ] Create a mapping of VITE_* to PUBLIC_* equivalents
+
+- [ ] **Code Updates**
+  - [ ] Update all imports from `$env/static/public` to use PUBLIC_ prefix
+  - [ ] Update any dynamic imports using `import.meta.env.VITE_*` to use `PUBLIC_`
+  - [ ] Update any build configurations or Vite plugins referencing VITE_ variables
+
+- [ ] **Environment Configuration**
+  - [ ] Update `.env` files to consolidate on PUBLIC_ prefix
+  - [ ] Remove duplicate VITE_ variables that shadow PUBLIC_ variables
+  - [ ] Update deployment configurations (Vercel, etc.) to use new variable names
+
+- [ ] **Documentation**
+  - [ ] Update SUBSCRIPTION_FLOW.md to remove VITE_ references
+  - [ ] Update any other documentation referencing environment variables
+  - [ ] Add a section about environment variable naming conventions
+
+- [ ] **Testing**
+  - [ ] Test all environment-dependent features in development
+  - [ ] Verify build process works with new variable names
+  - [ ] Test deployment to staging/production environments
+
 ## ✅ Completed
 - [x] QR code generation (client-side, dynamic URLs)
 - [x] Scorecard pulls dynamic event + score data via slug
