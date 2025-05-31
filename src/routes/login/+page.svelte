@@ -482,7 +482,7 @@
                     required
                     autocomplete={mode === 'signup' ? 'new-password' : 'current-password'}
                     minlength="8"
-                    pattern=".{8,}"
+                    pattern={'.{8,}'}
                     title="Password must be at least 8 characters long"
                   />
 
@@ -491,7 +491,6 @@
                   class="toggle-password" 
                   on:click={togglePassword}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}>
-                
                   {#if showPassword}
                     <EyeOff size={18} />
                   {:else}
