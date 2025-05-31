@@ -482,7 +482,7 @@
                   required
                   autocomplete={mode === 'signup' ? 'new-password' : 'current-password'}
                   minlength="8"
-                  pattern='.{8,}'
+                  pattern=".{8,}"
                   title="Password must be at least 8 characters long" />
                 <button 
                   type="button" 
