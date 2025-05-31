@@ -1,6 +1,5 @@
 import { json, error } from '@sveltejs/kit';
 import { stripe } from '$lib/server/stripe/client';
-import { STRIPE_PRICE_ID } from '$env/static/private';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ request, locals, url }) => {
@@ -8,11 +7,11 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
     console.log('Starting checkout process...');
     
     // Verify required environment variables
-    if (!STRIPE_PRICE_ID) {
+    if (!import.meta.env.STRIPE_PRICE_ID) {
       throw new Error('STRIPE_PRICE_ID is not set in environment variables');
     }
     
-    console.log('Using Stripe Price ID:', STRIPE_PRICE_ID);
+    console.log('Using Stripe Price ID:', import.meta.env.STRIPE_PRICE_ID);
     
     // Get the authenticated user from locals
     const { user } = await locals.getSession();
@@ -107,14 +106,63 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
       }
     }
 
-    // Create checkout session
-    console.log('Creating checkout session...');
+    // Check if organization has an existing subscription
+    const { data: subscriptionData, error: subscriptionError } = await locals.supabase
+      .from('organizations')
+      .select('stripe_subscription_id, subscription_status')
+      .eq('id', orgData.id)
+      .single();
+
+    // If user is on trial, update the existing subscription to end trial immediately
+    if (subscriptionData?.subscription_status === 'trialing' && subscriptionData.stripe_subscription_id) {
+      console.log('User is on trial, upgrading subscription...', {
+        subscriptionId: subscriptionData.stripe_subscription_id,
+        organizationId: orgData.id
+      });
+
+      try {
+        // End trial immediately and bill the user
+        const subscription = await stripe.subscriptions.update(
+          subscriptionData.stripe_subscription_id,
+          {
+            trial_end: 'now',
+            proration_behavior: 'none',
+            payment_behavior: 'default_incomplete',
+            payment_settings: { save_default_payment_method: 'on_subscription' },
+            metadata: {
+              organizationId: orgData.id,
+              userId: user.id,
+              customerId: customer.id,
+              upgraded_from_trial: 'true'
+            }
+          }
+        );
+
+        console.log('Subscription trial ended, billing user immediately', {
+          subscriptionId: subscription.id,
+          status: subscription.status
+        });
+
+        // Redirect to success page with subscription ID
+        return json({
+          url: `${url.origin}/dashboard?subscription_updated=true`,
+          sessionId: subscription.id,
+          isUpgrade: true
+        });
+      } catch (updateError) {
+        console.error('Error updating subscription:', updateError);
+        // Fall through to regular checkout if update fails
+      }
+    }
+
+    // Create new checkout session for new subscriptions
+    console.log('Creating new checkout session...');
     const checkoutSession = await stripe.checkout.sessions.create({
       customer: customer.id,
       payment_method_types: ['card'],
       line_items: [
         {
-          price: STRIPE_PRICE_ID,
+          price: import.meta.env.STRIPE_PRICE_ID,
           quantity: 1,
         },
       ],

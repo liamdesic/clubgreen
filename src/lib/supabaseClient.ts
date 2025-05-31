@@ -3,13 +3,23 @@
 import { createBrowserClient } from '@supabase/ssr';
 import { browser } from '$app/environment';
 import type { Database } from './database.types';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-declare global {
-  interface ImportMetaEnv {
-    PUBLIC_SUPABASE_URL: string;
-    PUBLIC_SUPABASE_ANON_KEY: string;
-  }
-}
+// Define Session type locally to avoid module resolution issues
+type Session = {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  token_type: string;
+  user: {
+    id: string;
+    email?: string;
+    user_metadata?: Record<string, any>;
+    app_metadata?: Record<string, any>;
+  };
+};
+
+export type { Session };
 
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
@@ -19,9 +29,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Create a typed Supabase client
-type SupabaseClient = ReturnType<typeof createBrowserClient<Database>>;
-
-let supabase: SupabaseClient;
+let supabase: SupabaseClient<Database>;
 
 // Initialize Supabase client based on the environment
 if (browser) {

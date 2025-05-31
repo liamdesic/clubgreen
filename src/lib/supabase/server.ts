@@ -23,3 +23,36 @@ export function createServerClient(cookies: Cookies) {
     }
   })
 }
+
+export function createAdminClient() {
+  const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+
+  // Create a simple cookie store for the admin client
+  const cookieStore = {
+    getItem: (key: string) => null,
+    setItem: (key: string, value: string) => {},
+    removeItem: (key: string) => {}
+  };
+
+  return _createServerClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false
+    },
+    cookies: {
+      get: (key) => cookieStore.getItem(key),
+      set: (key, value, options) => {
+        cookieStore.setItem(key, value);
+      },
+      remove: (key, options) => {
+        cookieStore.removeItem(key);
+      }
+    }
+  });
+}

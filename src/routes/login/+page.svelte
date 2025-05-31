@@ -1,8 +1,12 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
-  import { supabase } from '$lib/supabaseClient';
+  import { supabase, type Session } from '$lib/supabaseClient';
   import { Mail, Check, ArrowRight, RotateCcw, Eye, EyeOff, Lock, User } from 'lucide-svelte';
+  
+  // Error handling
+  let authError: string | null = null;
+  import '$lib/styles/login.css';
   import Button from '$lib/components/Button.svelte';
   import { tweened } from 'svelte/motion';
   import { cubicInOut } from 'svelte/easing';
@@ -20,10 +24,13 @@
   let loading = false;
   let linkSent = false;
   let processingAuth = false;
-  let authError = '';
   let finalRedirectTo = '/dashboard'; // Default redirect destination
   let step = 'enter-email';
   let mode = 'login';
+  
+  // Rate limiting for magic link sends
+  let lastMagicLinkSent = 0;
+  const MAGIC_LINK_COOLDOWN = 60 * 1000; // 1 minute cooldown
 
   // Animation for tab switching
   const bgX = tweened(0, { duration: 100, easing: cubicInOut});
@@ -35,44 +42,37 @@
     bgX.set(100); // signup is on the right (percent-based)
   }
   
-  // Process the authentication token if it exists in the URL hash
   // Handle auth state changes
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-    console.log('🔑 [AUTH] Auth state changed:', event);
-    console.log('🔑 [AUTH] Session exists:', !!session);
-    
-    if (event === 'SIGNED_IN' && session?.access_token) {
-      console.log('✅ [AUTH] User signed in, verifying session...');
-      console.log('🔑 [AUTH] Access token exists:', !!session.access_token);
+  let authSubscription: { unsubscribe: () => void } | null = null;
+  
+  onMount(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: Session | null) => {
+      console.log('🔑 [AUTH] Auth state changed:', event);
       
-      try {
-        // Verify the session by getting the user
-        console.log('🔍 [AUTH] Verifying session with Supabase...');
-        const { data: { user }, error } = await supabase.auth.getUser(session.access_token);
-        
-        if (error || !user) {
-          console.error('❌ [AUTH] Session verification failed:', error);
-          console.log('🚪 [AUTH] Signing out due to verification failure...');
-          await supabase.auth.signOut();
-          return;
-        }
-        
-        console.log('✅ [AUTH] Session verified for user:', user.email);
-        console.log('🔑 [AUTH] User ID:', user.id);
-        
-        console.log('User verified, redirecting to:', finalRedirectTo);
-        // Ensure the session is properly set in the browser
-        await new Promise(resolve => setTimeout(resolve, 100));
-        // Force a full page reload to ensure all auth state is properly set
+      if (event === 'SIGNED_IN') {
+        console.log('✅ [AUTH] User signed in, redirecting to:', finalRedirectTo);
         window.location.href = finalRedirectTo;
-      } catch (err) {
-        console.error('Error verifying session:', err);
+      } else if (event === 'SIGNED_OUT') {
+        console.log('User signed out');
       }
-    } else if (event === 'SIGNED_OUT') {
-      console.log('User signed out, cleaning up...');
-      // Clear any existing tokens to prevent issues
-      document.cookie = 'sb-access-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-      document.cookie = 'sb-refresh-token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    });
+    
+    authSubscription = subscription;
+    
+    // Cleanup function
+    return () => {
+      if (authSubscription) {
+        authSubscription.unsubscribe();
+        console.log('🔌 [AUTH] Cleaned up auth subscription');
+      }
+    };
+  });
+  
+  // Cleanup on component destroy
+  onDestroy(() => {
+    if (authSubscription) {
+      authSubscription.unsubscribe();
+      console.log('🔌 [AUTH] Cleaned up auth subscription on destroy');
     }
   });
 
@@ -98,65 +98,24 @@
       console.error('Error getting user:', error);
     }
     
-    // Try multiple methods to detect the hash
+    // Parse tokens from URL hash (Supabase's standard location for auth tokens)
     let accessToken = null;
     let refreshToken = null;
     
-    // Method 1: Direct hash access
     const hash = window.location.hash;
-    console.log('URL hash detected (method 1):', hash ? 'Yes' : 'No');
-    
     if (hash) {
-      // Extract tokens from the hash
       try {
         const params = new URLSearchParams(hash.substring(1));
         accessToken = params.get('access_token');
         refreshToken = params.get('refresh_token');
-        console.log('Method 1 - Access token found:', accessToken ? 'Yes' : 'No');
-      } catch (e) {
-        console.error('Error parsing hash with URLSearchParams:', e);
-      }
-    }
-    
-    // Method 2: Check the full URL for tokens
-    if (!accessToken) {
-      const fullUrl = window.location.href;
-      console.log('Checking full URL for tokens');
-      
-      if (fullUrl.includes('access_token=')) {
-        try {
-          // Extract the hash part manually
-          const hashPart = fullUrl.split('#')[1];
-          if (hashPart) {
-            const params = new URLSearchParams(hashPart);
-            accessToken = params.get('access_token');
-            refreshToken = params.get('refresh_token');
-            console.log('Method 2 - Access token found:', accessToken ? 'Yes' : 'No');
-          }
-        } catch (e) {
-          console.error('Error extracting token from full URL:', e);
-        }
-      }
-    }
-    
-    // Method 3: Manual parsing as a last resort
-    if (!accessToken && window.location.href.includes('access_token=')) {
-      try {
-        const urlParts = window.location.href.split('#');
-        if (urlParts.length > 1) {
-          const hashParams = urlParts[1].split('&');
-          for (const part of hashParams) {
-            if (part.startsWith('access_token=')) {
-              accessToken = part.split('=')[1];
-              console.log('Method 3 - Access token found:', accessToken ? 'Yes (truncated for security)' : 'No');
-            }
-            if (part.startsWith('refresh_token=')) {
-              refreshToken = part.split('=')[1];
-            }
-          }
+        
+        if (accessToken) {
+          console.log('Auth tokens found in URL hash');
+          // Clear the hash from the URL without reloading
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
         }
       } catch (e) {
-        console.error('Error with manual token extraction:', e);
+        console.error('Error parsing auth tokens from URL hash:', e);
       }
     }
     
@@ -190,18 +149,14 @@
           throw error;
         }
         
-        // Manually set cookies for additional persistence
-        document.cookie = `sb-access-token=${accessToken}; path=/; max-age=3600; SameSite=Lax; secure`;
-        document.cookie = `sb-refresh-token=${refreshToken}; path=/; max-age=3600; SameSite=Lax; secure`;
-        
         console.log('Session set successfully:', data.session ? 'Yes' : 'No');
         
-        // Verify the user is properly authenticated
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        console.log('User verified:', user ? `Yes (${user.email})` : 'No');
+        // Verify the user session
+        const { data: { user: verifiedUser }, error: verificationError } = await supabase.auth.getUser();
+        console.log('User session established:', verifiedUser ? 'Yes' : 'No');
         
-        if (userError || !user) {
-          console.error('Failed to verify user:', userError);
+        if (verificationError || !verifiedUser) {
+          console.error('Failed to verify user:', verificationError);
           throw new Error('Failed to authenticate user after setting tokens');
         }
         
@@ -260,8 +215,8 @@
         return;
       }
       
-      if (password.length < 6) {
-        error = 'Password must be at least 6 characters';
+      if (password.length < 8) {
+        error = 'Password must be at least 8 characters';
         console.error('❌ [AUTH] Validation error: Password too short');
         console.groupEnd();
         return;
@@ -352,66 +307,32 @@
     }
   }
   
-  // Handle magic link authentication
-  async function handleMagicLink() {
-    console.log('Initiating magic link flow for email:', email);
-    
-    if (!email) {
-      error = 'Please enter your email';
-      return;
-    }
-    
-    error = '';
-    loading = true;
-    
-    try {
-      console.log('Sending magic link to:', email);
-      console.log('Redirect after login:', finalRedirectTo);
-      
-      // Call the server-side API to send the magic link
-      const response = await fetch(`/api/auth/magic-link?redirectTo=${encodeURIComponent(finalRedirectTo)}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email })
-      });
-      
-      const result = await response.json();
-      
-      if (!response.ok || !result.success) {
-        const errorMessage = result.error || 'Failed to send magic link. Please try again.';
-        console.error('Magic link error:', errorMessage);
-        throw new Error(errorMessage);
-      }
-      
-      // Show success message
-      console.log('Magic link sent successfully');
-      linkSent = true;
-    } catch (err) {
-      console.error('Error sending magic link:', err);
-      error = err instanceof Error ? err.message : 'An unexpected error occurred';
-    } finally {
-      loading = false;
-    }
-  }
-  
-  // Handle email sign in
+  // Handle email sign in (magic link) with rate limiting
   async function handleEmailSignIn() {
     console.log('📧 [AUTH] Starting email sign in process');
     
     if (!email) {
-      error = 'Please enter your email';
+      setError('Please enter your email');
       console.error('❌ [AUTH] No email provided');
+      return;
+    }
+    
+    // Check rate limiting
+    const now = Date.now();
+    const timeSinceLastSend = now - lastMagicLinkSent;
+    
+    if (timeSinceLastSend < MAGIC_LINK_COOLDOWN) {
+      const timeLeft = Math.ceil((MAGIC_LINK_COOLDOWN - timeSinceLastSend) / 1000);
+      setError(`Please wait ${timeLeft} seconds before sending another magic link`);
       return;
     }
 
     loading = true;
-    error = '';
+    setError('');
     console.log('⏳ [AUTH] Sending magic link to:', email);
     
     try {
-      const redirectUrl = window.location.origin + '/login';
+      const redirectUrl = window.location.origin + finalRedirectTo;
       console.log('🔄 [AUTH] Setting redirect URL to:', redirectUrl);
       
       const { error: signInError } = await supabase.auth.signInWithOtp({
@@ -426,6 +347,8 @@
         throw signInError;
       }
       
+      // Update last sent time on success
+      lastMagicLinkSent = now;
       console.log('✅ [AUTH] Magic link sent successfully to:', email);
       linkSent = true;
       step = 'link-sent';
@@ -436,10 +359,23 @@
         message: err.message,
         email: email
       });
-      error = err.message || 'Failed to send magic link';
+      setError(err.message || 'Failed to send magic link. Please try again.');
     } finally {
       loading = false;
       console.log('🏁 [AUTH] Email sign in process completed');
+    }
+  }
+  
+  // Helper function to set error message
+  function setError(message: string) {
+    error = message;
+    // Auto-clear error after 5 seconds
+    if (message) {
+      setTimeout(() => {
+        if (error === message) {
+          error = '';
+        }
+      }, 5000);
     }
   }
   
@@ -485,12 +421,11 @@
         <div class="spinner"></div>
         <p>Processing authentication...</p>
       </div>
-    {:else if authError}
-      <div class="auth-error">
-        <p>Authentication Error:</p>
-        <p class="error-message">{authError}</p>
-        <Button on:click={() => authError = ''}>Try Again</Button>
+    {#if error}
+      <div class="global-error" role="alert">
+        <p class="error-message">{error}</p>
       </div>
+    {/if}
     {:else}
       {#if step === 'enter-email' && !linkSent}
         <div class="login-tabs" role="tablist" aria-label="Login options">
@@ -541,13 +476,14 @@
                 <Lock size={18} class="input-icon" />
                 <input 
                   id="password-input" 
-                  type={showPassword ? 'text' : 'password'} 
-                  bind:value={password} 
-                  placeholder="••••••••" 
+                  type={showPassword ? 'text' : 'password'}
+                  bind:value={password}
+                  placeholder="••••••••"
                   required
-                  minlength="8"
                   autocomplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                />
+                  minlength="8"
+                  pattern=".{8,}"
+                  title="Password must be at least 8 characters long"/>
                 <button 
                   type="button" 
                   class="toggle-password" 
@@ -598,7 +534,7 @@
             <Button 
               type="button" 
               variant="outline" 
-              on:click={handleMagicLink} 
+              on:click={handleEmailSignIn} 
               disabled={loading}
               class="magic-link-button"
             >
@@ -623,7 +559,7 @@
           <h2>Magic Link Sent!</h2>
           <p>We've sent a login link to <strong>{email}</strong></p>
           <p>Click the link in your email to log in.</p>
-          <Button on:click={handleAuth} disabled={loading}>
+          <Button on:click={handleEmailSignIn} disabled={loading}>
             {#if loading} Resending... {:else} Resend Magic Link {/if}
           </Button>
         </div>
@@ -637,143 +573,3 @@
 
   <footer>© 2025 Club Green</footer>
 </div>
-
-<style>
-  .global-error {
-    margin-top: 1rem;
-    text-align: center;
-    color: var(--danger-color, #ef4444);
-    background-color: rgba(239, 68, 68, 0.1);
-    padding: 0.75rem 1rem;
-    border-radius: 0.5rem;
-    font-size: 0.9rem;
-  }
-  
-  .form-group {
-    margin-bottom: 1.25rem;
-    width: 100%;
-  }
-  
-  .form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: 500;
-    color: var(--text-color, #333);
-  }
-  
-  .input-with-icon {
-    position: relative;
-    display: flex;
-    align-items: center;
-  }
-  
-  .input-icon {
-    position: absolute;
-    left: 0.75rem;
-    color: var(--muted-color, #6b7280);
-    pointer-events: none;
-  }
-  
-  .input-with-icon input {
-    width: 100%;
-    padding: 0.75rem 1rem 0.75rem 2.5rem;
-    border: 1px solid var(--border-color, #e5e7eb);
-    border-radius: 0.5rem;
-    font-size: 1rem;
-    transition: all 0.2s ease;
-  }
-  
-  .input-with-icon input:focus {
-    outline: none;
-    border-color: var(--primary-color, #4f46e5);
-    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
-  }
-  
-  .toggle-password {
-    position: absolute;
-    right: 0.75rem;
-    background: none;
-    border: none;
-    color: var(--muted-color, #6b7280);
-    cursor: pointer;
-    padding: 0.25rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .toggle-password:hover {
-    color: var(--text-color, #333);
-  }
-  
-  .auth-button {
-    width: 100%;
-    margin-top: 0.5rem;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-  
-  .divider {
-    display: flex;
-    align-items: center;
-    text-align: center;
-    margin: 1.5rem 0;
-    color: var(--muted-color, #6b7280);
-    font-size: 0.875rem;
-  }
-  
-  .divider::before,
-  .divider::after {
-    content: '';
-    flex: 1;
-    border-bottom: 1px solid var(--border-color, #e5e7eb);
-  }
-  
-  .divider span {
-    padding: 0 1rem;
-  }
-  
-  .magic-link-button {
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: white;
-    color: var(--text-color, #333);
-    border: 1px solid var(--border-color, #e5e7eb);
-  }
-  
-  .magic-link-button:hover {
-    background: var(--background-hover, #f9fafb);
-  }
-  
-  .spinner {
-    display: inline-block;
-    width: 1rem;
-    height: 1rem;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 50%;
-    border-top-color: white;
-    animation: spin 1s ease-in-out infinite;
-    margin-right: 0.5rem;
-  }
-  
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-  
-  .auth-processing {
-    text-align: center;
-    padding: 2rem;
-  }
-  
-  .auth-processing .spinner {
-    width: 2rem;
-    height: 2rem;
-    margin: 0 auto 1rem;
-    display: block;
-  }
-</style>
-
-

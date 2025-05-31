@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Clock } from 'lucide-svelte';
+  import { Clock4 } from 'lucide-svelte';
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';

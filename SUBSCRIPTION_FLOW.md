@@ -1,6 +1,6 @@
 # Subscription Flow Documentation
 
-This document outlines the complete subscription flow for the ClubGreen application, including Stripe integration, API endpoints, and frontend components.
+This document IS AI GENERATED AN MAY BE WRONG, VERIFY AS NEEDED. IT outlines the complete subscription flow for the ldrboard.co application, including Stripe integration, API endpoints, and frontend components.
 
 ## Table of Contents
 1. [Architecture Overview](#architecture-overview)
@@ -19,34 +19,21 @@ This document outlines the complete subscription flow for the ClubGreen applicat
 #### Supabase Configuration
 - [x] `PUBLIC_SUPABASE_URL` - Supabase project URL
 - [x] `PUBLIC_SUPABASE_ANON_KEY` - Public anonymous key for client-side operations
-- [x] `PUBLIC_SUPABASE_REDIRECT_URL` - Callback URL for authentication
+- [x] `VITE_SUPABASE_URL` - Same as PUBLIC_SUPABASE_URL (for Vite)
+- [x] `VITE_SUPABASE_ANON_KEY` - Same as PUBLIC_SUPABASE_ANON_KEY (for Vite)
+- [x] `VITE_SUPABASE_REDIRECT_URL` - Callback URL for authentication
+- [x] `VITE_LOCAL_DEV` - Set to true for local development
 - [x] `SUPABASE_SERVICE_ROLE_KEY` - Service role key for admin operations
 
 #### Stripe Configuration
 - [x] `PUBLIC_STRIPE_PUBLISHABLE_KEY` - Stripe publishable key (client-side)
-- [x] `PUBLIC_STRIPE_PRICE_ID` - ID of the Stripe price/plan (client-side)
+- [x] `VITE_STRIPE_PUBLISHABLE_KEY` - Same as PUBLIC_STRIPE_PUBLISHABLE_KEY (for Vite)
 - [x] `STRIPE_SECRET_KEY` - Secret key for server-side Stripe operations
 - [x] `STRIPE_WEBHOOK_SECRET` - Webhook signing secret
-
-#### Local Development
-- [x] `NODE_ENV` - Set to 'development' for local development
-
+- [x] `STRIPE_PRICE_ID` - ID of the Stripe price/plan
+- [x] `VITE_STRIPE_PRICE_ID` - Same as STRIPE_PRICE_ID (for Vite)
 Example `.env` file:
 ```
-# Supabase
-PUBLIC_SUPABASE_URL=your_supabase_url
-PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-PUBLIC_SUPABASE_REDIRECT_URL=your_redirect_url
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-
-# Stripe
-PUBLIC_STRIPE_PUBLISHABLE_KEY=your_stripe_publishable_key
-PUBLIC_STRIPE_PRICE_ID=your_stripe_price_id
-STRIPE_SECRET_KEY=your_stripe_secret_key
-STRIPE_WEBHOOK_SECRET=your_webhook_secret
-
-# Environment
-NODE_ENV=development
 ```
 
 ### Authentication Flow
@@ -484,103 +471,10 @@ http://localhost:5173/subscribe?testMode=true
 
 ## Testing
 
-### Test Cards
-Use Stripe's test card numbers in test mode:
-- Success: `4242 4242 4242 4242`
-- Authentication Required: `4000 0025 0000 3155`
-- Insufficient Funds: `4000 0000 0000 9995`
 
-### Webhook Testing
-Use the Stripe CLI to test webhooks locally:
-```bash
-stripe listen --forward-to localhost:5173/api/webhook
-```
 
 ## Current Issues
 
-### 1. Test Mode Authentication Redirect
-- **Issue**: In test mode, the application redirects to login when clicking the Subscribe button
-- **Location**: `/src/routes/subscribe/+page.svelte`
-- **Details**: 
-  - The test mode flow in `handleSubscribe()` redirects to `/dashboard?testMode=true&subscribed=true`
-  - The dashboard requires authentication, but the test mode flow doesn't ensure the user is logged in
-- **Impact**: Users get stuck in a login loop
-- **Priority**: High
 
-### 2. Stripe Checkout Error Handling
-- **Issue**: Generic error when checkout fails
-- **Location**: `/src/routes/api/create-checkout/+server.ts`
-- **Details**:
-  - Error messages from Stripe API are not properly propagated to the client
-  - No specific handling for common errors (e.g., invalid price ID, authentication issues)
-- **Impact**: Difficult to debug issues in production
-- **Priority**: High
-
-### 3. Environment Variable Loading
-- **Issue**: Inconsistent environment variable loading between development and production
-- **Location**: `vite.config.ts` and server-side code
-- **Details**:
-  - Some environment variables are not properly exposed to the client
-  - Different naming conventions used (`VITE_` vs. `PUBLIC_` prefixes)
-- **Impact**: Configuration issues when deploying to different environments
-- **Priority**: Medium
-
-### 4. Session Management
-- **Issue**: Session not properly maintained during subscription flow
-- **Location**: Authentication middleware and subscription endpoints
-- **Details**:
-  - Session cookies may not be properly set/validated
-  - Race conditions in session initialization
-- **Impact**: Users may get logged out during the checkout process
-- **Priority**: High
-
-### 5. Error Feedback in UI
-- **Issue**: Limited error feedback in the subscription UI
-- **Location**: `/src/routes/subscribe/+page.svelte`
-- **Details**:
-  - Error messages are not user-friendly
-  - Loading states could be more informative
-- **Impact**: Poor user experience when errors occur
-- **Priority**: Medium
-
-## Troubleshooting
-
-### Common Issues
-1. **Checkout Fails**
-   - Verify Stripe API keys are correct
-   - Check browser console for errors
-   - Verify the price ID exists in Stripe
-
-2. **Authentication Issues**
-   - Ensure user is logged in
-   - Check session cookies
-   - Verify CORS settings
-
-3. **Webhook Failures**
-   - Verify webhook signing secret
-   - Check server logs for errors
-   - Ensure the webhook endpoint is accessible
-
-## Future Improvements
-
-1. **Subscription Management**
-   - Add a customer portal for self-service
-   - Support plan upgrades/downgrades
-   - Add annual billing option
-
-2. **Analytics**
-   - Track subscription metrics
-   - Monitor churn rate
-   - Analyze usage patterns
-
-3. **Enhanced Testing**
-   - Add end-to-end tests
-   - Implement contract testing
-   - Add performance testing
-
-## Related Documentation
-
-- [Stripe API Reference](https://stripe.com/docs/api)
-- [Stripe Checkout](https://stripe.com/docs/payments/checkout)
-- [Supabase Auth](https://supabase.com/docs/guides/auth)
-- [SvelteKit Documentation](https://kit.svelte.dev/)
+1. **Updating Subscription Status**
+   - Currently, the `payment_up_to_date` status in the `organizations` table is only updated when a subscription is created. This should be updated when a subscription is upgraded from a trial to a paid plan.
