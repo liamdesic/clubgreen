@@ -474,16 +474,18 @@
               <label for="password-input">Password</label>
               <div class="input-with-icon">
                 <Lock size={18} class="input-icon" />
-                <input 
-                  id="password-input" 
-                  type={showPassword ? 'text' : 'password'}
-                  bind:value={password}
-                  placeholder="••••••••"
-                  required
-                  autocomplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                  minlength="8"
-                  pattern=".{8,}"
-                  title="Password must be at least 8 characters long" />
+                <input
+                    id="password-input"
+                    type={showPassword ? 'text' : 'password'}
+                    bind:value={password}
+                    placeholder="••••••••"
+                    required
+                    autocomplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                    minlength="8"
+                    pattern=".{8,}"
+                    title="Password must be at least 8 characters long"
+                  />
+
                 <button 
                   type="button" 
                   class="toggle-password" 
