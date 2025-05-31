@@ -1,11 +1,12 @@
 import { json } from '@sveltejs/kit';
 import { createClient } from '@supabase/supabase-js';
 import type { RequestHandler } from './$types';
+import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 
 // Create a Supabase client on the server side
 const createSupabaseServer = () => {
-  const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl = PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = PUBLIC_SUPABASE_ANON_KEY;
 
   console.log('Server: Supabase URL available:', !!supabaseUrl);
   console.log('Server: Supabase Anon Key available:', !!supabaseAnonKey);

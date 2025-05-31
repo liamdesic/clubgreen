@@ -2,11 +2,10 @@ import { json, error } from '@sveltejs/kit';
 import { stripe } from '$lib/server/stripe/client';
 import { createAdminClient } from '$lib/supabase/server';
 import type { RequestHandler } from './$types';
-
-// Environment variables are accessed via import.meta.env in SvelteKit
+import { STRIPE_PRICE_ID } from '$env/static/private';
 
 // Debug environment variables
-console.log('[DEBUG] STRIPE_PRICE_ID from import.meta.env:', import.meta.env.STRIPE_PRICE_ID);
+console.log('[DEBUG] STRIPE_PRICE_ID:', STRIPE_PRICE_ID);
 
 // Create admin client for critical database operations
 const supabaseAdmin = createAdminClient();
@@ -77,7 +76,7 @@ export const POST: RequestHandler = async ({ locals }) => {
     console.log('[TRIAL] Creating subscription with trial', {
       customer_id: customer.id,
       organization_id: orgData.id,
-      price_id: import.meta.env.STRIPE_PRICE_ID
+      price_id: STRIPE_PRICE_ID
     });
     
     let subscription;
@@ -86,7 +85,7 @@ export const POST: RequestHandler = async ({ locals }) => {
         customer: customer.id,
         items: [
           {
-            price: import.meta.env.STRIPE_PRICE_ID,
+            price: STRIPE_PRICE_ID,
           },
         ],
         payment_behavior: 'default_incomplete',
@@ -112,7 +111,7 @@ export const POST: RequestHandler = async ({ locals }) => {
         error: subscriptionError,
         customer_id: customer.id,
         organization_id: orgData.id,
-        price_id: import.meta.env.STRIPE_PRICE_ID
+        price_id: STRIPE_PRICE_ID
       });
       throw error(500, 'Failed to create subscription');
     }

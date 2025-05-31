@@ -1,17 +1,19 @@
 import { json, error } from '@sveltejs/kit';
 import { stripe } from '$lib/server/stripe/client';
 import type { RequestHandler } from './$types';
+import { STRIPE_PRICE_ID } from '$env/static/private';
+import { dev } from '$app/environment';
 
 export const POST: RequestHandler = async ({ request, locals, url }) => {
   try {
     console.log('Starting checkout process...');
     
     // Verify required environment variables
-    if (!import.meta.env.STRIPE_PRICE_ID) {
+    if (!STRIPE_PRICE_ID) {
       throw new Error('STRIPE_PRICE_ID is not set in environment variables');
     }
     
-    console.log('Using Stripe Price ID:', import.meta.env.STRIPE_PRICE_ID);
+    console.log('Using Stripe Price ID:', STRIPE_PRICE_ID);
     
     // Get the authenticated user from locals
     const { user } = await locals.getSession();
@@ -162,7 +164,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
       payment_method_types: ['card'],
       line_items: [
         {
-          price: import.meta.env.STRIPE_PRICE_ID,
+          price: STRIPE_PRICE_ID,
           quantity: 1,
         },
       ],
@@ -218,7 +220,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
     });
     
     // Return a more detailed error to the client in development
-    const isDev = import.meta.env.DEV;
+    const isDev = dev;
     const clientErrorMessage = isDev
       ? `${errorMessage}${errorStack ? '\n' + errorStack : ''}`
       : 'Failed to create checkout session. Please try again.';

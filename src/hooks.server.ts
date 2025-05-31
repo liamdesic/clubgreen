@@ -1,5 +1,6 @@
-import { createServerClient } from '@supabase/ssr'
-import { redirect, type Handle } from '@sveltejs/kit'
+import { createServerClient } from '@supabase/ssr';
+import { redirect, type Handle } from '@sveltejs/kit';
+import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 
 export const handle: Handle = async ({ event, resolve }) => {
   // Handle Chrome DevTools specific requests
@@ -14,8 +15,8 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   // Create a Supabase client with the Auth context of the request
   event.locals.supabase = createServerClient(
-    import.meta.env.PUBLIC_SUPABASE_URL,
-    import.meta.env.PUBLIC_SUPABASE_ANON_KEY,
+    PUBLIC_SUPABASE_URL,
+    PUBLIC_SUPABASE_ANON_KEY,
     {
       cookies: {
         get: (key) => event.cookies.get(key),

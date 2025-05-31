@@ -2,24 +2,24 @@
 
 ```
 .
-├── PROJECT_STRUCTURE.md
-├── README.md
-├── SUBSCRIPTION_FLOW.md
-├── TASKS.md
-├── cert/
+├── PROJECT_STRUCTURE.md     # This file - documents the project structure
+├── README.md               # Project documentation
+├── SUBSCRIPTION_FLOW.md    # Subscription and payment flow documentation
+├── TASKS.md                # Current tasks and TODOs
+├── cert/                   # SSL certificates for local development
 │   ├── cert.pem
 │   └── key.pem
-├── clubgreen-logo.svg
-├── eslint.config.js
-├── package-lock.json
-├── package.json
-├── src/
-│   ├── app.d.ts
-│   ├── app.html
-│   ├── hooks.server.ts
-│   ├── lib/
-│   │   ├── components/
-│   │   │   ├── ui/
+├── clubgreen-logo.svg      # Main logo
+├── eslint.config.js        # ESLint configuration
+├── package-lock.json       # NPM lock file
+├── package.json            # Project configuration and dependencies
+├── src/                    # Source code
+│   ├── app.d.ts           # TypeScript type declarations
+│   ├── app.html           # Main HTML template
+│   ├── hooks.server.ts    # SvelteKit server hooks
+│   ├── lib/               # Shared utilities and components
+│   │   ├── components/    # Reusable UI components
+│   │   │   ├── ui/        # Base UI components
 │   │   │   │   └── button.svelte
 │   │   │   ├── Button.svelte
 │   │   │   ├── LeaderboardModal.svelte
@@ -30,10 +30,10 @@
 │   │   ├── QRCodeModal.svelte
 │   │   ├── ToastHost.svelte
 │   │   ├── TrialStatus.svelte
-│   │   ├── server/
-│   │   │   └── stripe/
+│   │   ├── server/        # Server-side utilities
+│   │   │   └── stripe/    # Stripe integration
 │   │   │       └── client.ts
-│   │   ├── styles/
+│   │   ├── styles/        # Global styles
 │   │   │   ├── EditEvent.css
 │   │   │   ├── admin.css
 │   │   │   ├── base.css
@@ -43,66 +43,66 @@
 │   │   │   ├── onboarding.css
 │   │   │   ├── scorecard.css
 │   │   │   └── theme.css
-│   │   ├── supabase/
+│   │   ├── supabase/      # Supabase client and utilities
 │   │   │   └── server.ts
-│   │   ├── supabaseClient.ts
-│   │   ├── toastStore.js
-│   │   └── types/
+│   │   ├── supabaseClient.ts  # Supabase client initialization
+│   │   ├── toastStore.js  # Toast notification store
+│   │   └── types/         # TypeScript type definitions
 │   │       ├── event.ts
 │   │       └── score.ts
-│   ├── routes/
-│   │   ├── [org]/
-│   │   │   └── [event]/
+│   ├── routes/            # Application routes
+│   │   ├── [org]/         # Organization-specific routes
+│   │   │   └── [event]/   # Event-specific routes
 │   │   │       ├── leaderboard/
 │   │   │       │   └── +page.svelte
 │   │   │       └── scorecard/
 │   │   │           └── +page.svelte
-│   │   ├── api/
-│   │   │   ├── auth/
+│   │   ├── api/           # API endpoints
+│   │   │   ├── auth/      # Authentication endpoints
 │   │   │   │   └── magic-link/
 │   │   │   │       └── +server.ts
-│   │   │   ├── billing-portal/
+│   │   │   ├── billing-portal/  # Billing management
 │   │   │   │   └── +server.ts
-│   │   │   ├── create-checkout/
+│   │   │   ├── create-checkout/  # Checkout flow
 │   │   │   │   └── +server.ts
 │   │   │   ├── create-checkout-session/
 │   │   │   │   └── +server.ts
-│   │   │   ├── env-test/
+│   │   │   ├── env-test/  # Environment testing
 │   │   │   │   └── +server.ts
-│   │   │   ├── start-trial/
+│   │   │   ├── start-trial/  # Trial management
 │   │   │   │   └── +server.ts
-│   │   │   ├── webhook/
+│   │   │   ├── webhook/    # Webhook handlers
 │   │   │   │   └── +server.ts
-│   │   │   └── webhooks/
+│   │   │   └── webhooks/   # External service webhooks
 │   │   │       └── stripe/
 │   │   │           └── +server.ts
-│   │   ├── auth/
-│   │   │   └── callback/
+│   │   ├── auth/          # Authentication routes
+│   │   │   └── callback/  # OAuth callbacks
 │   │   │       └── +page.svelte
-│   │   ├── dashboard/
+│   │   ├── dashboard/     # User dashboard
 │   │   │   ├── [event_id]/
 │   │   │   │   └── setup/
 │   │   │   │       └── +page.svelte
-│   │   │   ├── settings/
+│   │   │   ├── settings/  # User settings
 │   │   │   │   └── +page.svelte
 │   │   │   ├── +page.server.ts
 │   │   │   └── +page.svelte
-│   │   ├── login/
+│   │   ├── login/         # Login page
 │   │   │   ├── +page.js
 │   │   │   └── +page.svelte
-│   │   ├── onboarding/
+│   │   ├── onboarding/    # User onboarding
 │   │   │   └── +page.svelte
-│   │   ├── pricing/
-│   │   ├── test/
+│   │   ├── pricing/       # Pricing page
+│   │   ├── test/          # Test routes
 │   │   │   └── +page.svelte
-│   │   ├── +layout.server.ts
-│   │   ├── +layout.svelte
-│   │   └── +page.svelte
-│   └── types/
-│       └── leo-profanity.d.ts
-├── static/
-│   ├── favicon.png
-│   └── logos/
+│   │   ├── +layout.server.ts  # Server layout
+│   │   ├── +layout.svelte     # Root layout
+│   │   └── +page.svelte       # Home page
+│   └── types/             # Global type definitions
+│       └── leo-profanity.d.ts  # Profanity filter types
+├── static/                # Static assets
+│   ├── favicon.png        # Site favicon
+│   └── logos/             # Logo variations
 │       ├── ldrb-icon-black.png
 │       ├── ldrb-icon-black.svg
 │       ├── ldrb-icon-white.png
@@ -115,11 +115,12 @@
 │       ├── ldrb-logo-colourlight.svg
 │       ├── ldrb-logo-white.png
 │       └── ldrb-logo-white.svg
-├── supabase/
-│   └── config.toml
-├── supabase-tables.md
-├── svelte.config.js
-├── tiebreakgame.md
-├── tsconfig.json
-└── vite.config.ts
+├── supabase/             # Supabase configuration
+│   ├── config.toml       # Local Supabase config
+│   └── migrations/       # Database migrations
+├── supabase-tables.md    # Database schema documentation
+├── svelte.config.js      # SvelteKit configuration
+├── tiebreakgame.md       # Game rules documentation
+├── tsconfig.json         # TypeScript configuration
+└── vite.config.ts        # Vite build configuration
 ```

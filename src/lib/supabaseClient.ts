@@ -1,9 +1,10 @@
 // check supabase-tables.md at project root for supabase table schemas
 
 import { createBrowserClient } from '@supabase/ssr';
-import { browser } from '$app/environment';
+import { browser, dev } from '$app/environment';
 import type { Database } from './database.types';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 
 // Define Session type locally to avoid module resolution issues
 type Session = {
@@ -21,8 +22,8 @@ type Session = {
 
 export type { Session };
 
-const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
@@ -43,7 +44,7 @@ if (browser) {
   });
 
   // Add auth state change listener for debugging in development
-  if (import.meta.env.DEV) {
+  if (dev) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       const timestamp = new Date().toISOString();
       

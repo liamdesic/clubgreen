@@ -3,6 +3,7 @@ import { stripe } from '$lib/server/stripe/client';
 import { supabase } from '$lib/supabaseClient';
 import type { RequestHandler } from './$types';
 import type Stripe from 'stripe';
+import { STRIPE_WEBHOOK_SECRET } from '$env/static/private';
 
 // Utility function to safely extract subscription ID from various Stripe objects
 function getSubscriptionId(subscription: string | { id: string } | Stripe.Subscription | null | undefined): string | null {
@@ -20,14 +21,14 @@ export const POST: RequestHandler = async ({ request }) => {
   try {
     const body = await getRawBody(request);
     const signature = request.headers.get('stripe-signature') || '';
-    if (!import.meta.env.STRIPE_WEBHOOK_SECRET) {
+    if (!STRIPE_WEBHOOK_SECRET) {
       throw new Error('STRIPE_WEBHOOK_SECRET is not set');
     }
 
     let event: Stripe.Event;
 
     try {
-      event = stripe.webhooks.constructEvent(body, signature, import.meta.env.STRIPE_WEBHOOK_SECRET);
+      event = stripe.webhooks.constructEvent(body, signature, STRIPE_WEBHOOK_SECRET);
     } catch (err) {
       console.error('Webhook signature verification failed:', err);
       throw error(400, 'Invalid signature');

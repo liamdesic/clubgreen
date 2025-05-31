@@ -1,9 +1,11 @@
-import { createServerClient as _createServerClient, type CookieOptions } from '@supabase/ssr'
-import type { Cookies } from '@sveltejs/kit'
+import { createServerClient as _createServerClient, type CookieOptions } from '@supabase/ssr';
+import type { Cookies } from '@sveltejs/kit';
+import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
 
 export function createServerClient(cookies: Cookies) {
-  const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY
+  const supabaseUrl = PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Missing Supabase environment variables')
@@ -25,8 +27,8 @@ export function createServerClient(cookies: Cookies) {
 }
 
 export function createAdminClient() {
-  const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = import.meta.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !serviceRoleKey) {
     throw new Error('Missing Supabase environment variables');
