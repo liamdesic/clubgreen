@@ -44,7 +44,7 @@
 		"bad-words": "^4.0.0",
 		"canvas-confetti": "^1.9.3",
 		"leo-profanity": "^1.7.0",
-		"lucide-svelte": "^0.510.0",
+		"lucide-svelte": "0.510.0",
 		"normalize.css": "^8.0.1",
 		"qrcode": "^1.5.4",
 		"stripe": "^18.2.0",

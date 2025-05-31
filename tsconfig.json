@@ -12,6 +12,6 @@
     "moduleResolution": "bundler",
     "types": ["svelte"]
   },
-  "include": ["src/**/*.d.ts", "src/**/*.js", "src/**/*.ts", "src/**/*.svelte"],
+  "include": ["src/**/*.d.ts", "src/**/*.js", "src/**/*.ts", "src/**/*.svelte", "src/types/**/*.d.ts"],
   "exclude": ["node_modules"]
 }
