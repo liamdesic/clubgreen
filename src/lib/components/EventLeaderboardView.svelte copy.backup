@@ -1,0 +1,173 @@
+<script lang="ts">
+  import { fade } from 'svelte/transition';
+  import { createEventDispatcher } from 'svelte';
+  import type { Event, Organization } from '$lib/types/event';
+  import '$lib/styles/leaderboard.css';
+  
+  // Props
+  export let event: Event;
+  export let organization: Organization;
+  export let scores: Array<{
+    id: string;
+    name: string;
+    totalScore: number;
+    holeInOnes: number;
+  }> = [];
+  export let qrCodeUrl: string = '';
+  export let showQr: boolean = true;
+  export let showAds: boolean = true;
+  
+  // Events
+  const dispatch = createEventDispatcher<{
+    colorTransitionStart: void;
+    colorTransitionEnd: void;
+  }>();
+  
+  // Split scores into top and bottom tables
+  $: topScores = scores.slice(0, 10);
+  $: bottomScores = scores.length > 10 ? scores.slice(10) : [];
+  
+  // Update accent color when event changes
+  $: if (event?.settings_json?.accent_color) {
+    updateAccentColor(event.settings_json.accent_color);
+  }
+  
+  function updateAccentColor(color: string) {
+    dispatch('colorTransitionStart');
+    
+    // Small delay to ensure fade-out starts
+    setTimeout(() => {
+      document.documentElement.style.setProperty('--accent-color', color);
+      
+      // Notify parent when transition is complete
+      const onTransitionEnd = () => {
+        document.documentElement.removeEventListener('transitionend', onTransitionEnd);
+        dispatch('colorTransitionEnd');
+      };
+      
+      document.documentElement.addEventListener('transitionend', onTransitionEnd, { once: true });
+    }, 50); // Small delay to ensure CSS picks up the transition
+  }
+  
+  // Format score with special handling for hole-in-ones
+  function formatScore(score: number, holeInOnes: number = 0): string {
+    return score === 1 && holeInOnes > 0 ? 'Hole in One!' : score.toString();
+  }
+</script>
+
+<div class="leaderboard-container" transition:fade={{ duration: 300 }}>
+  <header class="header">
+    {#if organization?.settings_json?.logo_url}
+      <img 
+        src={organization.settings_json.logo_url} 
+        alt={organization.name ? `${organization.name} Logo` : 'Logo'} 
+        class="logo"
+        on:error={(e) => e.target.style.display = 'none'}
+      />
+    {/if}
+    
+    <h1 class="event-title">{event?.title || 'Live Leaderboard'}</h1>
+    
+    {#if showQr && qrCodeUrl}
+      <div class="qr-code">
+        <img 
+          src={qrCodeUrl} 
+          alt="Event QR Code" 
+          on:error={(e) => e.target.style.display = 'none'}
+        />
+      </div>
+    {/if}
+  </header>
+  
+  <main class="leaderboard-content">
+    <div class="leaderboard-tables">
+      {#if scores.length === 0}
+        <div class="empty-state">
+          <p>No scores yet. Check back soon!</p>
+        </div>
+      {:else}
+        <!-- Top 10 Scores -->
+        <div class="score-table">
+          <div class="table-header">
+            <span>Rank</span>
+            <span>Player</span>
+            <span>Score</span>
+            {#if event?.settings_json?.hole_count}
+              <span>Hole in One</span>
+            {/if}
+          </div>
+          
+          {#each topScores as score, i}
+            <div class="score-row {i < 3 ? 'podium' : ''}">
+              <span class="rank">{i + 1}</span>
+              <span class="player-name">{score.name}</span>
+              <span class="score">{formatScore(score.totalScore, score.holeInOnes)}</span>
+              {#if event?.settings_json?.hole_count}
+                <span class="hole-in-one">
+                  {score.holeInOnes > 0 ? '⭐' : ''}
+                </span>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+      
+      <!-- Additional Scores (11+) -->
+      {#if bottomScores.length > 0}
+        <div class="score-table additional-scores">
+          {#each bottomScores as score, i}
+            <div class="score-row">
+              <span class="rank">{i + 11}</span>
+              <span class="player-name">{score.name}</span>
+              <span class="score">{formatScore(score.totalScore, score.holeInOnes)}</span>
+              {#if event?.settings_json?.hole_count}
+                <span class="hole-in-one">
+                  {score.holeInOnes > 0 ? '⭐' : ''}
+                </span>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </div>
+    
+    {#if showAds && event?.settings_json?.enable_ads}
+      <div class="ad-container">
+        <a href={event.settings_json.ads_url} target="_blank" rel="noopener">
+          {event.settings_json.ads_text}
+        </a>
+      </div>
+    {/if}
+  </main>
+</div>
+
+<style>
+  /* Component-specific styles */
+  .leaderboard-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem;
+  }
+  
+  .event-title {
+    transition: color 0.5s ease;
+  }
+  
+  .empty-state {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .header {
+      flex-direction: column;
+      gap: 1rem;
+    }
+  }
+</style>

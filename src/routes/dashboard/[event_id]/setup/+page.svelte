@@ -18,6 +18,8 @@
     archived: boolean;
     scorecard_ad_text: string;
     scorecard_ad_url: string;
+    show_on_main_leaderboard?: boolean;
+    event_type?: 'single' | 'ongoing';
   }
 
   interface PlayerScore {
@@ -38,7 +40,9 @@
     accent_color: '#00c853',
     archived: false,
     scorecard_ad_text: '',
-    scorecard_ad_url: 'https://clubgreen.au'
+    scorecard_ad_url: 'https://clubgreen.au',
+    show_on_main_leaderboard: true,
+    event_type: 'single'
   };
   
   let playerScores: PlayerScore[] = [];
@@ -340,6 +344,90 @@
   }
 </script>
 
+<style>
+  .event-settings-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  
+  /* Checkbox styling */
+  .checkbox-container {
+    display: flex;
+    align-items: flex-start;
+    position: relative;
+    padding-left: 35px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1.5;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  
+  .checkbox-container input {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+  }
+  
+  .checkmark {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 24px;
+    width: 24px;
+    background-color: #fff;
+    border: 2px solid #ccc;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+  }
+  
+  .checkbox-container:hover input ~ .checkmark {
+    border-color: var(--accent-color, #00c853);
+  }
+  
+  .checkbox-container input:checked ~ .checkmark {
+    background-color: var(--accent-color, #00c853);
+    border-color: var(--accent-color, #00c853);
+  }
+  
+  .checkmark:after {
+    content: "";
+    position: absolute;
+    display: none;
+  }
+  
+  .checkbox-container input:checked ~ .checkmark:after {
+    display: block;
+  }
+  
+  .checkbox-container .checkmark:after {
+    left: 7px;
+    top: 3px;
+    width: 5px;
+    height: 10px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    -webkit-transform: rotate(45deg);
+    -ms-transform: rotate(45deg);
+    transform: rotate(45deg);
+  }
+  
+  .helper-text {
+    color: #666;
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+    margin-left: -35px;
+    padding-left: 35px;
+    line-height: 1.4;
+  }
+</style>
+
 <DashboardHeader 
   organizationName={organization?.name || 'My'}
   eventTitle={event?.title || 'Event Setup'}
@@ -428,6 +516,27 @@
                 {settings.accent_color.startsWith('#') ? settings.accent_color.slice(1).toUpperCase() : settings.accent_color.toUpperCase()}
               </span>
             </div>
+          </div>
+
+          <h3 style="margin-top: var(--spacing-lg);">Advertisement Settings</h3>
+          <div class="form-group" style="margin-top: var(--spacing-lg);">
+            <label class="checkbox-container">
+              <input 
+                type="checkbox" 
+                bind:checked={settings.show_on_main_leaderboard}
+                on:change={() => unsavedChanges = true}
+              />
+              <span class="checkmark"></span>
+              {#if settings.event_type === 'ongoing'}
+                Show this event on the main leaderboard when scores are being submitted
+              {:else}
+                Show this event on the main leaderboard on event day when scores are being submitted
+              {/if}
+            </label>
+            <p class="helper-text">
+              When enabled, this event will automatically appear on the organization's main leaderboard 
+              {settings.event_type === 'ongoing' ? 'whenever scores are being submitted' : 'on the event day when scores are being submitted'}.
+            </p>
           </div>
 
           <h3 style="margin-top: var(--spacing-lg);">Advertisement Settings</h3>

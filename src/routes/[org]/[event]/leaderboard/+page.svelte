@@ -1,508 +1,298 @@
 <script lang="ts">
-  import '$lib/styles/base.css';
-  import '$lib/styles/theme.css';
-  import '$lib/styles/leaderboard.css';
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { supabase } from '$lib/supabaseClient';
   import { browser } from '$app/environment';
-  import type { RealtimeChannel } from '@supabase/supabase-js';
-  import QRCode from 'qrcode';
+  import { goto } from '$app/navigation';
+  import { getTodayISO, shouldDisplayEvent } from '$lib/utils/leaderboard';
+  import EventLeaderboardView from '$lib/components/EventLeaderboardView.svelte';
+  import type { PageData } from './$types';
   
   // Types
   interface PlayerScore {
     id: string;
     name: string;
-    totalScore: number;
+    totalScore: number;h
     holeInOnes: number;
   }
   
-  interface EventSettings {
+  interface Event {
+    id: string;
     title: string;
     hole_count: number;
     accent_color: string;
-    logo_url: string;
-    enable_ads: boolean;
-    ads_text: string;
-    ads_url: string;
-    qr_image_url: string;
+    logo_url?: string;
+    enable_ads?: boolean;
+    ads_text?: string;
+    ads_url?: string;
+    ads_image_url?: string | null;
   }
-
-
-
-  // ------ 🧠 STATE ------
-  let leaderboard = [];
-  let loading = true;
-  let error = null;
-  let currentOrg = '';
-  let currentEvent = '';
-  let eventId = '';
-  let hideTimeout: ReturnType<typeof setTimeout> | null = null;
-  let realtimeChannel: RealtimeChannel | null = null;
-  let showFullscreenButton = false;
-  let qrCodeDataUrl = ''; // To store the generated QR code
   
-  // Update CSS when accent color changes
-  $: if (browser && eventSettings?.accent_color) {
-    console.log('Event settings:', eventSettings);
-    console.log('Setting accent color to:', eventSettings.accent_color);
-    
-    // Set the CSS variable
-    document.documentElement.style.setProperty('--accent-color', eventSettings.accent_color);
-    
-    // Force update and log the computed style
-    const computedColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim();
-    console.log('CSS variable --accent-color is now set to:', computedColor);
-    
-    // Also check the actual computed color of the element
-    if (browser) {
-      requestAnimationFrame(() => {
-        const title = document.querySelector('.event-title');
-        if (title) {
-          const style = getComputedStyle(title);
-          console.log('Computed color of .event-title:', style.color);
-        }
-      });
-    }
-    
-    generateQRCode();
+  interface Organization {
+    id: string;
+    name: string;
+    slug: string;
+    settings_json?: {
+      logo_url?: string;
+      ad_image_url?: string;
+      [key: string]: any;
+    };
   }
-
-  // Organization settings
-  let organizationSettings = {
-    logo_url: ''
-  };
-
-  // Event settings (with safe defaults)
-  let eventSettings = {
-    title: 'Live Leaderboard',
-    hole_count: 9,
-    accent_color: '#00c853',
-    logo_url: '',
-    enable_ads: false,
-    ads_text: '',
-    ads_url: '',
-    qr_image_url: ''
-  };
-
-  // ------ ⚙️ LOAD SETTINGS ------
-  // Load organization settings
-  async function loadOrganizationSettings() {
-    try {
-      console.log('🔍 Fetching organization data for slug:', currentOrg);
-      const { data: orgData, error: orgError } = await supabase
-        .from('organizations')
-        .select('settings_json')
-        .eq('slug', currentOrg)
-        .single();
-        
-      if (orgError) throw orgError;
-      
-      console.log('✅ Organization data fetched:', orgData);
-      
-      if (orgData?.settings_json) {
-        organizationSettings = {
-          logo_url: orgData.settings_json.logo_url || '',
-          ad_image_url: orgData.settings_json.ad_image_url || ''
-        };
-        console.log('📋 Organization settings loaded:', organizationSettings);
-      } else {
-        console.log('ℹ️ No settings found in organization data');
-      }
-    } catch (err) {
-      console.error('Error loading organization settings:', err);
-    }
-  }
-
-  // Load event settings
-  async function loadEventSettings() {
-    try {
-      // Load organization settings first
-      await loadOrganizationSettings();
-      // Get the event details
-      const { data: eventData, error: eventError } = await supabase
-        .from('events')
-        .select('id, title, settings_json')
-        .eq('slug', currentEvent)
-        .single();
-
-      if (eventError) throw eventError;
-      if (!eventData) throw new Error('Event not found');
-
-      eventId = eventData.id;
-      
-          // Merge default settings with any settings from the database
-      eventSettings = {
-        ...eventSettings,
-        title: eventData.title || eventSettings.title,
-        ...(eventData.settings_json || {})
-      };
-      
-
-      
-      console.log('✅ EVENT SETTINGS:', eventSettings);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      console.error('❌ Error loading event settings:', errorMessage);
-      error = errorMessage;
-    }
-  }
-
-  // ------ 📊 LOAD SCORES ------
-  async function loadLeaderboard() {
-    if (!eventId) return; // Wait until we have an event ID
+  
+  // Get route parameters
+  export let data: PageData;
+  const { org, event: eventId } = $page.params;
+  
+  // State
+  let loading = true;
+  let error: string | null = null;
+  let event: Event | null = null;
+  let organization: Organization | null = null;
+  let leaderboard: PlayerScore[] = [];
+  let debug = false;
+  
+  // Load data
+  async function loadData() {
+    if (!browser) return;
     
     loading = true;
     error = null;
-
-    const { data, error: fetchError } = await supabase
-      .from('scorecard')
-      .select('player_id, name, score, hole_number, hole_in_ones')
-      .eq('event_id', eventId)  // Only get scores for this event
-      .eq('published', true);    // Only get published scores
-
-    if (fetchError) {
-      error = fetchError.message;
+    
+    try {
+      // Load event data
+      const { data: eventData, error: eventError } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', eventId)
+        .single();
+      
+      if (eventError) throw eventError;
+      if (!eventData) throw new Error('Event not found');
+      
+      // Check if event should be displayed
+      const today = getTodayISO();
+      const { count: scoreCount } = await supabase
+        .from('scorecard')
+        .select('*', { count: 'exact', head: true })
+        .eq('event_id', eventId);
+      
+      if (!shouldDisplayEvent(eventData, scoreCount || 0, today)) {
+        throw new Error('This event is not currently available for viewing');
+      }
+      
+      event = eventData;
+      
+      // Load organization data
+      const { data: orgData, error: orgError } = await supabase
+        .from('organizations')
+        .select('*')
+        .eq('slug', org)
+        .single();
+      
+      if (orgError) throw orgError;
+      organization = orgData;
+      
+      // Load leaderboard data
+      const { data: scoreData, error: scoreError } = await supabase
+        .from('scorecard')
+        .select('*')
+        .eq('event_id', eventId);
+      
+      if (scoreError) throw scoreError;
+      
+      // Process scores
+      leaderboard = processScores(scoreData || []);
+      
+    } catch (err) {
+      console.error('Error loading data:', err);
+      error = err instanceof Error ? err.message : 'Failed to load data';
+    } finally {
       loading = false;
-      return;
     }
-
-    const playerMap = new Map();
-    const holesPlayed: Record<string, number> = {};
-
-    for (const row of data) {
-      const id = row.player_id || row.name;
-      holesPlayed[id] = (holesPlayed[id] || 0) + 1;
-
-      if (!playerMap.has(id)) {
-        playerMap.set(id, {
-          id,
-          name: row.name,
+  }
+  
+  // Process scores from scorecard data
+  function processScores(rows: Array<{
+    player_id: string;
+    player_name?: string;
+    score?: number;
+    hole_in_one?: boolean;
+  }>): PlayerScore[] {
+    const playerMap = new Map<string, PlayerScore>();
+    
+    for (const row of rows) {
+      const playerId = row.player_id;
+      
+      if (!playerMap.has(playerId)) {
+        playerMap.set(playerId, {
+          id: playerId,
+          name: row.player_name || `Player ${playerId.slice(0, 6)}`,
           totalScore: 0,
           holeInOnes: 0
         });
       }
-
-      const player = playerMap.get(id);
-      player.totalScore += row.score ?? 0;
-      player.holeInOnes += row.hole_in_ones ?? 0;
+      
+      const player = playerMap.get(playerId)!;
+      player.totalScore += row.score || 0;
+      if (row.hole_in_one) player.holeInOnes++;
     }
-
-    leaderboard = Array.from(playerMap.values())
-      .filter(player => holesPlayed[player.id] === eventSettings.hole_count)
+    
+    return Array.from(playerMap.values())
       .sort((a, b) => a.totalScore - b.totalScore);
-
-    loading = false;
   }
-
-  // ------ 🔁 INIT + FULLSCREEN ------
-  function toggleFullscreen() {
-    if (typeof document !== 'undefined') {
-      const elem = document.documentElement;
-      if (!document.fullscreenElement) {
-        elem.requestFullscreen().catch(err => {
-          console.error('Error attempting to enable fullscreen:', err);
-        });
-      } else {
-        document.exitFullscreen().catch(err => {
-          console.error('Error attempting to exit fullscreen:', err);
-        });
-      }
-    }
-  }
-
-  function handleMouseMove() {
-    // Only handle mouse movement in fullscreen mode
-    if (!isFullscreen) return;
-    
-    if (!showFullscreenButton) {
-      showFullscreenButton = true;
-    }
-    
-    if (hideTimeout) clearTimeout(hideTimeout);
-    hideTimeout = setTimeout(() => {
-      if (isFullscreen) { // Only hide if still in fullscreen
-        showFullscreenButton = false;
-      }
-    }, 2000);
-  }
-
-  // Track fullscreen state
-  let isFullscreen = false;
   
-  // Update fullscreen state and button visibility
-  function onFullscreenChange() {
-    isFullscreen = !!document.fullscreenElement;
-    if (!isFullscreen) {
-      // Always show button when exiting fullscreen
-      showFullscreenButton = true;
-      if (hideTimeout) {
-        clearTimeout(hideTimeout);
-        hideTimeout = null;
-      }
-    } else {
-      // In fullscreen, hide the button initially
-      showFullscreenButton = false;
-    }
-  }
-
-  // Generate QR code for the current scorecard URL
-  async function generateQRCode() {
-    if (!browser || !currentOrg || !currentEvent || !eventSettings) return;
-    
-    const scorecardUrl = `${window.location.origin}/${currentOrg}/${currentEvent}/scorecard`;
-    try {
-      qrCodeDataUrl = await QRCode.toDataURL(scorecardUrl, {
-        width: 200,
-        margin: 1,
-        color: {
-          dark: eventSettings.accent_color || '#000000',
-          light: '#ffffff00' // Transparent background
-        },
-        errorCorrectionLevel: 'H' // High error correction
-      });
-    } catch (err) {
-      console.error('Error generating QR code:', err);
-      error = 'Failed to generate QR code';
-    }
-  }
-
-  // Set up realtime subscription
-  function setupRealtimeSubscription() {
-    if (realtimeChannel) {
-      supabase.removeChannel(realtimeChannel);
-    }
-    
-    realtimeChannel = supabase
-      .channel('public:scorecard')
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'scorecard' 
-      }, loadLeaderboard)
-      .on('postgres_changes', { 
-        event: 'UPDATE', 
-        schema: 'public', 
-        table: 'scorecard' 
-      }, loadLeaderboard)
-      .subscribe();
-  }
-
-  onMount(() => {
-    // Use an IIFE to handle the async operations
-    (async () => {
-    // Initialize current org and event from URL params
-    if ($page.params.org && $page.params.event) {
-      currentOrg = $page.params.org;
-      currentEvent = $page.params.event;
-      await loadEventSettings();
-      await loadLeaderboard();
-    }
-
-    // Set up realtime subscription
+  // Toggle debug mode
+  function toggleDebug() {
+    debug = !debug;
     if (browser) {
-      setupRealtimeSubscription();
-      
-      // Add event listeners for fullscreen and mouse movement
-      document.addEventListener('fullscreenchange', onFullscreenChange);
-      document.addEventListener('mousemove', handleMouseMove);
-      
-      // Set initial state based on fullscreen status
-      isFullscreen = !!document.fullscreenElement;
-      showFullscreenButton = !isFullscreen; // Show if not in fullscreen
+      localStorage.setItem('leaderboardDebug', String(debug));
+      const url = new URL(window.location.href);
+      if (debug) {
+        url.searchParams.set('debug', 'true');
+      } else {
+        url.searchParams.delete('debug');
+      }
+      window.history.replaceState({}, '', url);
     }
-
-    })(); // End of async IIFE
+  }
+  
+  // Initialize
+  onMount(() => {
+    loadData();
     
-    // Return cleanup function
-    return () => {
-      // Clean up event listeners and realtime subscription
-      if (browser) {
-        document.removeEventListener('fullscreenchange', onFullscreenChange);
-        document.removeEventListener('mousemove', handleMouseMove);
-      }
-      if (realtimeChannel) {
-        supabase.removeChannel(realtimeChannel);
-      }
-      if (hideTimeout) {
-        clearTimeout(hideTimeout);
-      }
-    };
-  });
-
-  onDestroy(() => {
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('mousemove', handleMouseMove);
+    // Check for debug mode
+    if (browser) {
+      const urlParams = new URLSearchParams(window.location.search);
+      debug = urlParams.has('debug') || localStorage.getItem('leaderboardDebug') === 'true';
     }
-    if (realtimeChannel) supabase.removeChannel(realtimeChannel);
   });
 </script>
 
-
-<div class="main-wrapper">
-  <header class="header">
-    <link rel="stylesheet" href="https://use.typekit.net/kic0xlz.css">
-    <div class="header-content">
-      {#if organizationSettings?.logo_url || eventSettings?.logo_url}
-        <div class="logos-container">
-          {#if organizationSettings?.logo_url}
-            <div class="logo-container org-logo">
-              <img 
-                src={organizationSettings.logo_url} 
-                alt="Organization Logo" 
-                class="logo" 
-                on:error={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  if (target) target.style.display = 'none';
-                }}
-              />
-            </div>
-          {/if}
-          {#if eventSettings?.logo_url}
-            <div class="logo-container event-logo">
-              <img 
-                src={eventSettings.logo_url} 
-                alt="Event Logo" 
-                class="logo" 
-                on:error={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  if (target) target.style.display = 'none';
-                }}
-              />
-            </div>
-          {/if}
-        </div>
-      {/if}
-      <div class="titles">
-        <h1>Mini-Golf Leaderboard</h1>
-        <h2 class="event-title">{eventSettings?.title || currentEvent}</h2>
-      </div>
+<div class="leaderboard-page">
+  {#if error}
+    <div class="error-message" role="alert">
+      <p>{error}</p>
+      <button 
+        class="retry-button" 
+        on:click={() => window.location.reload()}
+        aria-label="Retry loading leaderboard"
+      >
+        Retry
+      </button>
     </div>
-  </header>
-
-<!-- 🧾 MAIN CONTENT -->
-<div class="content">
-  <!-- 📊 SCORE TABLES -->
-  <div class="leaderboard-tables">
-
-    <!-- 🥇 Table 1: Players 1–5 -->
-    <div class="score-table">
-      <div class="row header-row">
-        <div class="rank">
-          <i class="fa-solid fa-medal"></i>
-        </div>
-        <div class="name">
-          <i class="fa-solid fa-user"></i> Player
-        </div>
-        <div class="score-label">
-          <i class="fa-solid fa-golf-ball-tee"></i>Score
-        </div>
-      </div>
-      {#each leaderboard.slice(0, 5) as player, index}
-        <div class="row">
-          <div class="rank">{index + 1}</div>
-          <div class="name">
-            {player.name}
-            {#if player.holeInOnes > 0}
-              <div class="hio-note">
-                <i class="fa-solid fa-fire"></i> <b>{player.holeInOnes}</b> hole-in-one{player.holeInOnes > 1 ? 's' : ''}
-              </div>
-            {/if}
-          </div>
-          <div class="score-pill">{player.totalScore}</div>
-        </div>
-      {/each}
+  {:else if loading}
+    <div class="loading-overlay">
+      <div class="spinner"></div>
+      <p>Loading leaderboard...</p>
     </div>
-
-    <!-- 🥈 Table 2: Players 6–10 -->
-    <div class="score-table">
-     <div class="row header-row">
-        <div class="rank">
-          <i class="fa-solid fa-medal"></i>
-        </div>
-        <div class="name">
-          <i class="fa-solid fa-user"></i> Player
-        </div>
-        <div class="score-label">
-          <i class="fa-solid fa-golf-ball-tee"></i>Score
-        </div>
-      </div>
-
-      {#each leaderboard.slice(5, 10) as player, index}
-        <div class="row">
-          <div class="rank">{index + 6}</div>
-          <div class="name">
-            {player.name}
-            {#if player.holeInOnes > 0}
-              <div class="hio-note">
-                <i class="fa-solid fa-fire"></i> <b>{player.holeInOnes}</b> hole-in-one{player.holeInOnes > 1 ? 's' : ''}
-              </div>
-            {/if}
-          </div>
-          <div class="score-pill">{player.totalScore}</div>
-        </div>
-      {/each}
-    </div>
-
-  </div>
-
-
-
-
-  <!-- 📢 SIDEBAR -->
-  <div class="sidebar">
-  <!-- 📢 Ad Image -->
-  {#if organizationSettings?.ad_image_url || eventSettings.ads_image_url}
-    <div class="ad-container">
-      <a href={eventSettings.ads_url || '#'} class="ad-banner">
-        <img 
-          src={eventSettings.ads_image_url || organizationSettings.ad_image_url} 
-          alt={eventSettings.ads_text || 'Advertisement'}
-          class="ad-image"
-        />
-        {#if eventSettings.ads_text}
-          <div class="ad-text">{eventSettings.ads_text}</div>
-        {/if}
-      </a>
-    </div>
-  {:else if eventSettings.ads_text}
-    <div class="ad-container">
-      <a href={eventSettings.ads_url || '#'} class="ad-banner text-only">
-        {eventSettings.ads_text}
-      </a>
+  {:else if event}
+    <EventLeaderboardView
+      event={event}
+      organizationSettings={organization?.settings_json || {}}
+      leaderboard={leaderboard}
+      showQr={true}
+      showAds={true}
+      debug={debug}
+    />
+  {/if}
+  
+  {#if debug}
+    <div class="debug-controls">
+      <button 
+        class="debug-toggle" 
+        on:click={toggleDebug}
+        title="Toggle debug mode"
+      >
+        {debug ? '🔴' : '⚪'} Debug
+      </button>
     </div>
   {/if}
-  <!-- 📲 QR Code -->
-  <div class="qr-box">
-    <div class="qr-title">
-      <h2>Scan to Play!</h2>
-      <p>Scan to enter scores</p>
-    </div>
-    {#if qrCodeDataUrl}
-      <div class="qr-code-container">
-        <img 
-          src={qrCodeDataUrl} 
-          alt="Scorecard QR Code" 
-          class="qr-code"
-        />
-      </div>
-    {:else}
-      <div class="qr-placeholder">Generating QR Code...</div>
-    {/if}
-  </div>
 </div>
 
-</div>
-
-</div>
-<button 
-  class="fullscreen-toggle {showFullscreenButton ? 'show' : ''}" 
-  on:click={toggleFullscreen}
-  on:keydown={(e) => e.key === 'Enter' || e.key === ' ' ? toggleFullscreen() : null}
-  aria-label="Toggle fullscreen mode"
->
-  <i class="fa-solid fa-expand"></i> Fullscreen
-</button>
-
-
-
+<style>
+  .leaderboard-page {
+    position: relative;
+    min-height: 100vh;
+    background-color: #f5f5f5;
+  }
+  
+  .error-message {
+    padding: 2rem;
+    margin: 2rem;
+    background: #ffebee;
+    border-left: 4px solid #f44336;
+    color: #b71c1c;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+  
+  .retry-button {
+    padding: 0.5rem 1rem;
+    background: #f44336;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  
+  .retry-button:hover {
+    background: #d32f2f;
+  }
+  
+  .debug-controls {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    z-index: 1000;
+  }
+  
+  .debug-toggle {
+    padding: 0.5rem 1rem;
+    background: #333;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+  }
+  
+  .debug-toggle:hover {
+    opacity: 1;
+  }
+  
+  /* Loading overlay */
+  .loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(255, 255, 255, 0.9);
+    z-index: 1000;
+  }
+  
+  .loading-overlay .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid var(--accent-color, #4CAF50);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+</style>

@@ -1,3 +1,10 @@
+<svelte:head>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <!-- TypeKit -->
+  <link rel="stylesheet" href="https://use.typekit.net/kic0xlz.css">
+</svelte:head>
+
 <script lang="ts">
   import { onMount } from 'svelte'
   import { invalidate } from '$app/navigation'

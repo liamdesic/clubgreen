@@ -11,6 +11,7 @@ export interface Event {
     ads_text?: string;
     scorecard_ad_text?: string;
     scorecard_ad_url?: string;
+    show_on_main_leaderboard?: boolean;
   };
   published: boolean;
   created_at: string;

@@ -1,30 +1,32 @@
 import { error, json } from '@sveltejs/kit';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-import type StripeType from 'stripe';
-import {
-  STRIPE_SECRET_KEY,
-  STRIPE_WEBHOOK_SECRET,
-  SUPABASE_SERVICE_ROLE_KEY
-} from '$env/static/private';
+import type { ExpandedSubscription, ExpandedInvoice } from '$lib/types/stripe';
+import { getInvoiceSubscription, getCustomerId } from '$lib/types/stripe';
+
+// Import environment variables
+import { STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SUPABASE_SERVICE_ROLE_KEY } from '$env/static/private';
 import { PUBLIC_SUPABASE_URL } from '$env/static/public';
 
-// Check required environment variables
+// Validate required environment variables at startup
 if (!STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY is not set');
 if (!STRIPE_WEBHOOK_SECRET) throw new Error('STRIPE_WEBHOOK_SECRET is not set');
 if (!PUBLIC_SUPABASE_URL) throw new Error('PUBLIC_SUPABASE_URL is not set');
 if (!SUPABASE_SERVICE_ROLE_KEY) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set');
 
-// Initialize Stripe with the latest API version
+// Initialize Stripe client at module level
 const stripe = new Stripe(STRIPE_SECRET_KEY, {
-  apiVersion: '2025-05-28.basil'
+  apiVersion: '2025-05-28.basil',
+  typescript: true
 });
 
-// Initialize Supabase Admin Client for server-side operations
-const supabaseAdmin = createClient(
-  PUBLIC_SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY
-);
+// Initialize Supabase Admin Client
+const supabaseAdmin = createClient(PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
 
 export async function POST({ request }) {
   const payload = await request.text();
@@ -68,15 +70,15 @@ export async function POST({ request }) {
         break;
       
       case 'customer.subscription.deleted':
-        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
+        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription | string);
         break;
       
       case 'invoice.payment_succeeded':
-        await handlePaymentSucceeded(event.data.object as Stripe.Invoice);
+        await handlePaymentSucceeded(event.data.object as ExpandedInvoice);
         break;
       
       case 'invoice.payment_failed':
-        await handlePaymentFailed(event.data.object as Stripe.Invoice);
+        await handlePaymentFailed(event.data.object as ExpandedInvoice);
         break;
       
 
@@ -149,7 +151,9 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
   }
 
   // Log current subscription state
-  const currentPeriodEnd = subscription.current_period_end || (subscription as any).current_period_end || Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60; // Default to 30 days from now if not set
+  const currentPeriodEnd = 'current_period_end' in subscription
+    ? subscription.current_period_end as number
+    : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60; // Default to 30 days from now if not set
   console.log('Current subscription state:', {
     subscription_id: subscription.id,
     status: subscription.status,
@@ -164,7 +168,7 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
   const trialHasEnded = subscription.trial_end ? subscription.trial_end <= now : true;
   
   // Get the latest invoice if available
-  const latestInvoice = subscription.latest_invoice as Stripe.Invoice | null;
+  const latestInvoice = subscription.latest_invoice as ExpandedInvoice | undefined;
   
   // Check if this is an upgrade from trial (trial ended early)
   const isUpgradeFromTrial = subscription.metadata?.upgraded_from_trial === 'true';
@@ -173,7 +177,8 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
   let effectiveStatus = subscription.status;
   
   // If this is an upgrade from trial or invoice is paid, mark as active
-  if (isUpgradeFromTrial || latestInvoice?.paid === true) {
+  const isInvoicePaid = latestInvoice && 'paid' in latestInvoice && latestInvoice.paid === true;
+  if (isUpgradeFromTrial || isInvoicePaid) {
     effectiveStatus = 'active';
   } else if (trialHasEnded && subscription.status === 'trialing') {
     effectiveStatus = 'active';
@@ -189,6 +194,9 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
     invoice_status: latestInvoice?.status,
     invoice_paid: latestInvoice?.paid
   });
+  if (latestInvoice) {
+    console.log('Invoice status:', latestInvoice.status, 'Paid:', 'paid' in latestInvoice ? latestInvoice.paid : 'unknown');
+  }
 
   // Update organization with subscription details
   const { error: updateError } = await supabaseAdmin
@@ -234,11 +242,20 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
   console.log(`Updated subscription ${subscription.id} for organization ${org.id}`);
 }
 
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  const customerId = typeof subscription.customer === 'string' 
-    ? subscription.customer 
-    : subscription.customer?.id;
+async function handleSubscriptionDeleted(subscription: Stripe.Subscription | string) {
+  console.log('Processing subscription deletion:', typeof subscription === 'string' ? subscription : subscription.id);
+  
+  // If subscription is a string, it's just an ID
+  if (typeof subscription === 'string') {
+    console.log('Processing subscription deletion for ID:', subscription);
+    // We can't do much with just an ID, so we'll log and return
+    return;
+  }
+  
+  // Ensure subscription is a Stripe.Subscription object
+  const sub = subscription as Stripe.Subscription;
 
+  const customerId = getCustomerId(subscription.customer);
   if (!customerId) {
     console.error('No customer ID found in subscription:', subscription.id);
     return;
@@ -265,38 +282,39 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 }
 
 // Utility function to safely extract subscription ID from various Stripe objects
-function getSubscriptionId(subscription: string | { id: string } | StripeType.Subscription | null | undefined): string | null {
+function getSubscriptionId(subscription: string | { id: string } | Stripe.Subscription | null | undefined): string | null {
   if (!subscription) return null;
   if (typeof subscription === 'string') return subscription;
-  return subscription.id || null;
+  
+  // Handle both { id: string } and Stripe.Subscription objects
+  const subObj = subscription as { id?: string };
+  return subObj?.id || null;
 }
 
-async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
-  if (!invoice.subscription) {
-    console.log('No subscription found in invoice, skipping');
+async function handlePaymentSucceeded(invoice: ExpandedInvoice) {
+  const subscription = getInvoiceSubscription(invoice);
+  const subscriptionId = getSubscriptionId(subscription);
+  
+  if (!subscriptionId) {
+    console.log('No valid subscription found in invoice, skipping');
     return;
   }
 
-  const subscriptionId = getSubscriptionId(invoice.subscription);
-  if (!subscriptionId) {
-    console.error('No valid subscription ID found in invoice');
-    return;
-  }
+
 
   console.log('Payment succeeded for invoice:', {
     id: invoice.id,
-    billing_reason: invoice.billing_reason,
+    billing_reason: 'billing_reason' in invoice ? invoice.billing_reason : 'unknown',
     subscription: subscriptionId,
-    paid: invoice.status === 'paid',
+    paid: 'paid' in invoice ? invoice.paid : invoice.status === 'paid',
     status: invoice.status
   });
 
   try {
     // Get the subscription with expanded latest invoice
-    const subscription = await stripe.subscriptions.retrieve(
-      subscriptionId,
-      { expand: ['latest_invoice.payment_intent'] }
-    );
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+      expand: ['latest_invoice.payment_intent']
+    }) as ExpandedSubscription;
 
     console.log('Retrieved subscription:', {
       id: subscription.id,
@@ -317,7 +335,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
           payment_behavior: 'default_incomplete',
           payment_settings: { save_default_payment_method: 'on_subscription' },
           expand: ['latest_invoice.payment_intent']
-        });
+        }) as ExpandedSubscription;
 
         console.log('Trial ended, subscription updated:', {
           id: updatedSubscription.id,
@@ -384,11 +402,9 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
   }
 }
 
-async function handlePaymentFailed(invoice: Stripe.Invoice) {
+async function handlePaymentFailed(invoice: ExpandedInvoice) {
   try {
-    const customerId = typeof invoice.customer === 'string' 
-      ? invoice.customer 
-      : invoice.customer?.id;
+    const customerId = getCustomerId(invoice.customer);
 
     if (!customerId) {
       console.error('No customer ID found in invoice:', invoice.id);

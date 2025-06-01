@@ -1,74 +1,230 @@
 # 🏌️ Mini-Golf Leaderboard - Project Tasks
 
-## 🔍 Environment Variable Consistency Check
+## 🏆 Shared Leaderboard Implementation Plan
 
-### Search Patterns to Verify
-- [ ] Search for `process.env` - Should not be used in SvelteKit
-- [ ] Search for `import.meta.env` - Only for build-time public variables
-- [ ] Search for `$env/static/private` - For private build-time variables
-- [ ] Search for `$env/static/public` - For public build-time variables
-- [ ] Search for `$env/dynamic/private` - For private runtime variables
-- [ ] Search for `$env/dynamic/public` - For public runtime variables
-- [ ] Search for `VITE_` prefix - Should be migrated to `PUBLIC_`
-- [ ] Search for direct `env.` usage - Should reference the correct env import
+### 1. 🔧 Architecture Overview
+```
+[Org Leaderboard Page] (/[org]/leaderboard)
+        ↓
+[Leaderboard Manager] – Rotation + State
+        ↓
+[Event Leaderboard View] – Per-event renderer
+        ↓
+[Shared Utilities] – Filtering, sorting, score counts
+```
 
-### Files to Check
-- [ ] `src/routes/api/webhooks/stripe/+server.ts` - Fixed env reference
-- [ ] `src/lib/server/stripe/client.ts` - Uses dynamic private env
-- [ ] `src/hooks.server.ts` - Uses static public env
-- [ ] `src/lib/supabase/server.ts` - Uses import.meta.env
-- [ ] `src/lib/supabaseClient.ts` - Uses import.meta.env
-- [ ] `vite.config.ts` - Handles env variable exposure
+### 2. 🧩 Key Components
+- [ ] **Org Leaderboard Page** (`/[org]/leaderboard`)
+  - [ ] Page shell that pulls org ID from slug
+  - [ ] Renders LeaderboardManager
+  - [ ] Handles loading and fallback states
 
-### Verification Steps
-1. [ ] Ensure all private variables use `$env/static/private` or `$env/dynamic/private`
-2. [ ] Ensure all public variables use `$env/static/public` or `$env/dynamic/public`
-3. [ ] Verify no direct `process.env` usage remains
-4. [ ] Check for any remaining `VITE_` prefixes that should be `PUBLIC_`
-5. [ ] Test all environment-dependent features after changes
+- [ ] **LeaderboardManager** (New Component)
+  - [ ] Loads events + score counts
+  - [ ] Uses `getDisplayableEvents()` to filter
+  - [ ] Handles:
+    - [ ] Rotation timing
+    - [ ] Current event index
+    - [ ] Subscribing to realtime updates
+    - [ ] Optional manual controls
 
-## 🔄 Environment Variable Standardization
-- [ ] **Codebase Audit**
-  - [ ] Search for all instances of `VITE_` in the codebase
-  - [ ] Document all files using Vite-specific environment variables
-  - [ ] Create a mapping of VITE_* to PUBLIC_* equivalents
+- [ ] **EventLeaderboardView**
+  - [ ] Renders a single event's leaderboard
+  - [ ] Reuses existing Leaderboard.svelte logic
+  - [ ] Handles cases like "no scores yet", "loading", or "errored"
 
-- [ ] **Code Updates**
-  - [ ] Update all imports from `$env/static/public` to use PUBLIC_ prefix
-  - [ ] Update any dynamic imports using `import.meta.env.VITE_*` to use `PUBLIC_`
-  - [ ] Update any build configurations or Vite plugins referencing VITE_ variables
+- [ ] **Utilities**
+  - [x] `utils/leaderboard.ts` — already built
+  - [ ] `types.ts` — defines shared types like LeaderboardState, ScoreCounts
 
-- [ ] **Environment Configuration**
-  - [ ] Update `.env` files to consolidate on PUBLIC_ prefix
-  - [ ] Remove duplicate VITE_ variables that shadow PUBLIC_ variables
-  - [ ] Update deployment configurations (Vercel, etc.) to use new variable names
+### 3. 🔄 Data Flow
 
-- [ ] **Documentation**
-  - [ ] Update SUBSCRIPTION_FLOW.md to remove VITE_ references
-  - [ ] Update any other documentation referencing environment variables
-  - [ ] Add a section about environment variable naming conventions
+- [ ] **Initial Load**
+  1. [ ] Fetch all events for organization_id
+  2. [ ] Fetch score counts per event
+  3. [ ] Apply `getDisplayableEvents()` → gives rotation list
 
-- [ ] **Testing**
-  - [ ] Test all environment-dependent features in development
-  - [ ] Verify build process works with new variable names
-  - [ ] Test deployment to staging/production environments
+- [ ] **Realtime Updates**
+  - [ ] Supabase subscription on scorecard
+  - [ ] On insert/update:
+    - [ ] Bump the scoreCounts map
+    - [ ] Re-run `getDisplayableEvents()`
+    - [ ] Update rotation if list changes
 
-## ✅ Completed
-- [x] QR code generation (client-side, dynamic URLs)
-- [x] Scorecard pulls dynamic event + score data via slug
-- [x] Panel-based edit UI tested
-- [x] Toast system working globally
+- [ ] **Rotation**
+  - [ ] Auto-advance every rotationInterval
+  - [ ] Skip events with `scoreCounts[id] === 0`
+  - [ ] Loop back to start when complete
+  - [ ] Optional features:
+    - [ ] Manual "next" and "back"
+    - [ ] "Pause rotation" toggle
 
-## 🛠️ In Progress
+### 4. 🛠 Implementation Plan
 
-### 💳 Stripe Integration & Billing
-- [x] **Automatic Trial on Organization Creation**
-  - [x] Create Stripe customer during organization creation
-  - [x] Set up 14-day trial subscription
-  - [x] Handle duplicate organization slugs
-  - [x] Proper environment variable setup
-  - [x] Error handling and user feedback
-  - [x] Store Stripe customer and subscription IDs
+#### ✅ Phase 1: Scaffold
+- [ ] Create `/[org]/leaderboard` route
+- [ ] Add `<LeaderboardManager />` as main component
+- [ ] Display fallback when no displayable events
+
+#### 🚀 Phase 2: Fetching Logic
+- [ ] Fetch org-scoped events
+- [ ] Fetch score counts per event (efficient SELECT head count)
+- [ ] Filter + sort using `getDisplayableEvents()`
+
+#### 🔁 Phase 3: Rotation Engine
+- [ ] Track currentIndex, rotationInterval, and timer
+- [ ] Crossfade between EventLeaderboardView
+- [ ] Clean up interval on unmount
+
+#### 🌩 Phase 4: Supabase Realtime
+- [ ] Subscribe to scorecard inserts
+- [ ] Update scoreCounts on insert
+- [ ] Trigger `getDisplayableEvents()` again on change
+
+#### 🎨 Phase 5: UI Polish
+- [ ] Add animation between transitions
+- [ ] Responsive for vertical and horizontal layouts
+- [ ] Show "Nothing Live Right Now" if filtered list is empty
+
+### 5. 🧠 Technical Considerations
+- [ ] **Performance**: Only mount 1 leaderboard at a time
+- [ ] **Offline Support**: Cache last loaded state via localStorage
+- [ ] **Accessibility**: Announce active leaderboard with ARIA or visually hidden labels
+- [ ] **Error Handling**: Gracefully degrade on fetch errors or no Supabase
+
+### 6. 🗃 Queries You'll Need
+- [ ] **Get all events for org**
+  ```sql
+  SELECT * FROM events WHERE organization_id = $orgId
+  ```
+
+- [ ] **Get score counts per event**
+  ```sql
+  SELECT event_id, COUNT(*) 
+  FROM scorecard 
+  WHERE event_id IN (...) 
+  GROUP BY event_id
+  ```
+
+- [ ] **Realtime subscription**
+  ```typescript
+  const subscription = supabase
+    .channel('scorecard-changes')
+    .on('postgres_changes', 
+      { 
+        event: 'INSERT',
+        schema: 'public',
+        table: 'scorecard'
+      },
+      (payload) => {
+        // Handle new score
+      }
+    )
+    .subscribe();
+  ```
+
+### 7. 🧠 State Model
+- [ ] **Define TypeScript Interface**
+  ```typescript
+  interface LeaderboardState {
+    events: Event[];
+    currentEventIndex: number;
+    scoreCounts: Record<string, number>;
+    displayableEvents: Event[];
+    loading: boolean;
+    error: string | null;
+    rotationInterval: number;
+    rotationPaused: boolean;
+  }
+  ```
+
+### 8. ✅ Next Steps
+1. [ ] Create `/src/routes/[org]/leaderboard/+page.svelte`
+2. [ ] Implement `LeaderboardManager.svelte`
+3. [ ] Set up realtime subscriptions
+4. [ ] Add rotation controls and animations
+
+## 🧱 EventLeaderboardView Component Refactor
+
+### 🎯 Purpose
+Refactor the leaderboard into a reusable component that can be used in both single-event and rotating leaderboard contexts.
+
+### ✅ Goals
+- [ ] Decouple leaderboard rendering from routing and data fetching
+- [ ] Create a reusable `<EventLeaderboardView />` component
+- [ ] Support both single-event and multi-event rotation modes
+- [ ] Eliminate style/behavior duplication
+- [ ] Improve testability and maintainability
+
+### 🧩 Component API
+```typescript
+<script lang="ts">
+  export let event: Event;
+  export let organizationSettings: OrgSettings;
+  export let leaderboard: PlayerScore[];
+  export let qrCodeUrl?: string;
+  export let showQr?: boolean = true;
+  export let showAds?: boolean = true;
+</script>
+```
+
+### 📐 Responsibilities
+- [ ] Display logos, event title, leaderboard table, ad panel, and QR code
+- [ ] Render player rankings (Top 10)
+- [ ] Apply dynamic theming via `--accent-color`
+- [ ] Handle missing data gracefully
+- [ ] Support optional hiding of QR/ad panels
+
+### 🏗 Implementation Plan
+1. [ ] Create `src/lib/components/EventLeaderboardView.svelte`
+   - [ ] Move layout and display logic from current page
+   - [ ] Replace variables with props
+   - [ ] Add TypeScript interfaces
+   - [ ] Document props and usage
+   - [ ] Implement color transition system using CSS variables
+   - [ ] Add transition event emitters
+
+2. [ ] Update `/[org]/[event]/leaderboard/+page.svelte`
+   - [ ] Extract data fetching logic
+   - [ ] Use new `<EventLeaderboardView />` component
+   - [ ] Handle loading/error states
+
+3. [ ] Update `/[org]/leaderboard/+page.svelte`
+   - [ ] Use `<EventLeaderboardView />` for each event
+   - [ ] Implement two-phase transition system:
+     - [ ] Phase 1: Fade out content (300ms)
+     - [ ] Phase 2: Update color + fade in (500ms)
+   - [ ] Add rotation controls with debouncing
+   - [ ] Handle transition state management
+
+### 🎨 Animation Architecture
+- [ ] **CSS Transitions**
+  - [ ] Global accent color transitions (500ms)
+  - [ ] Content fade in/out (300ms)
+  - [ ] Optimize with `will-change`
+- [ ] **State Management**
+  - [ ] Track transition states
+  - [ ] Debounce rapid rotations
+  - [ ] Handle interrupted transitions
+
+### 🔍 Testing
+- [ ] Test with various event configurations
+- [ ] Verify theming transitions smoothly
+- [ ] Test rapid rotation handling
+- [ ] Verify responsive behavior
+- [ ] Test transition interruptions
+
+### 🔮 Future Extensions
+- [ ] Add animation transitions
+- [ ] Compact mode for small screens
+- [ ] Split-screen layout support
+- [ ] Customizable color schemes
+
+------------
+
+# 🏌️ Mini-Golf Leaderboard - Project Tasks
+
+
 
 - [ ] **Billing Portal & Subscription Management**
   - [ ] Create customer portal for subscription management
@@ -90,139 +246,19 @@
   - [ ] Display billing history
   - [ ] Add payment method management
 
-### 🔄 1. Account & Event Settings Refactor
-**Route:** `/dashboard/organization/settings`
-- [x] Create organization settings page
-  - [x] Add organization logo upload component
-  - [x] Add ad image upload component
-  - [x] Save images to Supabase storage
-  - [x] Store image URLs in organization settings
-  - [x] Add form validation and error handling
-  - [x] Implement accent color picker
-  - [x] Add billing email field
-  - [ ] Add organization name editing
-
-## 💰 4. Stripe Billing Integration
-
-### Database Updates
-- [x] Add `subscriptions` table:
-  - `id` (UUID, primary key)
-  - `organization_id` (UUID, foreign key to organizations)
-  - `stripe_customer_id` (text)
-  - `stripe_subscription_id` (text, nullable)
-  - `status` (text: 'trialing' | 'active' | 'past_due' | 'canceled' | 'unpaid')
-  - `current_period_end` (timestamp with time zone)
-  - `trial_ends_at` (timestamp with time zone)
-  - `created_at` (timestamp with time zone)
-  - `updated_at` (timestamp with time zone)
-
-- [x] Add `payment_up_to_date` (boolean) to `organizations` table
-- [x] Create RLS policies for subscription data
-
-### Stripe Setup
-- [x] Create Stripe account and get API keys
-- [x] Set up Stripe webhook endpoint
-- [x] Create subscription plan in Stripe dashboard with 14-day trial
-- [x] Add Stripe.js and Stripe Node.js client
-- [x] Implement server-side webhook handler
-- [x] Create checkout session endpoint with trial support
-
-### Testing Stripe Integration
-
-#### 1. Local Testing Setup
-```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-```
-
-#### 2. Test Subscription Flow
-1. **Test Mode**:
-   - Sign up and finish onboarding
-   - Click 
-   - The flow will use Stripe's test mode automatically
-
-2. **Test Cards**:
-   - Success: 4242 4242 4242 4242
-   - Authentication Required: 4000 0025 0000 3155
-   - Decline: 4000 0000 0000 0002
-   - Fill in other details with any valid future date and CVC
-   - Complete the checkout
-   - Verify webhook events in Stripe Dashboard
-   - Check database for subscription record
-
-3. **Webhook Testing**:
-   - Use Stripe CLI to forward webhooks:
-     ```bash
-     stripe listen --forward-to localhost:5173/api/webhooks/stripe
-     ```
-   - Test webhook events with Stripe CLI:
-     ```bash
-     stripe trigger payment_intent.succeeded
-     ```
-
-#### 3. Verify Subscription Status
-- Check `subscriptions` table for new records
-- Verify `organizations.payment_up_to_date` updates correctly
-- Test trial period behavior
-- Test payment failure scenarios
-
-### Subscription Flow Implementation
-
 #### 1. Account Creation & Authentication
 - [x] **Signup Flow**:
   - User signs up with email
   - Receives magic link
   - Automatically starts 14-day trial
   - Trial status managed by Stripe Checkout
-
-#### 2. Trial Status Management
-- [ ] **Frontend**: Trial Banner Component
-  - [ ] Create persistent banner showing trial status
-  - [ ] Display "🎉 Your 14-day free trial has begun! [Upgrade Now]" on first login
-  - [ ] Show "⏳ X days left in trial. [Upgrade Now]" on subsequent logins
-  - [ ] Banner should be visible on all authenticated routes
-
-#### 3. Upgrade Flow
-- [ ] **Frontend**: Upgrade Button
-  - [ ] Add [Upgrade Now] button to trial banner
-  - [ ] Connect to Stripe Checkout with:
-    ```typescript
-    const response = await fetch('/api/create-checkout-session', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        priceId: import.meta.env.STRIPE_PRICE_ID,
-        email: userEmail,
-        organizationId: currentOrgId
-      })
-    });
-    const { sessionId } = await response.json();
-    const stripe = await loadStripe(import.meta.env.PUBLIC_STRIPE_PUBLISHABLE_KEY);
-    await stripe.redirectToCheckout({ sessionId });
-    ```
-  - [ ] Handle successful/failed payment flows via webhooks
-
-#### 4. Webhook Handlers (Implemented)
-- [x] `customer.subscription.created`: Create subscription record
-- [x] `customer.subscription.updated`: Update trial/status in database
-- [x] `customer.subscription.deleted`: Handle subscription cancellation
-- [x] `invoice.payment_succeeded`: Update payment status
-- [x] `invoice.payment_failed`: Handle payment failures
-  - [ ] `invoice.payment_failed`: Notify user and update status
+ Notify user and update status
 
 #### 6. Post-Trial Experience
 - [ ] **Frontend**: Post-Trial UI
   - [ ] Show upgrade prompt if trial expires without subscription
   - [ ] Restrict access to premium features if needed
   - [ ] Display current subscription status in user settings
-
-### UI Components
-- [ ] Create simple `/pricing` page with plan options (optional, can link directly to Stripe Checkout)
-- [ ] Create subscription management component in organization settings
-- [ ] Handle Stripe Checkout redirects for success/failure
 
 ### Backend Implementation
 - [ ] Implement subscription service with methods for:
@@ -235,15 +271,8 @@ npm run dev
   - Checking trial status
   - Calculating days remaining in trial
 
-### Trial Flow
-- [ ] Set `payment_up_to_date = true` for new organizations
-- [ ] Set `trial_ends_at` to now + 10 days for new organizations
-- [ ] Show trial status and expiration in UI
-- [ ] Send trial expiration reminders (3 days, 1 day before)
-
 ### Access Control & Edge Cases
 - [ ] **Authentication States**:
-  - [ ] Handle unauthenticated users trying to access paid features
   - [ ] Handle users with expired sessions
   - [ ] Handle multiple tabs with different auth states
 
@@ -350,7 +379,6 @@ npm run dev
 - `src/lib/styles/leaderboard.css` - Leaderboard styles
 - `src/lib/styles/dashboard.css` - Dashboard styles
 
-## 🏗️ Implementation Plan
 
 ### Technical Stack
 - **Frontend**: Svelte/SvelteKit
@@ -370,7 +398,6 @@ npm run dev
 4. Enable CI/CD from GitHub
 
 ### Testing Strategy
-- Unit tests for utility functions
 - Component tests for UI elements
 - End-to-end tests for critical user flows
 - Cross-browser and device testing
