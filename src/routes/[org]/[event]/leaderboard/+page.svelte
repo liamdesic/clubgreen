@@ -7,12 +7,13 @@
   import { getTodayISO, shouldDisplayEvent } from '$lib/utils/leaderboard';
   import EventLeaderboardView from '$lib/components/EventLeaderboardView.svelte';
   import type { PageData } from './$types';
+  import '$lib/styles/theme.css';
   
   // Types
   interface PlayerScore {
     id: string;
     name: string;
-    totalScore: number;h
+    totalScore: number;
     holeInOnes: number;
   }
   
@@ -55,53 +56,92 @@
   async function loadData() {
     if (!browser) return;
     
+    console.log(`[Leaderboard] Starting data load for org: ${org}, event: ${eventId}`);
     loading = true;
     error = null;
     
     try {
       // Load event data
+      console.log(`[Leaderboard] Fetching event data for slug: ${eventId}`);
       const { data: eventData, error: eventError } = await supabase
         .from('events')
         .select('*')
-        .eq('id', eventId)
+        .eq('slug', eventId)
         .single();
       
-      if (eventError) throw eventError;
-      if (!eventData) throw new Error('Event not found');
+      if (eventError) {
+        console.error(`[Leaderboard] Error fetching event data:`, eventError);
+        throw eventError;
+      }
+      if (!eventData) {
+        console.error(`[Leaderboard] Event not found for slug: ${eventId}`);
+        throw new Error('Event not found');
+      }
+      console.log(`[Leaderboard] Event data retrieved:`, eventData);
       
-      // Check if event should be displayed
+      // Set the accent color CSS variable on the document root
+      if (browser && eventData?.settings_json?.accent_color) {
+        document.documentElement.style.setProperty('--accent-color', eventData.settings_json.accent_color);
+        console.log(`[Leaderboard] Set accent color to ${eventData.settings_json.accent_color}`);
+      }
+      
+      // Check scorecard count (for informational purposes only)
       const today = getTodayISO();
-      const { count: scoreCount } = await supabase
+      console.log(`[Leaderboard] Checking scorecard count for event ID: ${eventData.id}, today: ${today}`);
+      const { count: scoreCount, error: countError } = await supabase
         .from('scorecard')
         .select('*', { count: 'exact', head: true })
-        .eq('event_id', eventId);
+        .eq('event_id', eventData.id);
       
+      if (countError) {
+        console.error(`[Leaderboard] Error counting scorecards:`, countError);
+      }
+      
+      console.log(`[Leaderboard] Scorecard count: ${scoreCount || 0}`);
+      
+      // For specific event pages, we always show the event regardless of date or score count
+      // The shouldDisplayEvent function is still used for the organization-level leaderboard
+      // This is just logging for debugging purposes
       if (!shouldDisplayEvent(eventData, scoreCount || 0, today)) {
-        throw new Error('This event is not currently available for viewing');
+        console.log(`[Leaderboard] Note: This event wouldn't be shown on the org leaderboard (date: ${eventData.event_date} vs today: ${today}, scores: ${scoreCount})`);
       }
       
       event = eventData;
       
       // Load organization data
+      console.log(`[Leaderboard] Fetching organization data for slug: ${org}`);
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
         .select('*')
         .eq('slug', org)
         .single();
       
-      if (orgError) throw orgError;
+      if (orgError) {
+        console.error(`[Leaderboard] Error fetching organization data:`, orgError);
+        throw orgError;
+      }
+      console.log(`[Leaderboard] Organization data retrieved:`, orgData);
       organization = orgData;
       
       // Load leaderboard data
+      console.log(`[Leaderboard] Fetching scorecard data for event ID: ${eventData.id}`);
       const { data: scoreData, error: scoreError } = await supabase
         .from('scorecard')
         .select('*')
-        .eq('event_id', eventId);
+        .eq('event_id', eventData.id);
       
-      if (scoreError) throw scoreError;
+      if (scoreError) {
+        console.error(`[Leaderboard] Error fetching scorecard data:`, scoreError);
+        throw scoreError;
+      }
+      
+      console.log(`[Leaderboard] Retrieved ${scoreData?.length || 0} scorecard entries`);
       
       // Process scores
+      console.time('[Leaderboard] Score processing');
       leaderboard = processScores(scoreData || []);
+      console.timeEnd('[Leaderboard] Score processing');
+      console.log(`[Leaderboard] Processed leaderboard with ${leaderboard.length} players`);
       
     } catch (err) {
       console.error('Error loading data:', err);
@@ -114,10 +154,11 @@
   // Process scores from scorecard data
   function processScores(rows: Array<{
     player_id: string;
-    player_name?: string;
+    name?: string; // Changed from player_name
     score?: number;
-    hole_in_one?: boolean;
+    hole_in_ones?: number; // Changed from hole_in_one (boolean) to hole_in_ones (number)
   }>): PlayerScore[] {
+    console.log(`[Leaderboard] Processing ${rows.length} scorecard rows`);
     const playerMap = new Map<string, PlayerScore>();
     
     for (const row of rows) {
@@ -126,7 +167,7 @@
       if (!playerMap.has(playerId)) {
         playerMap.set(playerId, {
           id: playerId,
-          name: row.player_name || `Player ${playerId.slice(0, 6)}`,
+          name: row.name || `Player ${playerId.slice(0, 6)}`, // Use row.name
           totalScore: 0,
           holeInOnes: 0
         });
@@ -134,11 +175,18 @@
       
       const player = playerMap.get(playerId)!;
       player.totalScore += row.score || 0;
-      if (row.hole_in_one) player.holeInOnes++;
+      player.holeInOnes += row.hole_in_ones || 0; // Sum row.hole_in_ones (number)
     }
     
-    return Array.from(playerMap.values())
+    const result = Array.from(playerMap.values())
       .sort((a, b) => a.totalScore - b.totalScore);
+    
+    console.log(`[Leaderboard] Processed scores for ${result.length} unique players`);
+    if (debug) {
+      console.table(result);
+    }
+    
+    return result;
   }
   
   // Toggle debug mode
@@ -158,13 +206,15 @@
   
   // Initialize
   onMount(() => {
-    loadData();
-    
-    // Check for debug mode
+    // Check for debug mode first so logs can be more detailed if debug is enabled
     if (browser) {
       const urlParams = new URLSearchParams(window.location.search);
       debug = urlParams.has('debug') || localStorage.getItem('leaderboardDebug') === 'true';
+      console.log(`[Leaderboard] Debug mode: ${debug ? 'enabled' : 'disabled'}`);
     }
+    
+    console.log(`[Leaderboard] Component mounted, loading data...`);
+    loadData();
   });
 </script>
 
@@ -211,10 +261,10 @@
 
 <style>
   .leaderboard-page {
+    padding: 0 !important;
     position: relative;
     min-height: 100vh;
-    background-color: #f5f5f5;
-  }
+    background: linear-gradient(135deg, var(--accent-color-700), var(--accent-color-800), var(--accent-color-900));  }
   
   .error-message {
     padding: 2rem;

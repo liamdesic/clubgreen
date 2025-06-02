@@ -25,7 +25,6 @@ body {
   font-family: 'obviously', sans-serif;
   font-size: 1.25rem; /* Base font size increased */
   line-height: 1.5;
-  background-color: var(--accent-color-dark);
   color: white;
   min-height: 100vh;
   display: flex;
@@ -38,7 +37,6 @@ body {
 .header {
   padding: 2rem 2rem 1.5rem;
   margin-bottom: 1.5rem;
-  background: var(--accent-color-dark);
 }
 
 .header-content {
@@ -60,17 +58,22 @@ body {
 .logo-container {
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: auto;
 }
 
 .logo-container.org-logo {
+  min-width: 200px;
   max-width: 350px;
 }
 
 .logo-container.event-logo {
+  min-width: 200px;
   max-width: 350px;
 }
 
 .logo {
+  display: block;
   height: auto;
   max-height: 400px;
   width: 100%;
@@ -497,40 +500,7 @@ body {
     }
   }
 
-  button.fullscreen-toggle {
-    position: fixed;
-    bottom: 1rem;
-    right: 1rem;
-    background: rgba(0, 0, 0, 0.6);
-    color: white;
-    padding: 0.7rem 1rem;
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    cursor: pointer;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s;
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  button.fullscreen-toggle i {
-    margin-right: 0.5rem;
-  }
-
-  :global(body):has(button.fullscreen-toggle:hover) button.fullscreen-toggle,
-  :global(body):has(button.fullscreen-toggle:focus) button.fullscreen-toggle {
-    opacity: 1 !important;
-    pointer-events: auto;
-  }
-
-.fullscreen-toggle.show {
-  opacity: 1;
-  pointer-events: auto;
-}
+  /* Fullscreen toggle button styles removed */
 
 /* ------------------------------
    📢 AD CONTAINER STYLES

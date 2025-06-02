@@ -13,18 +13,39 @@ export function getTodayISO(): string {
  * Check if an event should be displayed based on its settings and scores
  */
 export function shouldDisplayEvent(event: Event, scoreCount: number, today: string): boolean {
-  // Must be published
-  if (!event.published) return false;
+  // Debug log for filtering
+  console.log(`[Leaderboard Debug] Checking event ${event.id} - ${event.title}:`, {
+    showInLeaderboard: event.settings_json?.show_on_main_leaderboard ?? true,
+    event_date: event.event_date,
+    today: today,
+    scoreCount: scoreCount
+  });
+  
+  // Note: published flag check removed as it's deprecated
   
   // Check if explicitly hidden in settings (defaults to true if not set)
   const showInLeaderboard = event.settings_json?.show_on_main_leaderboard ?? true;
-  if (!showInLeaderboard) return false;
+  if (!showInLeaderboard) {
+    console.log(`[Leaderboard Debug] Event ${event.id} filtered out: show_on_main_leaderboard is false`);
+    return false;
+  }
   
-  // Event date must be today
-  if (event.event_date !== today) return false;
+  // Event date logic:
+  // - If event_date is null, always show it (ongoing event)
+  // - If event_date is set, it must be today (one-day event)
+  if (event.event_date !== null && event.event_date !== today) {
+    console.log(`[Leaderboard Debug] Event ${event.id} filtered out: date ${event.event_date} is not today (${today})`);
+    return false;
+  }
   
   // Must have at least one score
-  return scoreCount > 0;
+  if (scoreCount <= 0) {
+    console.log(`[Leaderboard Debug] Event ${event.id} filtered out: no scores (count: ${scoreCount})`);
+    return false;
+  }
+  
+  console.log(`[Leaderboard Debug] Event ${event.id} WILL BE DISPLAYED`);
+  return true;
 }
 
 /**

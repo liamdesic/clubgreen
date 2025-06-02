@@ -7,14 +7,22 @@
   import FileUpload from '$lib/FileUpload.svelte';
   import '$lib/styles/theme.css';
   import '$lib/styles/base.css';
+  import '$lib/styles/DashboardSettings.css';
 
   // State
   let loading = true;
   let saving = false;
+  let loadingSubscription = false;
   let organization = {
     id: '',
     name: 'Organization',
     slug: '',
+    stripe_customer_id: '',
+    stripe_subscription_id: '',
+    subscription_status: '',
+    current_period_end: null,
+    trial_ends_at: null,
+    payment_up_to_date: true,
     settings: {
       logo_url: '',
       accent_color: '#00c853',
@@ -24,6 +32,25 @@
     }
   };
   
+  // Subscription data
+  let subscriptionData: {
+    status: string;
+    trialDaysLeft: number;
+    currentPeriodEnd: string | null;
+    hasActiveSubscription: boolean;
+    isInTrial: boolean;
+    isTrialExpired: boolean;
+    isCanceling: boolean;
+  } = {
+    status: '',
+    trialDaysLeft: 0,
+    currentPeriodEnd: null,
+    hasActiveSubscription: false,
+    isInTrial: false,
+    isTrialExpired: false,
+    isCanceling: false
+  };
+  
   // Track if slug has been manually edited
   let isSlugManuallyEdited = false;
 
@@ -31,6 +58,147 @@
   let logoUrl = '';
   let adImageUrl = '';
 
+  // Process subscription data
+  function processSubscriptionData() {
+    // Calculate trial days left if in trial
+    if (organization.trial_ends_at) {
+      const trialEnd = new Date(organization.trial_ends_at);
+      const now = new Date();
+      const diffTime = trialEnd.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      subscriptionData.trialDaysLeft = diffDays > 0 ? diffDays : 0;
+      subscriptionData.isInTrial = diffDays > 0;
+      subscriptionData.isTrialExpired = diffDays <= 0;
+    } else {
+      subscriptionData.isInTrial = false;
+      subscriptionData.isTrialExpired = false;
+    }
+    
+    // Process subscription status
+    const status = organization.subscription_status || 'inactive';
+    subscriptionData.status = status;
+    subscriptionData.hasActiveSubscription = ['active', 'trialing', 'active_canceling'].includes(status);
+    subscriptionData.isCanceling = status === 'active_canceling';
+    
+    // Format current period end date
+    if (organization.current_period_end) {
+      const endDate = new Date(organization.current_period_end);
+      subscriptionData.currentPeriodEnd = endDate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    }
+  }
+  
+  // Open Stripe Customer Portal for managing subscription
+  
+  async function updateBillingInfo() {
+    try {
+      showToast('Opening billing portal...', 'info');
+      
+      // Call the billing-portal API endpoint
+      const response = await fetch('/api/billing-portal', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        
+        // Check for specific error messages
+        if (errorData.message && errorData.message.includes('Stripe Customer Portal is not configured')) {
+          console.error('Stripe Customer Portal configuration error:', errorData.message);
+          showToast('Failed to open billing portal: Stripe Customer Portal is not configured', 'error');
+          return;
+        }
+        
+        throw new Error(errorData.message || 'Failed to open billing portal');
+      }
+      
+      const { url } = await response.json();
+      
+      // Redirect to the Stripe customer portal
+      window.location.href = url;
+    } catch (err) {
+      console.error('Error opening billing portal:', err);
+      showToast('Failed to open billing portal', 'error');
+    }
+  }
+  
+  // Cancel subscription
+  async function cancelSubscription() {
+    if (!confirm('Are you sure you want to cancel your subscription? Your subscription will remain active until the end of your current billing period.')) {
+      return;
+    }
+    
+    try {
+      // Set optimistic UI update
+      const originalStatus = subscriptionData.status;
+      subscriptionData.status = 'active_canceling';
+      
+      // Call the cancel-subscription API endpoint
+      const response = await fetch('/api/cancel-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ organizationId: organization.id })
+      });
+      
+      if (!response.ok) {
+        // Revert optimistic update on error
+        subscriptionData.status = originalStatus;
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to cancel subscription');
+      }
+      
+      const result = await response.json();
+      
+      // Update UI with cancellation info
+      organization.subscription_status = 'active_canceling';
+      processSubscriptionData();
+      
+      showToast('Subscription will be canceled at the end of the billing period', 'success');
+    } catch (err) {
+      console.error('Error canceling subscription:', err);
+      showToast('Failed to cancel subscription', 'error');
+    }
+  }
+  
+  // Redirect to checkout for subscription
+  async function redirectToCheckout() {
+    try {
+      showToast('Preparing checkout...', 'info');
+      
+      const response = await fetch('/api/create-checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          organizationId: organization.id 
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create checkout session');
+      }
+      
+      const { url } = await response.json();
+      
+      // Redirect to Stripe checkout
+      window.location.href = url;
+    } catch (err) {
+      console.error('Error creating checkout session:', err);
+      showToast('Failed to reactivate subscription', 'error');
+    }
+  }
+  
   // Initialize organization data
   async function loadOrganization() {
     try {
@@ -80,7 +248,8 @@
         console.log('✅ Loaded organization data:', {
           id: orgData.id,
           name: orgData.name,
-          hasSettings: !!orgData.settings_json
+          hasSettings: !!orgData.settings_json,
+          hasSubscription: !!orgData.stripe_subscription_id
         });
         organization = {
           ...orgData,
@@ -101,6 +270,9 @@
         if (organization.settings.ad_image_url) {
           console.log('🖼️ Loaded ad image URL:', organization.settings.ad_image_url);
         }
+        
+        // Process subscription data
+        processSubscriptionData();
       }
 
     } catch (err) {
@@ -114,10 +286,14 @@
   // Handle file upload completion
   function handleLogoUpload(event: CustomEvent) {
     logoUrl = event.detail.url;
+    // Update organization settings when logo URL changes (including when cleared)
+    organization.settings.logo_url = logoUrl;
   }
 
   function handleAdUpload(event: CustomEvent) {
     adImageUrl = event.detail.url;
+    // Update organization settings when ad image URL changes (including when cleared)
+    organization.settings.ad_image_url = adImageUrl;
   }
 
   // Save organization settings
@@ -252,8 +428,9 @@
         <h2>Branding</h2>
         
         <div class="form-group">
-          <label>Organization Logo</label>
+          <label for="org-logo">Organization Logo</label>
           <FileUpload 
+            id="org-logo"
             initialUrl={organization.settings.logo_url}
             label="Upload Logo" 
             folder="organization-logos"
@@ -263,14 +440,7 @@
               console.log('Logo URL updated:', e.detail.url);
             }}
           />
-          {#if organization.settings.logo_url}
-            <div class="current-file">
-              <span>Current: </span>
-              <a href={organization.settings.logo_url} target="_blank" rel="noopener noreferrer">
-                View Current Logo
-              </a>
-            </div>
-          {/if}
+
         </div>
         
         <div class="form-group">
@@ -291,21 +461,15 @@
         <h2>Advertisement</h2>
         
         <div class="form-group">
-          <label>Ad Image</label>
+          <label for="ad-image">Ad Image</label>
           <FileUpload 
+            id="ad-image"
             label="Upload Ad Image" 
             folder="ads"
             on:upload={handleAdUpload}
             initialUrl={organization.settings.ad_image_url}
           />
-          {#if organization.settings.ad_image_url && !adImageUrl}
-            <div class="current-file">
-              <span>Current: </span>
-              <a href={organization.settings.ad_image_url} target="_blank" rel="noopener noreferrer">
-                View Current Ad Image
-              </a>
-            </div>
-          {/if}
+
         </div>
         
         <div class="form-group">
@@ -319,18 +483,68 @@
         </div>
       </div>
       
-      <!-- Billing Information -->
-      <div class="settings-section">
-        <h2>Billing</h2>
+      <!-- Subscription & Billing Information -->
+      <div class="form-block">
+        <h2>Subscription & Billing</h2>
+        
+        <div class="subscription-section">
+          <h3>Subscription</h3>
+          
+          <div class="subscription-status">
+            <div class="status-label">Status:</div>
+            {#if subscriptionData.hasActiveSubscription}
+              {#if subscriptionData.status === 'active'}
+                <div class="status-badge active">Active</div>
+              {:else if subscriptionData.status === 'trialing'}
+                <div class="status-badge trialing">Trial</div>
+              {:else if subscriptionData.status === 'active_canceling'}
+                <div class="status-badge canceling">Active - Canceling</div>
+              {:else}
+                <div class="status-badge inactive">Inactive</div>
+              {/if}
+            {:else}
+              <div class="status-badge inactive">No Active Subscription</div>
+            {/if}
+          </div>
+          
+          {#if subscriptionData.hasActiveSubscription && subscriptionData.currentPeriodEnd}
+            <div class="subscription-detail">
+              <div class="detail-label">
+                {subscriptionData.isCanceling ? 'Access Until:' : 'Next Billing Date:'}
+              </div>
+              <div class="detail-value">{subscriptionData.currentPeriodEnd}</div>
+            </div>
+          {/if}
+          
+          <div class="subscription-actions">
+            {#if subscriptionData.hasActiveSubscription}
+              <button class="button primary" on:click={updateBillingInfo}>
+                Manage Subscription
+              </button>
+            {:else}
+              <button class="button primary" on:click={redirectToCheckout}>
+                Subscribe
+              </button>
+            {/if}
+          </div>
+        </div>
+        
+        <div class="form-divider"></div>
         
         <div class="form-group">
-          <label for="billing-email">Billing Email</label>
+          <label for="billing_email">Billing Email</label>
           <input
-            type="email"
-            id="billing-email"
+            type="text"
+            id="billing_email"
             bind:value={organization.settings.billing_email}
-            placeholder="billing@example.com"
+            placeholder="Enter billing email"
           />
+        </div>
+        
+        <div class="form-actions">
+          <button class="button primary" on:click={saveSettings} disabled={saving}>
+            {saving ? 'Saving...' : 'Save Billing Info'}
+          </button>
         </div>
       </div>
       
@@ -361,269 +575,11 @@
 </div>
 
 <style>
-  .input-with-prefix {
-    display: flex;
-    align-items: center;
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
-    overflow: hidden;
-  }
-  
-  .input-with-prefix .prefix {
-    padding: 0.5rem 0.75rem;
-    background: #f8fafc;
-    color: #64748b;
-    font-size: 0.9em;
-    border-right: 1px solid #e2e8f0;
-    white-space: nowrap;
-  }
-  
-  .input-with-prefix input {
-    flex: 1;
-    border: none;
-    padding: 0.5rem 0.75rem;
-    font-size: 1em;
-    outline: none;
-    min-width: 0; /* Allow input to shrink below content size */
-  }
-  
-  .hint {
-    display: block;
-    margin-top: 0.25rem;
-    color: #64748b;
-    font-size: 0.85em;
-  }
-  
+  /* Custom styles not covered by DashboardSettings.css */
   :global(body) {
-    background: var(--light-gradient);
-    min-height: 100vh;
     margin: 0;
   }
-
-  .settings-container {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 2rem 1.5rem 4rem;
-  }
-
-  .settings-form {
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-    max-width: 800px;
-    margin: 0 auto;
-  }
-
-  h1 {
-    font-size: 2.25rem;
-    font-weight: 700;
-    color: #1a1a1a;
-    margin: 0 0 2.5rem 0;
-    text-align: center;
-    letter-spacing: -0.5px;
-  }
   
-  .settings-section {
-    background: white;
-    border-radius: 16px;
-    padding: 2rem;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
-    border: 1px solid rgba(0, 0, 0, 0.04);
-    transition: transform 0.2s, box-shadow 0.2s;
-  }
-  
-  .settings-section:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  }
-  
-  .form-group {
-    margin-bottom: 1.75rem;
-  }
-  
-  .form-group:last-child {
-    margin-bottom: 0;
-  }
-  
-  .form-group:last-child {
-    margin-bottom: 0;
-  }
-  
-  .form-group label {
-    display: block;
-    margin-bottom: 0.75rem;
-    font-weight: 600;
-    color: #374151;
-    font-size: 0.95rem;
-    letter-spacing: -0.25px;
-  }
-  
-  input[type="text"],
-  input[type="email"],
-  input[type="color"] {
-    width: 100%;
-    padding: 0.875rem 1.125rem;
-    border: 1.5px solid #e5e7eb;
-    border-radius: 10px;
-    font-size: 1rem;
-    background: #f9fafb;
-    color: #1f2937;
-    transition: all 0.25s ease;
-    font-family: inherit;
-  }
-  
-  input[type="text"]:focus,
-  input[type="email"]:focus {
-    outline: none;
-    border-color: var(--accent-color);
-    box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.1);
-    background: white;
-  }
-  
-  .current-file {
-    margin-top: 0.75rem;
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-  }
-  
-  .current-file a {
-    color: var(--accent-color);
-    text-decoration: none;
-    font-weight: 500;
-  }
-  
-  .current-file a:hover {
-    text-decoration: underline;
-  }
-  
-  .color-picker {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-  
-  .color-picker input[type="color"] {
-    width: 60px;
-    height: 40px;
-    padding: 0;
-    border: 2px solid var(--border-color);
-    border-radius: 6px;
-    cursor: pointer;
-  }
-  
-  .form-actions {
-    margin-top: 2rem;
-    display: flex;
-    justify-content: flex-end;
-  }
-  
-  .danger-zone {
-    margin-top: 4rem;
-    padding-top: 2rem;
-    border-top: 1px solid #f0f0f0;
-  }
-  
-  .danger-zone h3 {
-    color: #dc2626;
-    margin-bottom: 1rem;
-    font-size: 1.1rem;
-  }
-  
-  .button.danger {
-    background-color: #dc2626;
-    color: white;
-    border: 1px solid #dc2626;
-  }
-  
-  .button.danger:hover {
-    background-color: #b91c1c;
-    border-color: #b91c1c;
-  }
-  
-  .button {
-    padding: 0.875rem 2.25rem;
-    background: var(--accent-color, #4f46e5);
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    width: auto;
-    letter-spacing: 0.25px;
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-    position: relative;
-    overflow: hidden;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-  }
-  
-  .button::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(255, 255, 255, 0);
-    transition: background 0.3s ease;
-    border-radius: 8px;
-  }
-  
-  .button:hover {
-    background: var(--accent-hover, #4338ca);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  }
-  
-  .button:active {
-    transform: translateY(0);
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  }
-  
-  .button:focus-visible {
-    outline: 2px solid var(--accent-color, #4f46e5);
-    outline-offset: 2px;
-  }
-  
-  .button:disabled {
-    background: #9ca3af;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-    opacity: 0.7;
-  }
-  
-  .button.primary {
-    background: var(--accent-color, #4f46e5);
-    color: white;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-  }
-  
-  .button.primary:hover {
-    background: var(--accent-hover, #4338ca);
-  }
-  
-  .loading {
-    text-align: center;
-    padding: 3rem 0;
-    color: var(--text-secondary);
-    font-size: 1.1rem;
-  }
-  
-  h2 {
-    margin-top: 0;
-    margin-bottom: 1.75rem;
-    color: #111827;
-    font-size: 1.375rem;
-    font-weight: 700;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid #f3f4f6;
-    letter-spacing: -0.5px;
-  }
+  /* Loading state is now handled by DashboardSettings.css */
+  /* h2 styling is now handled by DashboardSettings.css */
 </style>

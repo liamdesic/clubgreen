@@ -9,7 +9,36 @@
   --color-purple-dark: #281735;
   --color-purple-deepest: #1c1821;
   --color-soft-blue: #b3e8ff;
-
+  
+  /* 🎨 Dynamic Accent Color System */
+  /* Default accent color - will be overridden by event settings */
+  --accent-color: #00c853;
+  
+  /* Accent Color Variations - Light to Dark */
+  --accent-color-100: color-mix(in srgb, var(--accent-color) 10%, white); /* Very light */
+  --accent-color-200: color-mix(in srgb, var(--accent-color) 30%, white); /* Light */
+  --accent-color-300: color-mix(in srgb, var(--accent-color) 50%, white); /* Medium light */
+  --accent-color-400: color-mix(in srgb, var(--accent-color) 70%, white); /* Slightly light */
+  --accent-color-500: var(--accent-color); /* Base accent color */
+  --accent-color-600: color-mix(in srgb, var(--accent-color) 80%, black); /* Slightly dark */
+  --accent-color-700: color-mix(in srgb, var(--accent-color) 60%, black); /* Medium dark */
+  --accent-color-800: color-mix(in srgb, var(--accent-color) 40%, black); /* Dark */
+  --accent-color-900: color-mix(in srgb, var(--accent-color) 20%, black); /* Very dark */
+  
+  /* Saturation Variations */
+  --accent-color-saturated: color-mix(in srgb, var(--accent-color) 80%, rgb(255, 0, 0)); /* More saturated */
+  --accent-color-desaturated: color-mix(in srgb, var(--accent-color) 80%, gray); /* Less saturated */
+  
+  /* Legacy support for existing code */
+  --accent-color-light: var(--accent-color-200);
+  --accent-color-dark: var(--accent-color-800);
+  
+  /* Gradient Variations */
+  --accent-gradient-light: linear-gradient(135deg, var(--accent-color-100), var(--accent-color-300), var(--accent-color-500));
+  --accent-gradient-medium: linear-gradient(135deg, var(--accent-color-300), var(--accent-color-500), var(--accent-color-700));
+  --accent-gradient-dark: linear-gradient(135deg, var(--accent-color-500), var(--accent-color-700), var(--accent-color-900));
+  --accent-gradient-very-dark: linear-gradient(135deg, var(--accent-color-700), var(--accent-color-800), var(--accent-color-900));
+  
   /* 🌈 Gradients */
   --gradient-dark: linear-gradient(135deg, #572b86, #281735, #1c1821);
   --gradient-color: linear-gradient(135deg, #689ef9, #6e4ef4, #572b86);

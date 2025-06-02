@@ -21,6 +21,8 @@
     show_on_main_leaderboard?: boolean;
     event_type?: 'single' | 'ongoing';
   }
+  
+  let eventDate: string = '';
 
   interface PlayerScore {
     id: string;
@@ -114,6 +116,9 @@
         event_name: data.title || ''
       };
       
+      // Set event date from the event data
+      eventDate = data.event_date ? new Date(data.event_date).toISOString().split('T')[0] : '';
+      
       await loadPlayerScores();
       loading = false;
     } catch (err: any) {
@@ -202,22 +207,22 @@
     try {
       saving = true;
       error = null;
-
-      if (!event) throw new Error('No event loaded');
-
+      
+      // Update event title, date, and settings
       const { error: updateError } = await supabase
         .from('events')
         .update({
           title: settings.event_name,
+          event_date: eventDate || null,
           settings_json: {
             ...settings,
-            event_name: undefined // Remove the duplicate field
+            event_name: undefined // Don't duplicate the title in settings
           }
         })
         .eq('id', eventUuid);
 
       if (updateError) throw updateError;
-
+      
       showToast('Settings saved successfully!', 'success');
       unsavedChanges = false;
     } catch (err: any) {
@@ -426,6 +431,21 @@
     padding-left: 35px;
     line-height: 1.4;
   }
+  
+  .date-picker {
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    width: 100%;
+    margin-bottom: 1rem;
+  }
+  
+  .date-picker:focus {
+    outline: none;
+    border-color: var(--accent-color, #00c853);
+    box-shadow: 0 0 0 2px rgba(0, 200, 83, 0.2);
+  }
 </style>
 
 <DashboardHeader 
@@ -443,8 +463,18 @@
       <div class="event-sections-wrapper">
         <section class="event-section">
           <h2>Event Settings</h2>
-          <label for="event-name" class="form-label">Event Title</label>
+          <label for="event-name" class="form-label">Event Name</label>
           <input id="event-name" type="text" bind:value={settings.event_name} placeholder="Enter event name" />
+          
+          <label for="event-date" class="form-label">Event Date</label>
+          <input 
+            id="event-date" 
+            type="date" 
+            class="date-picker"
+            bind:value={eventDate} 
+            on:change={() => unsavedChanges = true}
+            placeholder="Select event date"
+          />
 
           <label for="hole-count" class="form-label" style="margin-top: var(--spacing-md);">Number of Holes</label>
           <div style="display: flex; align-items: center; gap: var(--spacing-lg);">

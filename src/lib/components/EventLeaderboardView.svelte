@@ -1,94 +1,51 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import type { SvelteComponent } from 'svelte';
-  
-  // Define the component interface
-  interface $$Events {
-    [evt: string]: (event: any) => void;
-  }
-  
-  interface $$Props {
-    event: any;
-    organizationSettings?: any;
-    leaderboard?: any[];
-    qrCodeUrl?: string;
-    showQr?: boolean;
-    showAds?: boolean;
-    debug?: boolean;
-  }
-  
-  // Export the component as default
-  export default class EventLeaderboardView extends SvelteComponent<$$Props, $$Events> {};
   import { fade } from 'svelte/transition';
   import { supabase } from '$lib/supabaseClient';
   import { browser } from '$app/environment';
   import QRCode from 'qrcode';
   import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
-
-  // Types
-  export interface PlayerScore {
-    id: string;
-    name: string;
-    totalScore: number;
-    holeInOnes: number;
-  }
-
-  export interface EventSettings {
-    id: string;
-    title: string;
-    hole_count: number;
-    accent_color: string;
-    logo_url: string;
-    enable_ads: boolean;
-    ads_text: string;
-    ads_url: string;
-    ads_image_url?: string | null;
-    created_at?: string;
-    updated_at?: string;
-  }
-
-  export interface OrganizationSettings {
-    id: string;
-    name: string;
-    logo_url: string;
-    ad_image_url?: string | null;
-    created_at?: string;
-    updated_at?: string;
-  }
-
-
-
+  import type { 
+    PlayerScore, 
+    EventSettings, 
+    OrganizationSettings 
+  } from '$lib/types/leaderboard';
+  
   // Props with defaults
   export let org: string;
-  export let event: string;
+  export let event: string | EventSettings;
+  export let organizationSettings: Partial<OrganizationSettings> = {};
+  export let leaderboard: PlayerScore[] = [];
+  export let debug = false;
   export let hydrateFromSupabase = true;
-  export let fullscreenable = true;
+  // Fullscreen functionality has been removed
   export let realtimeUpdates = true;
   export let initialScores: PlayerScore[] = [];
   export let initialEventSettings: Partial<EventSettings> = {};
   export let initialOrganizationSettings: Partial<OrganizationSettings> = {};
   export let showLoadingIndicator = true;
   export let showErrorMessages = true;
-  export let debug = false;
 
   // State
   let loading = false;
   let error: string | null = null;
   let eventSettings: Partial<EventSettings> = { ...initialEventSettings };
-  let organizationSettings: Partial<OrganizationSettings> = { ...initialOrganizationSettings };
-  let leaderboard: PlayerScore[] = [...initialScores];
   let qrCodeDataUrl: string | null = null;
-  let isFullscreen = false;
-  let showFullscreenButton = false;
-  let hideTimeout: ReturnType<typeof setTimeout> | null = null;
   let realtimeChannel: any = null;
-  let currentEvent = eventSettings?.title || event || '';
+  let currentEvent = (typeof event === 'string' ? event : event?.title) || '';
   let isMounted = false;
-
+  
+  // Initialize organization settings
+  organizationSettings = { ...initialOrganizationSettings, ...organizationSettings };
+  
+  // Initialize leaderboard
+  leaderboard = [...initialScores, ...leaderboard];
+  
   // Derived state
   $: topScores = leaderboard.slice(0, 5);
   $: bottomScores = leaderboard.slice(5, 10);
   $: hasScores = leaderboard.length > 0;
+  $: eventId = typeof event === 'string' ? event : event.id;
 
   // Combined data loading function
   async function loadData() {
@@ -109,7 +66,6 @@
       
       // Generate QR code after we have all the data
       await generateQRCode();
-      updateAccentColor();
       
       // Set up realtime updates if enabled
       if (realtimeUpdates) {
@@ -130,21 +86,22 @@
   // Lifecycle
   onMount(async () => {
     isMounted = true;
-    if (!browser) return;
-
-    // Add event listeners
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('keydown', handleKeyDown);
     
-    // Initial data load
-    await loadData().catch(() => {
-      // Error is already handled in loadData
-    });
+    if (browser) {
+      // Add event listeners
+      document.addEventListener('keydown', handleKeydown);
+      
+      // Always try to generate QR code on mount
+      generateQRCode();
+    }
     
     return () => {
       isMounted = false;
-      cleanup();
+      
+      if (browser) {
+        // Remove event listeners
+        document.removeEventListener('keydown', handleKeydown);
+      }
     };
   });
 
@@ -157,7 +114,7 @@
       const { data, error: err } = await supabase
         .from('scorecard')
         .select('player_id, name, score, hole_number, hole_in_ones, published')
-        .eq('event_id', event)
+        .eq('event_id', eventId)
         .eq('published', true);
         
       if (err) throw err;
@@ -195,7 +152,7 @@
       const { data, error: err } = await supabase
         .from('event_settings')
         .select('*')
-        .eq('event_id', event)
+        .eq('event_id', eventId)
         .single();
         
       if (err) throw err;
@@ -209,7 +166,9 @@
         id: data.id || event,
         title: data.title || 'Event',
         hole_count: data.hole_count || 9,
-        accent_color: data.accent_color || '#4CAF50',
+        settings_json: {
+          accent_color: data.settings_json?.accent_color || '#4CAF50'
+        },
         logo_url: data.logo_url || '',
         enable_ads: data.enable_ads ?? true,
         ads_text: data.ads_text || '',
@@ -270,111 +229,34 @@
       .filter(player => holesPlayed[player.id] === holeCount);
   }
 
-  // Fullscreen handling
-  function toggleFullscreen(): void {
-    if (!fullscreenable || !browser) return;
-    
+  function handleKeydown(e: KeyboardEvent): void {
     try {
-      if (!document.fullscreenElement) {
-        const elem = document.documentElement;
-        if (elem.requestFullscreen) {
-          elem.requestFullscreen().catch((err: Error) => {
-            console.error('Error attempting to enable fullscreen:', err);
-            error = 'Fullscreen mode is not available';
-          });
-        }
-      } else {
-        if (document.exitFullscreen) {
-          document.exitFullscreen().catch((err: Error) => {
-            console.error('Error attempting to exit fullscreen:', err);
-            error = 'Failed to exit fullscreen mode';
-          });
-        }
-      }
-    } catch (err) {
-      console.error('Fullscreen error:', err);
-      error = 'Failed to toggle fullscreen mode';
-    }
-  }
-
-  function handleMouseMove(): void {
-    if (!fullscreenable || !isFullscreen || !browser) return;
-    
-    if (!showFullscreenButton) {
-      showFullscreenButton = true;
-    }
-    
-    // Clear any existing timeout
-    if (hideTimeout) {
-      clearTimeout(hideTimeout);
-      hideTimeout = null;
-    }
-    
-    // Set a new timeout to hide the button
-    hideTimeout = window.setTimeout(() => {
-      if (isMounted) {
-        showFullscreenButton = false;
-      }
-      hideTimeout = null;
-    }, 2000);
-  }
-
-  function handleFullscreenChange(): void {
-    if (!browser) return;
-    
-    isFullscreen = !!document.fullscreenElement;
-    if (!isFullscreen) {
-      showFullscreenButton = false;
-    }
-  }
-
-  function handleKeyDown(event: KeyboardEvent): void {
-    if (!browser || !isFullscreen) return;
-    
-    try {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        toggleFullscreen();
-      }
+      // Keydown handler (fullscreen functionality removed)
     } catch (err) {
       console.error('Error handling keydown:', err);
     }
   }
 
-  function updateAccentColor(): void {
-    if (browser && event?.accent_color) {
-      document.documentElement.style.setProperty('--accent-color', event.accent_color);
-      
-      // Debug logging
-      if (debug) {
-        console.log('EventLeaderboardView state:', {
-          event,
-          organizationSettings,
-          leaderboard,
-          loading,
-          error
-        });
-      }
-    }
-  }
-
   // QR Code Generation
   async function generateQRCode(): Promise<void> {
-    if (!browser || !org || !event || !eventSettings) return;
+    if (!browser || !eventId) return;
     
-    const scorecardUrl = `${window.location.origin}/${org}/${event}/scorecard`;
+    const scorecardUrl = `${window.location.origin}/${org}/${eventId}/scorecard`;
+    console.log('[Leaderboard] Generating QR code for URL:', scorecardUrl);
+    
     try {
       qrCodeDataUrl = await QRCode.toDataURL(scorecardUrl, {
         width: 200,
         margin: 1,
         color: {
-          dark: eventSettings.accent_color || '#000000',
+          dark: eventSettings.settings_json?.accent_color || '#000000',
           light: '#ffffff00' // Transparent background
         },
         errorCorrectionLevel: 'H' // High error correction
       });
+      console.log('[Leaderboard] QR code generated successfully');
     } catch (err) {
-      console.error('Error generating QR code:', err);
+      console.error('[Leaderboard] Error generating QR code:', err);
       error = 'Failed to generate QR code';
     }
   }
@@ -386,12 +268,12 @@
     }
     
     realtimeChannel = supabase
-      .channel(`leaderboard:${event}`)
+      .channel(`leaderboard:${eventId}`)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'scorecard',
-        filter: `event_id=eq.${event}`
+        filter: `event_id=eq.${eventId}`
       }, loadLeaderboard)
       .subscribe();
   }
@@ -407,20 +289,10 @@
       }
       
       // Cleanup event listeners
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeydown);
       
       // Clear any pending timeouts
-      if (hideTimeout) {
-        clearTimeout(hideTimeout);
-        hideTimeout = null;
-      }
-      
-      // Reset fullscreen if needed
-      if (document.fullscreenElement) {
-        document.exitFullscreen().catch(console.error);
-      }
+      // Fullscreen reset code removed
     } catch (err) {
       console.error('Error during cleanup:', err);
     }
@@ -507,16 +379,13 @@
     background-color: #b71c1c;
   }
   
-  /* Fullscreen styles */
-  .main-wrapper.fullscreen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 1000;
-    background: white;
-    overflow-y: auto;
+  /* Rank badge styling */
+  .rank-badge {
+    width: 50px;
+    height: 50px;
+    margin-left: -10px;
+    margin-top: 10px;
+    object-fit: contain;
   }
   
   /* Responsive adjustments */
@@ -567,7 +436,7 @@
   </div>
 {/if}
 
-<div class:main-wrapper class:fullscreen={isFullscreen}>
+<div class="main-wrapper">
   <header class="header">
     <div class="header-content">
       {#if organizationSettings?.logo_url || eventSettings?.logo_url}
@@ -583,6 +452,7 @@
                   if (target) target.style.display = 'none';
                 }}
                 loading="lazy"
+                style="min-width: 200px; max-width: 350px; width: auto;"
               />
             </div>
           {/if}
@@ -597,6 +467,7 @@
                   if (target) target.style.display = 'none';
                 }}
                 loading="lazy"
+                style="min-width: 200px; max-width: 350px; width: auto;"
               />
             </div>
           {/if}
@@ -614,12 +485,12 @@
     </div>
   </header>
 
-<!-- 🧾 MAIN CONTENT -->
+<!-- MAIN CONTENT -->
 <div class="content">
-  <!-- 📊 SCORE TABLES -->
+  <!-- SCORE TABLES -->
   <div class="leaderboard-tables">
 
-    <!-- 🥇 Table 1: Players 1–5 -->
+    <!-- Table 1: Players 1–5 -->
     <div class="score-table">
       <div class="row header-row">
         <div class="rank">
@@ -634,7 +505,17 @@
       </div>
       {#each leaderboard.slice(0, 5) as player, index}
         <div class="row">
-          <div class="rank">{index + 1}</div>
+          <div class="rank">
+            {#if index === 0}
+              <img src="/badges/gold-badge.png" alt="1st Place" class="rank-badge" />
+            {:else if index === 1}
+              <img src="/badges/silver-badge.png" alt="2nd Place" class="rank-badge" />
+            {:else if index === 2}
+              <img src="/badges/bronze-badge.png" alt="3rd Place" class="rank-badge" />
+            {:else}
+              {index + 1}
+            {/if}
+          </div>
           <div class="name">
             {player.name}
             {#if player.holeInOnes > 0}
@@ -648,7 +529,7 @@
       {/each}
     </div>
 
-    <!-- 🥈 Table 2: Players 6–10 -->
+    <!-- Table 2: Players 6–10 -->
     <div class="score-table">
      <div class="row header-row">
         <div class="rank">
@@ -683,9 +564,9 @@
 
 
 
-  <!-- 📢 SIDEBAR -->
+  <!-- SIDEBAR -->
   <div class="sidebar">
-  <!-- 📢 Ad Image -->
+  <!-- Ad Image -->
   {#if organizationSettings?.ad_image_url || eventSettings.ads_image_url}
     <div class="ad-container">
       <a href={eventSettings.ads_url || '#'} class="ad-banner">
@@ -706,7 +587,7 @@
       </a>
     </div>
   {/if}
-  <!-- 📲 QR Code -->
+  <!-- QR Code -->
   <div class="qr-box">
     <div class="qr-title">
       <h2>Scan to Play!</h2>
@@ -729,14 +610,3 @@
 </div>
 
 </div>
-<button 
-  class="fullscreen-toggle {showFullscreenButton ? 'show' : ''}" 
-  on:click={toggleFullscreen}
-  on:keydown={(e) => e.key === 'Enter' || e.key === ' ' ? toggleFullscreen() : null}
-  aria-label="Toggle fullscreen mode"
->
-  <i class="fa-solid fa-expand"></i> Fullscreen
-</button>
-
-
-

@@ -96,7 +96,7 @@
 
   function reset() {
     file = null;
-    url = initialUrl || '';
+    url = ''; // Always clear URL completely, don't use initialUrl
     status = '';
     size = 0;
     dispatch('upload', { url: '' });
@@ -141,10 +141,10 @@
           {#if file}
             {file.name} ({size} KB)
           {:else}
-            Current logo
+            {label.replace('Upload', '')}
           {/if}
         </div>
-        <small>{file ? 'Uploaded' : 'Current'}</small>
+        <small>{file ? 'Uploaded' : ''}</small>
       </div>
       <button class="upload-remove" on:click={reset} title="Remove">✖</button>
     </div>
