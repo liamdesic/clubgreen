@@ -130,7 +130,7 @@ export const POST: RequestHandler = async ({ request, locals, url }) => {
             trial_end: 'now',
             proration_behavior: 'create_prorations',
             payment_behavior: 'error_if_incomplete',
-            expand: ['latest_invoice.payment_intent'],
+            // Removed expand: ['latest_invoice.payment_intent'] as it causes errors when payment_intent doesn't exist
             payment_settings: { save_default_payment_method: 'on_subscription' },
             metadata: {
               organizationId: orgData.id,
