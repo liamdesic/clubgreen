@@ -5,47 +5,92 @@
   import { browser } from '$app/environment';
   import QRCode from 'qrcode';
   import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
+  import TimeRangeBadge from '$lib/components/TimeRangeBadge.svelte';
+  import { getTimeRangeLabel } from '$lib/utils/timeFilters';
+  import type { ScoreTimeRange } from '$lib/utils/timeFilters';
+  import type { Event, Organization } from '$lib/types/database';
   import type { 
     PlayerScore, 
     EventSettings, 
-    OrganizationSettings 
-  } from '$lib/types/leaderboard';
+    OrganizationSettings,
+    EventLeaderboardViewProps 
+  } from '$lib/types/application/leaderboard';
   
   // Props with defaults
-  export let org: string;
-  export let event: string | EventSettings;
-  export let organizationSettings: Partial<OrganizationSettings> = {};
-  export let leaderboard: PlayerScore[] = [];
-  export let debug = false;
-  export let hydrateFromSupabase = true;
-  // Fullscreen functionality has been removed
-  export let realtimeUpdates = true;
-  export let initialScores: PlayerScore[] = [];
-  export let initialEventSettings: Partial<EventSettings> = {};
-  export let initialOrganizationSettings: Partial<OrganizationSettings> = {};
-  export let showLoadingIndicator = true;
+  export let organization: Organization; // Organization object from server
+  export let event: Event; // Event object from server
+  export let scorecard: any[] = []; // Scorecard data from server
+  
+  // Props for LeaderboardManager compatibility
+  export let org: string = ''; // Organization slug (alternative to organization.slug)
+  export let organizationSettings: OrganizationSettings = {}; // Organization settings
+  export let showQr: boolean = true;
+  export let showAds: boolean = true;
+  export let preloadedLeaderboard: PlayerScore[] = []; // Pre-loaded leaderboard data
+  
+  // Optional props
+  export let hydrateFromSupabase = false; // Default to false since data comes from server
   export let showErrorMessages = true;
+  export let realtimeUpdates = true; // Enable realtime updates by default
+  export let showLoadingIndicator = true; // Show loading indicator by default
+  
+  // No debug mode needed
+  
+  // Use the settings_json type from the EventSettings interface
+  type EventSettingsJson = NonNullable<EventSettings['settings_json']>;
+
+  // Derived values - using reactive declarations
+  $: org = organization?.slug || '';
+  $: eventId = event?.id || '';
+  $: eventSettings = {
+    id: event?.id || '',
+    title: event?.title || 'Event',
+    hole_count: event?.settings_json?.hole_count || 9,
+    settings_json: {
+      accent_color: event?.settings_json?.accent_color || '#4CAF50',
+      score_time_range: (event?.settings_json?.score_time_range as ScoreTimeRange) || 'all_time'
+    } as EventSettingsJson,
+    logo_url: event?.settings_json?.logo_url || '',
+    enable_ads: event?.settings_json?.enable_ads ?? true,
+    ads_text: event?.settings_json?.ads_text || '',
+    ads_url: event?.settings_json?.ads_url || '',
+    ads_image_url: event?.settings_json?.ads_image_url || null,
+    created_at: event?.created_at,
+    updated_at: event?.updated_at
+  };
+  
+  // Use organization settings from props if provided, otherwise from organization object
+  $: organizationSettings = organizationSettings || (organization?.settings_json as OrganizationSettings) || {};
+  
+  // Use preloaded leaderboard data if available
+  $: leaderboard = preloadedLeaderboard?.length ? preloadedLeaderboard : [];
 
   // State
   let loading = false;
   let error: string | null = null;
-  let eventSettings: Partial<EventSettings> = { ...initialEventSettings };
   let qrCodeDataUrl: string | null = null;
   let realtimeChannel: any = null;
-  let currentEvent = (typeof event === 'string' ? event : event?.title) || '';
+  let currentEvent = event?.title || '';
+  
+  // Use showQr and showAds props to control visibility
+  $: qrCodeVisible = showQr && !loading && !error;
+  $: adVisible = showAds && organizationSettings?.ad_image_url && !loading && !error;
   let isMounted = false;
   
-  // Initialize organization settings
-  organizationSettings = { ...initialOrganizationSettings, ...organizationSettings };
-  
-  // Initialize leaderboard
-  leaderboard = [...initialScores, ...leaderboard];
+  // Process scorecard data into leaderboard format
+  $: {
+    if (scorecard && scorecard.length > 0) {
+      leaderboard = processScores(scorecard);
+      // Sort by total score (ascending for golf - lower is better)
+      leaderboard.sort((a, b) => a.totalScore - b.totalScore);
+    }
+  }
   
   // Derived state
   $: topScores = leaderboard.slice(0, 5);
   $: bottomScores = leaderboard.slice(5, 10);
   $: hasScores = leaderboard.length > 0;
-  $: eventId = typeof event === 'string' ? event : event.id;
+  // This is already handled by the reactive declaration above
 
   // Combined data loading function
   async function loadData() {
@@ -84,7 +129,7 @@
   }
 
   // Lifecycle
-  onMount(async () => {
+  onMount(() => {
     isMounted = true;
     
     if (browser) {
@@ -95,6 +140,7 @@
       generateQRCode();
     }
     
+    // Return cleanup function
     return () => {
       isMounted = false;
       
@@ -110,13 +156,31 @@
     if (!browser) return;
     
     try {
-      // Fetch all scorecard entries for the event
-      const { data, error: err } = await supabase
+      // Get the time range setting from the event, default to 'all_time'
+      const timeRange = event?.settings_json?.score_time_range || 'all_time';
+      
+      // Import the time filter utility
+      const { getTimeRangeCutoff } = await import('$lib/utils/timeFilters');
+      
+      // Get the cutoff timestamp for the specified time range
+      const cutoffTimestamp = getTimeRangeCutoff(timeRange);
+      
+      // Build the query
+      let query = supabase
         .from('scorecard')
-        .select('player_id, name, score, hole_number, hole_in_ones, published')
+        .select('player_id, name, score, hole_number, hole_in_ones, published, created_at')
         .eq('event_id', eventId)
         .eq('published', true);
-        
+      
+      // Apply time filter if a cutoff timestamp is specified
+      if (cutoffTimestamp) {
+        query = query.gte('created_at', cutoffTimestamp);
+        console.log(`[EventLeaderboardView] Filtering scores with time range: ${timeRange}, cutoff: ${cutoffTimestamp}`);
+      }
+      
+      // Execute the query
+      const { data, error: err } = await query;
+      
       if (err) throw err;
       
       if (!data || data.length === 0) {
@@ -150,9 +214,9 @@
     
     try {
       const { data, error: err } = await supabase
-        .from('event_settings')
+        .from('events')
         .select('*')
-        .eq('event_id', eventId)
+        .eq('id', eventId)
         .single();
         
       if (err) throw err;
@@ -161,21 +225,25 @@
         throw new Error('Event settings not found');
       }
       
+      // Parse settings_json from the events table
+      const settingsJson = data.settings_json as Record<string, any> || {};
+      
       // Type-safe assignment with defaults
       eventSettings = {
-        id: data.id || event,
+        id: data.id || event.id,
         title: data.title || 'Event',
-        hole_count: data.hole_count || 9,
+        hole_count: settingsJson.hole_count || 9,
         settings_json: {
-          accent_color: data.settings_json?.accent_color || '#4CAF50'
-        },
-        logo_url: data.logo_url || '',
-        enable_ads: data.enable_ads ?? true,
-        ads_text: data.ads_text || '',
-        ads_url: data.ads_url || '',
-        ads_image_url: data.ads_image_url || null,
+          accent_color: settingsJson.accent_color || '#4CAF50',
+          score_time_range: (settingsJson.score_time_range as ScoreTimeRange) || 'all_time'
+        } as EventSettingsJson,
+        logo_url: settingsJson.logo_url || '',
+        enable_ads: settingsJson.enable_ads ?? true,
+        ads_text: settingsJson.ads_text || '',
+        ads_url: settingsJson.ads_url || '',
+        ads_image_url: settingsJson.ads_image_url || null,
         created_at: data.created_at,
-        updated_at: data.updated_at
+        updated_at: data.created_at // events table might not have updated_at
       };
       
       currentEvent = eventSettings.title;
@@ -196,7 +264,7 @@
         .single();
 
       if (err) throw err;
-      organizationSettings = data?.settings_json || {};
+      organizationSettings = (data?.settings_json as OrganizationSettings) || {};
     } catch (err) {
       console.error('Error loading organization settings:', err);
     }
@@ -216,13 +284,14 @@
           id,
           name: row.name,
           totalScore: 0,
-          holeInOnes: 0
+          hole_in_ones: 0,
+          player_id: row.player_id || id
         });
       }
 
       const player = playerMap.get(id)!;
       player.totalScore += row.score ?? 0;
-      player.holeInOnes += row.hole_in_ones ?? 0;
+      player.hole_in_ones = (player.hole_in_ones || 0) + (row.hole_in_ones ?? 0);
     }
 
     return Array.from(playerMap.values())
@@ -238,23 +307,22 @@
   }
 
   // QR Code Generation
-  async function generateQRCode(): Promise<void> {
-    if (!browser || !eventId) return;
-    
-    const scorecardUrl = `${window.location.origin}/${org}/${eventId}/scorecard`;
-    console.log('[Leaderboard] Generating QR code for URL:', scorecardUrl);
+  async function generateQRCode() {
+    if (!browser) return;
     
     try {
+      // Generate a QR code for the secure scorecard URL using the short_code
+      // Format: /org-slug/short_code-access_uuid
+      const scorecardUrl = `${window.location.origin}/${org}/${event.short_code}-${event.access_uuid}`;
+      
       qrCodeDataUrl = await QRCode.toDataURL(scorecardUrl, {
         width: 200,
-        margin: 1,
+        margin: 2,
         color: {
-          dark: eventSettings.settings_json?.accent_color || '#000000',
-          light: '#ffffff00' // Transparent background
-        },
-        errorCorrectionLevel: 'H' // High error correction
+          dark: '#000000',
+          light: '#ffffff'
+        }
       });
-      console.log('[Leaderboard] QR code generated successfully');
     } catch (err) {
       console.error('[Leaderboard] Error generating QR code:', err);
       error = 'Failed to generate QR code';
@@ -274,8 +342,37 @@
         schema: 'public', 
         table: 'scorecard',
         filter: `event_id=eq.${eventId}`
-      }, loadLeaderboard)
+      }, handleScoreUpdate)
       .subscribe();
+  }
+  
+  // Handle score update from realtime subscription
+  async function handleScoreUpdate(payload: any): Promise<void> {
+    if (!browser || !isMounted) return;
+    
+    console.log(`[EventLeaderboardView] Received scorecard update:`, payload);
+    
+    // Get the created_at timestamp from the payload
+    const scoreCreatedAt = payload.new?.created_at;
+    
+    // Check if the score should be included based on the time range
+    const timeRange = event?.settings_json?.score_time_range || 'all_time';
+    
+    // If it's 'all_time', we always include it
+    if (timeRange !== 'all_time' && scoreCreatedAt) {
+      // Import the time filter utility
+      const { getTimeRangeCutoff } = await import('$lib/utils/timeFilters');
+      const cutoffTimestamp = getTimeRangeCutoff(timeRange);
+      
+      // If the score is older than the cutoff, ignore it
+      if (cutoffTimestamp && new Date(scoreCreatedAt) < new Date(cutoffTimestamp)) {
+        console.log(`[EventLeaderboardView] Ignoring score update as it's outside the time range ${timeRange}`);
+        return;
+      }
+    }
+    
+    // Score is within the time range or we're showing all time, reload the leaderboard
+    await loadLeaderboard();
   }
 
   function cleanup(): void {
@@ -306,22 +403,47 @@
 
 <!-- Global Styles -->
 <style global>
-  @import '$lib/styles/theme.css';
-  @import '$lib/styles/leaderboard.css';
   
   /* Loading and Error States */
   .loading-overlay {
     position: fixed;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(255, 255, 255, 0.9);
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
     z-index: 1000;
-    backdrop-filter: blur(4px);
+    color: white;
+  }
+  
+  .loading-spinner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: var(--accent-color, #4CAF50);
+    animation: spin 1s ease-in-out infinite;
+  }
+  
+  .spinner-label {
+    margin-top: 1rem;
+    font-size: 1rem;
+    color: white;
+  }
+  
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
   
   .loading-dots {
@@ -337,6 +459,30 @@
     33% { width: 1em; }
     66% { width: 1.5em; }
     100% { width: 0.5em; }
+  }
+  
+  .time-filter-pill {
+    display: inline-flex;
+    align-items: center;
+    background: white;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 0.35rem 1rem;
+    border-radius: 1rem;
+    margin-left: 0.75rem;
+    vertical-align: middle;
+    white-space: nowrap;
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .pill-prefix {
+    color: var(--accent-color-900);
+    margin-right: 0.25rem;
+  }
+  
+  .pill-time-range {
+    color: var(--accent-color);
   }
   
   .error-message {
@@ -404,18 +550,17 @@
       margin-top: 0.5rem;
     }
   }
+  
+
 </style>
 
 
 {#if showLoadingIndicator && loading}
   <div class="loading-overlay">
-    <LoadingSpinner 
-      size="xl" 
-      color="var(--accent-color, #4CAF50)" 
-      label="Loading leaderboard..."
-      showLabel={true}
-      center={true}
-    />
+    <div class="loading-spinner">
+      <div class="spinner"></div>
+      <div class="spinner-label">Loading leaderboard...</div>
+    </div>
   </div>
 {/if}
 
@@ -437,7 +582,8 @@
 {/if}
 
 <div class="main-wrapper">
-  <header class="header">
+  <!-- Header with logos and event title -->
+  <div class="event-header">
     <div class="header-content">
       {#if organizationSettings?.logo_url || eventSettings?.logo_url}
         <div class="logos-container">
@@ -480,10 +626,15 @@
           {#if loading}
             <span class="loading-dots">...</span>
           {/if}
+          {#if eventSettings?.settings_json?.score_time_range}
+            <span class="time-filter-pill" style="--accent-color: {eventSettings?.settings_json?.accent_color || '#4CAF50'}">
+              <span class="pill-prefix">Scores from</span> <span class="pill-time-range">{getTimeRangeLabel(eventSettings.settings_json.score_time_range)}</span>
+            </span>
+          {/if}
         </h2>
       </div>
     </div>
-  </header>
+  </div>
 
 <!-- MAIN CONTENT -->
 <div class="content">
@@ -518,9 +669,9 @@
           </div>
           <div class="name">
             {player.name}
-            {#if player.holeInOnes > 0}
+            {#if player.hole_in_ones && player.hole_in_ones > 0}
               <div class="hio-note">
-                <i class="fa-solid fa-fire"></i> <b>{player.holeInOnes}</b> hole-in-one{player.holeInOnes > 1 ? 's' : ''}
+                <i class="fa-solid fa-fire"></i> <b>{player.hole_in_ones}</b> hole-in-one{player.hole_in_ones > 1 ? 's' : ''}
               </div>
             {/if}
           </div>
@@ -548,9 +699,9 @@
           <div class="rank">{index + 6}</div>
           <div class="name">
             {player.name}
-            {#if player.holeInOnes > 0}
+            {#if player.hole_in_ones && player.hole_in_ones > 0}
               <div class="hio-note">
-                <i class="fa-solid fa-fire"></i> <b>{player.holeInOnes}</b> hole-in-one{player.holeInOnes > 1 ? 's' : ''}
+                <i class="fa-solid fa-fire"></i> <b>{player.hole_in_ones}</b> hole-in-one{player.hole_in_ones > 1 ? 's' : ''}
               </div>
             {/if}
           </div>

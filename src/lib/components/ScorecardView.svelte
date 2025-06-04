@@ -1,9 +1,5 @@
-<script>
-  import '$lib/styles/base.css';
-  import '$lib/styles/theme.css';
-  import '$lib/styles/scorecard.css';
+<script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
   import { browser } from '$app/environment';
   import confetti from 'canvas-confetti';
   import { supabase } from '$lib/supabaseClient';
@@ -14,24 +10,41 @@
   import { v4 as uuidv4 } from 'uuid';
   import profanity from 'leo-profanity'; 
   
+  // Props - data passed from the secure routing system
+  export let organization: any; // Organization object from server
+  export let event: any; // Event object from server
+  // We'll use this in the future for direct scorecard display, but for now we load it from Supabase
+  export const scorecard: any[] = []; // Using export const since we don't use it yet
+  
   const customEase = cubicOut;
 
-  // 🧬 FETCH SETTINGS FROM EVENTS AND ORGANIZATIONS TABLES
+  // These reactive declarations will be used throughout the component
+
+  // Extract settings from props
   let eventSettings = {
-    title: 'Live Leaderboard',  // Default value
-    hole_count: 9,  // Default value
-    accent_color: '#00c853',  // Default value
-    scorecard_ad_text: '',
-    scorecard_ad_url: ''
+    title: event?.title || 'Live Leaderboard',
+    hole_count: event?.settings_json?.hole_count || 9,
+    accent_color: event?.settings_json?.accent_color || '#00c853',
+    scorecard_ad_text: event?.settings_json?.scorecard_ad_text || '',
+    scorecard_ad_url: event?.settings_json?.scorecard_ad_url || ''
   };
+  
   let orgSettings = {
-    logo_url: null,
-    name: null
+    logo_url: organization?.settings_json?.logo_url || null,
+    name: organization?.name || null
   };
-  let currentOrg = '';
-  let currentEvent = '';
-  let eventId = '';
-  let orgId = '';
+  
+  $: currentOrg = organization?.slug || '';
+  $: currentEvent = event?.slug || '';
+  $: eventId = event?.id || '';
+  $: orgId = organization?.id || '';
+  $: eventName = event?.name || 'Scorecard';
+  $: courseName = event?.course_name || '';
+  $: courseHoleCount = event?.hole_count || 18;
+  $: organizationId = organization?.id;
+  $: organizationSlug = organization?.slug;
+  $: organizationName = organization?.name || '';
+  $: accentColor = organization?.settings_json?.accent_color || '#4CAF50';
   
 
   
@@ -105,8 +118,7 @@
   // Load settings when component mounts
   onMount(() => {
     showToast('Loading event settings...', 'info');
-    currentOrg = $page.params.org;
-    currentEvent = $page.params.event;
+    // currentOrg and currentEvent are already set from props
     loadEventSettings();
     profanity.loadDictionary('en');
   });

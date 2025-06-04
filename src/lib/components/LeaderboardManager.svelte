@@ -10,9 +10,11 @@
   } from '$lib/utils/leaderboard';
   import EventLeaderboardView from './EventLeaderboardView.svelte';
   import TransitionOverlay from './TransitionOverlay.svelte';
-  import type { Event } from '$lib/types/event';
-  import type { PlayerScore, OrganizationSettings } from '$lib/types/leaderboard';
+  import TimeRangeBadge from '$lib/components/TimeRangeBadge.svelte';
+  import type { Event } from '$lib/types/database';
+  import type { PlayerScore, OrganizationSettings } from '$lib/types/application/leaderboard';
   import LoadingSpinner from './LoadingSpinner.svelte';
+  import LeaderboardRotationStatus from './LeaderboardRotationStatus.svelte';
 
   // Props
   export let organizationId: string;
@@ -46,6 +48,9 @@
   let lastMemoryCheck = Date.now();
   let memoryCheckInterval: ReturnType<typeof setInterval> | null = null;
   
+  // Declare animationFrameId at the top level
+  let animationFrameId: number; 
+  
   // Event dispatcher
   const dispatch = createEventDispatcher();
   
@@ -57,10 +62,10 @@
   $: hasEvents = displayableEvents.length > 0;
   $: currentLeaderboard = currentEvent ? eventLeaderboards[currentEvent.id] || [] : [];
 
-  // Crossfade transition
+  // Crossfade transition (removed fallback: fade)
   const [send, receive] = crossfade({
     duration: 400,
-    fallback: fade
+    // removed fallback: fade
   });
 
   // Load all data
@@ -200,12 +205,38 @@
   // Load leaderboard for a specific event
   async function loadLeaderboardForEvent(eventId: string) {
     try {
-      // Fetch all scorecard entries for the event
-      const { data, error: err } = await supabase
+      // Find the event to get its time range setting
+      const event = events.find(e => e.id === eventId);
+      if (!event) {
+        console.error(`Event ${eventId} not found`);
+        eventLeaderboards[eventId] = [];
+        return;
+      }
+      
+      // Get the time range setting from the event, default to 'all_time'
+      const timeRange = event.settings_json?.score_time_range || 'all_time';
+      
+      // Import the time filter utility
+      const { getTimeRangeCutoff } = await import('$lib/utils/timeFilters');
+      
+      // Get the cutoff timestamp for the specified time range
+      const cutoffTimestamp = getTimeRangeCutoff(timeRange);
+      
+      // Build the query
+      let query = supabase
         .from('scorecard')
-        .select('player_id, name, score, hole_number, hole_in_ones, published')
+        .select('player_id, name, score, hole_number, hole_in_ones, published, created_at')
         .eq('event_id', eventId)
         .eq('published', true);
+      
+      // Apply time filter if a cutoff timestamp is specified
+      if (cutoffTimestamp) {
+        query = query.gte('created_at', cutoffTimestamp);
+        console.log(`[LeaderboardManager] Filtering scores for event ${eventId} with time range: ${timeRange}, cutoff: ${cutoffTimestamp}`);
+      }
+      
+      // Execute the query
+      const { data, error: err } = await query;
       
       if (err) throw err;
       
@@ -280,10 +311,42 @@
     
     console.log(`[LeaderboardManager] Received scorecard update:`, payload);
     
-    // Get the event ID from the payload
+    // Get the event ID and created_at timestamp from the payload
     const eventId = payload.new?.event_id;
+    const scoreCreatedAt = payload.new?.created_at;
     if (!eventId) return;
     
+    // Find the event to check its time range setting
+    const event = events.find(e => e.id === eventId);
+    if (!event) return;
+    
+    // Check if the score should be included based on the time range
+    const timeRange = event.settings_json?.score_time_range || 'all_time';
+    
+    // For real-time updates, we need to check if the new score falls within the time range
+    // If it's 'all_time', we always include it
+    if (timeRange !== 'all_time' && scoreCreatedAt) {
+      // We'll do a lazy import of the time filter utility to avoid issues with SSR
+      import('$lib/utils/timeFilters').then(({ getTimeRangeCutoff }) => {
+        const cutoffTimestamp = getTimeRangeCutoff(timeRange);
+        
+        // If the score is older than the cutoff, ignore it
+        if (cutoffTimestamp && new Date(scoreCreatedAt) < new Date(cutoffTimestamp)) {
+          console.log(`[LeaderboardManager] Ignoring score update for event ${eventId} as it's outside the time range ${timeRange}`);
+          return;
+        }
+        
+        // Score is within the time range, proceed with the update
+        processScoreUpdate(eventId);
+      });
+    } else {
+      // For 'all_time' or if we can't determine the time range, always process the update
+      processScoreUpdate(eventId);
+    }
+  }
+  
+  // Helper function to process score updates with debouncing
+  function processScoreUpdate(eventId: string) {
     // Add this event to pending updates
     pendingUpdates.add(eventId);
     
@@ -296,11 +359,8 @@
     updateDebounceTimer = setTimeout(async () => {
       if (!isMounted) return;
       
-      console.log(`[LeaderboardManager] Processing ${pendingUpdates.size} debounced updates`);
-      
       try {
-        // Update score counts once for all events
-        await loadScoreCounts();
+        console.log(`[LeaderboardManager] Processing updates for events:`, Array.from(pendingUpdates));
         
         // Process each event that needs updating
         const updatePromises = Array.from(pendingUpdates).map(eventId => 
@@ -327,18 +387,34 @@
     // Reset time remaining display
     timeRemaining = rotationInterval / 1000;
     
-    // Start countdown display
-    const countdownInterval = setInterval(() => {
-      timeRemaining -= 1;
-      if (timeRemaining <= 0) {
-        clearInterval(countdownInterval);
+    // --- Start smooth countdown display using requestAnimationFrame ---
+    let startTime = performance.now();
+
+    function updateCountdown(currentTime: number) {
+      const elapsedTime = currentTime - startTime;
+      const remainingTimeMs = rotationInterval - elapsedTime;
+      
+      // Update timeRemaining in seconds, rounding up to show the next second sooner
+      timeRemaining = Math.max(0, Math.ceil(remainingTimeMs / 1000));
+
+      if (remainingTimeMs > 0) {
+        animationFrameId = requestAnimationFrame(updateCountdown);
+      } else {
+        // Countdown finished, rotate to next event
+        rotateToNext();
       }
-    }, 1000);
+    }
     
-    // Set the rotation timer
+    // Start the animation loop
+    animationFrameId = requestAnimationFrame(updateCountdown);
+    
+    // --- End smooth countdown display ---
+
+    // Set the rotation timer (this is still needed to trigger rotateToNext after rotationInterval)
+    // We clear the requestAnimationFrame loop inside the updateCountdown function when timeRemainingMs <= 0
     rotationTimer = setTimeout(() => {
-      rotateToNext();
-      clearInterval(countdownInterval);
+      // This timeout acts as the primary trigger for rotation completion
+      // The animationFrame loop handles the visual countdown
     }, rotationInterval);
     
     console.log(`[LeaderboardManager] Started rotation timer: ${rotationInterval}ms`);
@@ -350,6 +426,10 @@
       clearTimeout(rotationTimer);
       rotationTimer = null;
       console.log(`[LeaderboardManager] Stopped rotation timer`);
+    }
+    // Also cancel the animation frame loop if it's running
+    if (typeof animationFrameId !== 'undefined') {
+      cancelAnimationFrame(animationFrameId);
     }
   }
 
@@ -598,18 +678,29 @@
       >
         {#if currentEvent}
           <EventLeaderboardView
+            organization={{ slug: organizationSlug, id: organizationId }}
             org={organizationSlug}
             event={currentEvent}
             organizationSettings={organizationSettings}
-            leaderboard={currentLeaderboard}
+            preloadedLeaderboard={currentLeaderboard}
             showQr={true}
             showAds={true}
-            debug={debug}
             hydrateFromSupabase={false}
           />
         {/if}
       </div>
     {/key}
+    
+    <!-- Rotation Status Indicator -->
+    <LeaderboardRotationStatus 
+      events={displayableEvents}
+      currentEventId={currentEvent?.id || ''}
+      currentEventIndex={currentEventIndex}
+      totalEvents={displayableEvents.length}
+      timeRemaining={timeRemaining}
+      rotationInterval={rotationInterval}
+      accentColor={currentEvent?.settings_json?.accent_color || organizationSettings?.accent_color || '#4CAF50'}
+    />
     
     <!-- Transition Overlay -->
     <TransitionOverlay 
@@ -756,34 +847,29 @@
     z-index: 100;
   }
   
-  .control-button {
-    width: 3rem;
-    height: 3rem;
-    border-radius: 50%;
+  /* Controls styling */
+  button {
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
     border: none;
     background: white;
     color: #333;
-    font-size: 1.2rem;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    font-size: 0.9rem;
+    font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
   }
   
-  .control-button:hover:not(:disabled) {
+  button:hover:not(:disabled) {
     background: #f0f0f0;
-    transform: scale(1.05);
   }
   
-  .control-button:disabled {
+  button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
   
-  .event-counter {
-    display: flex;
-    align-items: center;
+  .timer-display {
     color: white;
     font-weight: 600;
     padding: 0 1rem;

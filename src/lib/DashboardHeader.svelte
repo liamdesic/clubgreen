@@ -3,14 +3,21 @@
   import { goto } from '$app/navigation';
   import '$lib/styles/theme.css';
   import '$lib/styles/dashboard.css';
-  import { ChevronRight } from 'lucide-svelte';
+  import ChevronRight from 'lucide-svelte/icons/chevron-right';
+  import { getTimeRangeLabel } from '$lib/utils/timeFilters';
+  import type { ScoreTimeRange } from '$lib/utils/timeFilters';
   
   export let organizationName: string = '';
   export let eventTitle: string = '';
+  export let timeRange: ScoreTimeRange = 'all_time';
+  export let accentColor: string = '#4CAF50';
   
   function goToDashboard() {
     goto('/dashboard');
   }
+  
+  $: showTimeRange = timeRange && timeRange !== 'all_time';
+  $: timeRangeLabel = getTimeRangeLabel(timeRange);
 </script>
 
 <header class="dashboard-header">
@@ -36,6 +43,11 @@
           <ChevronRight size={16} class="breadcrumb-separator" aria-hidden="true" />
           <span class="breadcrumb-item current" aria-current="page">
             {eventTitle}
+            {#if showTimeRange}
+              <span class="time-range-pill" style="--accent-color: {accentColor}">
+                Scores from {timeRangeLabel}
+              </span>
+            {/if}
           </span>
         </li>
       {/if}
@@ -86,7 +98,7 @@
     outline: none;
   }
   
-  .logo {
+  .dashboard-logo {
     height: 32px;
     width: auto;
     display: block;
@@ -108,10 +120,7 @@
     gap: 0.5rem;
   }
   
-  .breadcrumb-separator {
-    color: #6b7280;
-    flex-shrink: 0;
-  }
+
   
   .breadcrumb-item {
     display: flex;
@@ -132,5 +141,18 @@
   .breadcrumb-item.current {
     color: #ffffff;
     font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  
+  .time-range-pill {
+    background: white;
+    color: var(--accent-color, #4CAF50);
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    white-space: nowrap;
   }
 </style>

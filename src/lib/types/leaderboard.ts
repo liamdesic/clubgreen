@@ -1,4 +1,5 @@
-import type { SvelteComponent } from 'svelte';
+import { SvelteComponent } from 'svelte';
+import type { ScoreTimeRange } from '$lib/utils/timeFilters';
 
 export interface PlayerScore {
   id: string;
@@ -14,6 +15,7 @@ export interface EventSettings {
   accent_color?: string; // Keep for backward compatibility
   settings_json?: {
     accent_color?: string;
+    score_time_range?: ScoreTimeRange;
     [key: string]: any;
   };
   logo_url?: string;

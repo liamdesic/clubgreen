@@ -4,8 +4,10 @@
   import { page } from '$app/stores';
   import { showToast } from '$lib/toastStore';
   import DashboardHeader from '$lib/DashboardHeader.svelte';
+  import TimeRangeSelector from '$lib/components/TimeRangeSelector.svelte';
   import type { Event } from '$lib/types/event';
   import type { Score } from '$lib/types/score';
+  import type { ScoreTimeRange } from '$lib/utils/timeFilters';
   import '$lib/styles/theme.css';
   import '$lib/styles/dashboard.css';
   import '$lib/styles/EditEvent.css';
@@ -20,6 +22,7 @@
     scorecard_ad_url: string;
     show_on_main_leaderboard?: boolean;
     event_type?: 'single' | 'ongoing';
+    score_time_range?: ScoreTimeRange;
   }
   
   let eventDate: string = '';
@@ -35,7 +38,7 @@
   let eventId = '';
   let eventUuid = ''; // Will store the actual UUID of the event
   let event: Event | null = null;
-  let organization: { name: string } | null = null;
+  let organization: { name: string; settings_json?: { color_palette?: string[] } } | null = null;
   let settings: Settings = {
     event_name: '',
     hole_count: 9,
@@ -44,7 +47,8 @@
     scorecard_ad_text: '',
     scorecard_ad_url: 'https://clubgreen.au',
     show_on_main_leaderboard: true,
-    event_type: 'single'
+    event_type: 'single',
+    score_time_range: 'all_time'
   };
   
   let playerScores: PlayerScore[] = [];
@@ -351,7 +355,7 @@
 
 <style>
   .event-settings-container {
-    max-width: 800px;
+    width: 100%;
     margin: 0 auto;
     padding: 2rem;
   }
@@ -446,6 +450,37 @@
     border-color: var(--accent-color, #00c853);
     box-shadow: 0 0 0 2px rgba(0, 200, 83, 0.2);
   }
+
+  .color-picker {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .color-palette {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  
+  .color-swatch {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0;
+  }
+  
+  .color-swatch:hover {
+    transform: scale(1.1);
+  }
+  
+  .color-swatch.selected {
+    border-color: var(--color-black);
+    box-shadow: 0 0 0 2px var(--accent-color);
+  }
 </style>
 
 <DashboardHeader 
@@ -495,56 +530,20 @@
 
           <label class="form-label" style="margin-top: var(--spacing-md);">Accent Colour</label>
           <div class="color-picker">
-            <button 
-              type="button" 
-              class="color-swatch" 
-              style="background: {settings.accent_color};"
-              on:click={() => document.getElementById('color-input')?.click()}
-              aria-label="Pick a color"
-              title="Click to choose a color"
-            ></button>
-            <input 
-              id="color-input"
-              type="color" 
-              bind:value={settings.accent_color}
-              on:input={() => {
-                unsavedChanges = true;
-                // Update the hex display
-                const hexDisplay = document.querySelector('.hex-display');
-                if (hexDisplay) hexDisplay.textContent = settings.accent_color.toUpperCase();
-              }}
-              style="position: absolute; opacity: 0; width: 1px; height: 1px;"
-              aria-hidden="true"
-            />
-            <div class="hex-input">
-              <span class="hex-prefix">#</span>
-              <input 
-                type="text" 
-                class="hex-value" 
-                value={settings.accent_color.startsWith('#') ? settings.accent_color.slice(1).toUpperCase() : settings.accent_color.toUpperCase()}
-                on:input={(e) => {
-                  const value = e.target.value.toUpperCase().replace(/[^0-9A-F]/g, '');
-                  if (value.length <= 6) {
-                    settings.accent_color = '#' + value;
+            <div class="color-palette">
+              {#each organization?.settings_json?.color_palette || ['#00c853'] as color}
+                <button 
+                  type="button" 
+                  class="color-swatch {settings.accent_color === color ? 'selected' : ''}" 
+                  style="background: {color};"
+                  on:click={() => {
+                    settings.accent_color = color;
                     unsavedChanges = true;
-                  }
-                }}
-                on:blur={() => {
-                  // Ensure we always have a valid color
-                  if (settings.accent_color === '#') {
-                    settings.accent_color = '#000000';
-                  }
-                }}
-                maxlength="6"
-                aria-label="Hex color code"
-                placeholder="RRGGBB"
-              />
-              <span class="hex-display" on:click={() => {
-                const input = document.querySelector('.hex-value');
-                if (input) input.focus();
-              }}>
-                {settings.accent_color.startsWith('#') ? settings.accent_color.slice(1).toUpperCase() : settings.accent_color.toUpperCase()}
-              </span>
+                  }}
+                  aria-label="Select color {color}"
+                  title="Click to select this color"
+                ></button>
+              {/each}
             </div>
           </div>
 
@@ -567,6 +566,18 @@
               When enabled, this event will automatically appear on the organization's main leaderboard 
               {settings.event_type === 'ongoing' ? 'whenever scores are being submitted' : 'on the event day when scores are being submitted'}.
             </p>
+          </div>
+          
+          <div class="form-group" style="margin-top: var(--spacing-lg);">
+            <TimeRangeSelector 
+              value={settings.score_time_range || 'all_time'}
+              label="Leaderboard Time Filter"
+              helpText="Filter scores on the leaderboard by when they were submitted"
+              on:change={(e) => {
+                settings.score_time_range = e.detail.value;
+                unsavedChanges = true;
+              }}
+            />
           </div>
 
           <h3 style="margin-top: var(--spacing-lg);">Advertisement Settings</h3>

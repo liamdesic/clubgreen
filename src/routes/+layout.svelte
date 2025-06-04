@@ -6,8 +6,9 @@
 </svelte:head>
 
 <script lang="ts">
-  import { onMount } from 'svelte'
   import { invalidate } from '$app/navigation'
+  import { onMount } from 'svelte'
+  import type { LayoutData } from './$types'
   import { browser } from '$app/environment'
   import { supabase } from '$lib/supabaseClient'
   import '$lib/styles/base.css'
@@ -15,18 +16,27 @@
   import ToastHost from '$lib/ToastHost.svelte'
   import { page } from '$app/stores'
 
-  // Handle auth state changes
-  onMount(() => {
-    if (!browser) return
+  export let data: LayoutData
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      // Invalidate all pages when auth state changes
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+  let { session } = data;
+  $: ({ session } = data);
+
+  onMount(() => {
+    console.log('🔐 [AUTH] Setting up auth state change listener')
+    
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event: string, _session: Session | null) => {
+      console.log('🔄 [AUTH] Auth state changed:', event)
+      
+      if (_session?.expires_at !== session?.expires_at) {
+        console.log('⏰ [AUTH] Session expiry changed, invalidating...')
         invalidate('supabase:auth')
       }
     })
 
     return () => {
+      console.log('🧹 [AUTH] Cleaning up auth state change listener')
       subscription.unsubscribe()
     }
   })

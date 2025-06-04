@@ -1,15 +1,18 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import QRCode from 'qrcode';
-  import { Check, Smartphone, Tv2, Download, Copy, ArrowUpRight } from 'lucide-svelte';
+  import { Check, Phone, Monitor, Download, Copy, ExternalLink } from 'lucide-svelte';
   
   type QRCodeType = 'leaderboard' | 'scorecard';
   
-  export let baseUrl = '';
+  export let organization = '';
+  export let shortCode = '';
+  export let accessUuid = '';
   
-  // Generate the correct URLs
-  $: leaderboardUrl = `${baseUrl}/leaderboard`;
-  $: scorecardUrl = `${baseUrl}/scorecard`;
+  // Generate the correct URLs for the new routing system
+  $: baseUrl = window.location.origin;
+  $: leaderboardUrl = `${baseUrl}/${organization}/lb/${shortCode}`;
+  $: scorecardUrl = `${baseUrl}/${organization}/${shortCode}?access=${accessUuid}`;
   export let onClose;
   
   let leaderboardQrCode = '';
@@ -18,9 +21,17 @@
   let downloadedType: QRCodeType | null = null;
   
   onMount(async () => {
+    // Add modal-open class to body
+    document.body.classList.add('modal-open');
+    
     // Generate QR codes
     leaderboardQrCode = await QRCode.toDataURL(leaderboardUrl, { width: 300 });
     scorecardQrCode = await QRCode.toDataURL(scorecardUrl, { width: 300 });
+  });
+
+  onDestroy(() => {
+    // Remove modal-open class from body
+    document.body.classList.remove('modal-open');
   });
   
   async function downloadQRCode(type: QRCodeType) {
@@ -77,7 +88,7 @@
       <!-- Leaderboard QR -->
       <div class="qr-item">
         <div class="qr-icon">
-          <Tv2 size={90} />
+          <Monitor size={90} />
         </div>
         <h3>Leaderboard</h3>
         <img src={leaderboardQrCode} alt="Leaderboard QR Code" />
@@ -103,7 +114,7 @@
               class="go-button"
               aria-label="Open leaderboard in new tab"
             >
-              <ArrowUpRight size={16} /> Go
+              <ExternalLink size={16} /> Go
             </a>
           </div>
         </div>
@@ -122,7 +133,7 @@
       <!-- Scorecard QR -->
       <div class="qr-item">
         <div class="qr-icon">
-          <Smartphone size={90} />
+          <Phone size={90} />
         </div>
         <h3>Scorecard</h3>
         <img src={scorecardQrCode} alt="Scorecard QR Code" />
@@ -148,7 +159,7 @@
               class="go-button"
               aria-label="Open scorecard in new tab"
             >
-              <ArrowUpRight size={16} /> Go
+              <ExternalLink size={16} /> Go
             </a>
           </div>
         </div>
@@ -180,6 +191,8 @@
     align-items: center;
     z-index: 1000;
     padding: 1rem;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .modal-content {
@@ -191,6 +204,9 @@
     position: relative;
     color: white;
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    margin: auto;
+    max-height: 90vh;
+    overflow-y: auto;
   }
 
   .close-button {
@@ -373,6 +389,11 @@
     transform: translateY(0);
   }
 
+  /* Prevent body scroll when modal is open */
+  :global(body.modal-open) {
+    overflow: hidden;
+  }
+
   /* Responsive adjustments */
   @media (max-width: 768px) {
     .qr-grid {
@@ -382,6 +403,13 @@
     
     .modal-content {
       padding: 1.5rem;
+      margin: 1rem;
+      max-height: calc(100vh - 2rem);
+    }
+
+    .modal-overlay {
+      align-items: flex-start;
+      padding: 0.5rem;
     }
   }
 </style>

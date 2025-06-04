@@ -8,6 +8,7 @@
   import EventLeaderboardView from '$lib/components/EventLeaderboardView.svelte';
   import type { PageData } from './$types';
   import '$lib/styles/theme.css';
+  import '$lib/styles/leaderboard.css';
   
   // Types
   interface PlayerScore {
@@ -42,7 +43,7 @@
   
   // Get route parameters
   export let data: PageData;
-  const { org, event: eventId } = $page.params;
+  const { org, shortcode } = $page.params;
   
   // State
   let loading = true;
@@ -56,17 +57,17 @@
   async function loadData() {
     if (!browser) return;
     
-    console.log(`[Leaderboard] Starting data load for org: ${org}, event: ${eventId}`);
+    console.log(`[Leaderboard] Starting data load for org: ${org}, shortcode: ${shortcode}`);
     loading = true;
     error = null;
     
     try {
       // Load event data
-      console.log(`[Leaderboard] Fetching event data for slug: ${eventId}`);
+      console.log(`[Leaderboard] Fetching event data for short_code: ${shortcode}`);
       const { data: eventData, error: eventError } = await supabase
         .from('events')
         .select('*')
-        .eq('slug', eventId)
+        .eq('short_code', shortcode)
         .single();
       
       if (eventError) {
@@ -74,7 +75,7 @@
         throw eventError;
       }
       if (!eventData) {
-        console.error(`[Leaderboard] Event not found for slug: ${eventId}`);
+        console.error(`[Leaderboard] Event not found for short_code: ${shortcode}`);
         throw new Error('Event not found');
       }
       console.log(`[Leaderboard] Event data retrieved:`, eventData);
@@ -206,6 +207,15 @@
   
   // Initialize
   onMount(() => {
+    // Log CSS loading for debugging
+    if (browser) {
+      console.log('[CSS Debug] Checking loaded stylesheets:');
+      const cssFiles = Array.from(document.styleSheets).map(sheet => sheet.href);
+      cssFiles.forEach(href => console.log(href));
+      
+      const leaderboardCssLoaded = cssFiles.some(href => href && href.includes('leaderboard.css'));
+      console.log(`[CSS Debug] Leaderboard CSS loaded: ${leaderboardCssLoaded}`);
+    }
     // Check for debug mode first so logs can be more detailed if debug is enabled
     if (browser) {
       const urlParams = new URLSearchParams(window.location.search);
@@ -237,15 +247,14 @@
     </div>
   {:else if event}
     <EventLeaderboardView
+      organization={organization}
       event={event}
       organizationSettings={organization?.settings_json || {}}
-      leaderboard={leaderboard}
+      preloadedLeaderboard={leaderboard}
       showQr={true}
       showAds={true}
-      debug={debug}
     />
   {/if}
-  
   {#if debug}
     <div class="debug-controls">
       <button 

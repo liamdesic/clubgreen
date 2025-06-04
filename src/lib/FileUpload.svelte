@@ -8,6 +8,7 @@
   export let folder = 'uploads'; // e.g. logos, ads, qr-codes
   export let initialUrl = ''; // Add this line to accept initial URL
   export let ariaDescribedBy = '';
+  export let theme = 'light'; // 'light' or 'dark'
 
   const dispatch = createEventDispatcher();
 
@@ -156,15 +157,22 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
+    --upload-bg: var(--theme-bg, #fdfdfd);
+    --upload-border: var(--theme-border, #ccc);
+    --upload-text: var(--theme-text, #333);
+    --upload-text-secondary: var(--theme-text-secondary, #666);
+    --upload-hover: var(--theme-hover, #eee);
+    --upload-shadow: var(--theme-shadow, rgba(0,0,0,0.05));
   }
 
   .upload-empty {
-    border: 2px dashed #ccc;
+    border: 2px dashed var(--upload-border);
     border-radius: 12px;
     padding: 2rem;
     text-align: center;
     position: relative;
-    background: #fdfdfd;
+    background: var(--upload-bg);
+    color: var(--upload-text);
   }
 
   .upload-browse {
@@ -172,9 +180,10 @@
     padding: 0.4rem 1rem;
     font-weight: 600;
     font-size: 0.9rem;
-    background: #eee;
+    background: var(--upload-hover);
     border-radius: 6px;
     cursor: pointer;
+    color: var(--upload-text);
   }
 
   .upload-input {
@@ -189,10 +198,11 @@
     display: flex;
     align-items: center;
     gap: 1rem;
-    background: #f8f8f8;
+    background: var(--upload-bg);
     padding: 1rem;
     border-radius: 10px;
-    box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+    box-shadow: inset 0 1px 2px var(--upload-shadow);
+    color: var(--upload-text);
   }
 
   .thumb {
@@ -200,7 +210,7 @@
     width: 50px;
     object-fit: contain;
     border-radius: 8px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--upload-border);
   }
 
   .file-info {
@@ -213,11 +223,12 @@
   .file-name {
     font-weight: 600;
     font-size: 0.95rem;
+    color: var(--upload-text);
   }
 
   .upload-progress {
     height: 6px;
-    background: #ddd;
+    background: var(--upload-border);
     border-radius: 4px;
     overflow: hidden;
     margin-top: 0.25rem;
@@ -234,11 +245,31 @@
     border: none;
     font-size: 1.25rem;
     cursor: pointer;
-    color: #888;
+    color: var(--upload-text-secondary);
     transition: color 0.2s;
   }
 
   .upload-remove:hover {
     color: #e53935;
+  }
+
+  /* Dark mode styles */
+  :global(.dark) .upload-section {
+    --theme-bg: #1a1a1a;
+    --theme-border: #333;
+    --theme-text: #fff;
+    --theme-text-secondary: #999;
+    --theme-hover: #2a2a2a;
+    --theme-shadow: rgba(0,0,0,0.2);
+  }
+
+  /* Light mode styles */
+  :global(.light) .upload-section {
+    --theme-bg: #fdfdfd;
+    --theme-border: #ccc;
+    --theme-text: #333;
+    --theme-text-secondary: #666;
+    --theme-hover: #eee;
+    --theme-shadow: rgba(0,0,0,0.05);
   }
 </style>

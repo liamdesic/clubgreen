@@ -3,9 +3,11 @@
   import { fade } from 'svelte/transition';
   import { browser } from '$app/environment';
   import { supabase } from '$lib/supabaseClient';
+  import { page } from '$app/stores';
   import TransitionOverlay from '$lib/components/TransitionOverlay.svelte';
   import LeaderboardManager from '$lib/components/LeaderboardManager.svelte';
   import '$lib/styles/theme.css';
+  import '$lib/styles/leaderboard.css';
 
   // Page state management
   type LoadState = 'loading' | 'transition' | 'ready' | 'error';
@@ -19,6 +21,7 @@
   let accentColor = '#4CAF50'; // Default accent color
   let errorMsg: string | null = null;
   let leaderboardLoaded = false;
+  let eventCode = '';
   
   // Cleanup and stability management
   let pageVisible = true;
@@ -34,15 +37,17 @@
     errorMsg = null;
     
     try {
-      // Get organization slug from URL
-      const slug = window.location.pathname.split('/')[1];
-      organizationSlug = slug;
+      // Get route parameters
+      organizationSlug = $page.params.org;
+      eventCode = $page.params.code;
+      
+      console.log(`[Org Leaderboard] Initializing for org: ${organizationSlug}, code: ${eventCode}`);
       
       // Fetch organization data and get logo URL from settings_json
       const { data, error } = await supabase
         .from('organizations')
         .select('id, settings_json')
-        .eq('slug', slug)
+        .eq('slug', organizationSlug)
         .single();
       
       if (error || !data) throw new Error(error?.message || 'Organization not found');
@@ -55,7 +60,7 @@
       // Apply accent color to CSS variable
       if (browser) {
         document.documentElement.style.setProperty('--accent-color', accentColor);
-        console.log(`[logo-display] Set accent color to ${accentColor}`);
+        console.log(`[Org Leaderboard] Set accent color to ${accentColor}`);
       }
       
       // Brief delay before showing transition
@@ -65,7 +70,7 @@
       state = 'transition';
       
     } catch (err) {
-      console.error('Error loading logo:', err);
+      console.error('[Org Leaderboard] Error loading data:', err);
       errorMsg = err instanceof Error ? err.message : 'Failed to load organization';
       state = 'error';
     }
@@ -73,14 +78,14 @@
   
   // Handle leaderboard loaded event
   function handleLeaderboardReady() {
-    console.log('[logo-display] LeaderboardManager is ready');
+    console.log('[Org Leaderboard] LeaderboardManager is ready');
     leaderboardLoaded = true;
   }
   
   // Handle page visibility changes
   function handleVisibilityChange() {
     pageVisible = !document.hidden;
-    console.log(`[logo-display] Page visibility changed: ${pageVisible ? 'visible' : 'hidden'}`);
+    console.log(`[Org Leaderboard] Page visibility changed: ${pageVisible ? 'visible' : 'hidden'}`);
     
     // When page becomes visible again after being hidden, check if we need to refresh
     if (pageVisible && state === 'ready') {
@@ -97,7 +102,7 @@
     
     // Set up a new cleanup timer - runs every 3 hours
     periodicCleanupTimer = setTimeout(() => {
-      console.log('[logo-display] Running periodic cleanup');
+      console.log('[Org Leaderboard] Running periodic cleanup');
       
       // Force garbage collection by refreshing key components
       if (state === 'ready' && leaderboardManagerRef) {
@@ -120,6 +125,16 @@
     
     // Set up periodic cleanup
     setupPeriodicCleanup();
+    
+    // Log CSS loading for debugging
+    if (browser) {
+      console.log('[CSS Debug] Checking loaded stylesheets:');
+      const cssFiles = Array.from(document.styleSheets).map(sheet => sheet.href);
+      cssFiles.forEach(href => console.log(href));
+      
+      const leaderboardCssLoaded = cssFiles.some(href => href && href.includes('leaderboard.css'));
+      console.log(`[CSS Debug] Leaderboard CSS loaded: ${leaderboardCssLoaded}`);
+    }
     
     // Cleanup on unmount
     return () => {

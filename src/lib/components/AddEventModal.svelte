@@ -1,10 +1,11 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import type { Organization } from '$lib/types';
+  import type { Organization } from '$lib/types/database';
   import { showToast } from '$lib/toastStore.js';
   import { supabase } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
   import { Plus } from 'lucide-svelte';
+  import { generateUniqueShortCode, generateUniqueAccessUUID } from '$lib/utils/codeUtils';
 
   // Props
   export let organization: Organization | null = null;
@@ -108,6 +109,15 @@
         event_date = new Date(newDate).toISOString();
       }
 
+      // Generate short code and access UUID for the new event
+      logStep('Generating short code and access UUID...');
+      const shortCodeStart = Date.now();
+      const [short_code, access_uuid] = await Promise.all([
+        generateUniqueShortCode(),
+        generateUniqueAccessUUID()
+      ]);
+      logStep(`Code generation completed in ${Date.now() - shortCodeStart}ms`);
+      
       // Prepare event data
       const eventData = { 
         title: newTitle, 
@@ -116,8 +126,12 @@
         organization_id: organization.id,
         settings_json: {},
         created_at: new Date().toISOString(),
-        published: false
+        published: false,
+        short_code,
+        access_uuid
       };
+      
+      console.log('🔑 [createEvent] Generated codes:', { short_code, access_uuid });
 
       logStep('Event data prepared');
       console.log('📝 [createEvent] Prepared data:', eventData);

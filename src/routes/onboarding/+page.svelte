@@ -2,6 +2,8 @@
   import { goto } from '$app/navigation';
   import { supabase } from '$lib/supabaseClient';
   import FileUpload from '$lib/FileUpload.svelte';
+  import { showToast } from '$lib/toastStore';
+  import { onMount } from 'svelte';
   import '$lib/styles/onboarding.css';
 
   // Form state
@@ -37,6 +39,27 @@
   function handleLogoUpload(event: CustomEvent) {
     logoUrl = event.detail.url;
   }
+  
+  // Check authentication when component mounts
+  onMount(async () => {
+    console.log('🚀 [onboarding] Component mounted, verifying authentication...');
+    
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error || !session) {
+        console.error('Auth error on onboarding page:', error);
+        const errorMessage = 'Please log in to access the onboarding page';
+        goto(`/login?redirectTo=/onboarding&error=${encodeURIComponent(errorMessage)}`);
+        return;
+      }
+      
+      console.log('✅ [onboarding] User is authenticated');
+    } catch (error) {
+      console.error('🔥 [onboarding] Error checking authentication:', error);
+      showToast('An error occurred. Please refresh and try again.', 'error');
+    }
+  });
 
   // Handle form submission
   async function handleSubmit() {
@@ -47,10 +70,19 @@
 
     isSubmitting = true;
     error = '';
+    
+    // Verify authentication before proceeding
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) {
+      showToast('Your session has expired. Please log in again.', 'error');
+      goto('/login?redirectTo=/onboarding');
+      return;
+    }
 
     try {
       // Get current user with fresh session
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      const { data, error: userError } = await supabase.auth.getUser();
+      const user = data?.user;
       
       if (userError || !user) {
         console.error('Auth error:', userError);
@@ -58,10 +90,16 @@
         const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
         
         if (refreshError || !refreshData.user) {
-          throw new Error('Session expired. Please log in again.');
+          const errorMessage = 'Session expired. Please log in again.';
+          goto(`/login?redirectTo=/onboarding&error=${encodeURIComponent(errorMessage)}`);
+          return;
         }
       }
 
+      if (!user) {
+        throw new Error('User session not found');
+      }
+      
       // Create organization
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
@@ -110,11 +148,13 @@
         
         // Redirect to dashboard
         window.location.href = '/dashboard';
-      } catch (trialError) {
+      } catch (error) {
+        const trialError = error as Error;
         console.error('Trial start error:', trialError);
-        throw new Error(`Organization created, but we couldn't start your trial: ${trialError.message}. Please contact support.`);
+        throw new Error(`Organization created, but we couldn't start your trial: ${trialError.message || 'Unknown error'}. Please contact support.`);
       }
-    } catch (err) {
+    } catch (error) {
+      const err = error as Error;
       console.error('Error during onboarding:', err);
       error = err.message || 'An error occurred during onboarding. Please try again.';
     } finally {

@@ -1,11 +1,13 @@
 <script lang="ts">
-  import { Link, Calendar, Pencil, QrCode } from 'lucide-svelte';
-  import type { Event, Organization } from '$lib/types';
+  import { Link, Calendar, Pencil, QrCode, User, CloudUpload } from 'lucide-svelte';
+  import type { Event, Organization } from '$lib/types/database';
   import { createEventDispatcher } from 'svelte';
 
   // Props
   export let event: Event;
   export let organization: Organization | null = null;
+  export let scoreCount: number = 0;
+  export let playerCount: number = 0;
 
   const dispatch = createEventDispatcher();
 
@@ -21,18 +23,51 @@
       year: 'numeric' 
     });
   };
+
+  // Get event status
+  $: eventStatus = (() => {
+    const today = new Date().toISOString().split('T')[0];
+    const eventDate = event.event_date;
+    
+    // If no event date, it's an ongoing event
+    if (!eventDate) {
+      return scoreCount > 0 
+        ? { text: 'Live', color: '#E53935', isLive: true } // Red
+        : { text: 'Waiting for Scores', color: '#9E9E9E' }; // Grey
+    }
+    
+    const isToday = eventDate === today;
+    const isFuture = new Date(eventDate) > new Date(today);
+    
+    if (isFuture) {
+      return { text: 'Upcoming', color: '#2196F3' }; // Blue
+    } else if (isToday) {
+      return scoreCount > 0
+        ? { text: 'Live', color: '#E53935', isLive: true } // Red
+        : { text: 'Waiting for Scores', color: '#9E9E9E' }; // Grey
+    } else {
+      return { text: 'Archived', color: '#757575' }; // Dark Grey
+    }
+  })();
 </script>
 
 <div class="event-card">
+  <div class="event-status" style="--status-color: {eventStatus.color}">
+    <div class="status-dot {eventStatus.isLive ? 'flashing' : ''}"></div>
+    {eventStatus.text}
+  </div>
   <h2 class="event-title">{event.title}</h2>
-  <p class="event-line">
-    <Link color="blue" size="14" /> 
-    {organization?.slug}/{event.slug}
-  </p>
-  <p class="event-line">
-    <Calendar color="orange" size="14" /> 
-    {event.event_date ? formatDate(event.event_date) : 'Ongoing'}
-  </p>
+  <div class="event-shortcode"><code>/{event.short_code}</code></div>
+  <div class="event-stats">
+    <div class="stat">
+      <Calendar size={14} />
+      <span>{event.event_date ? formatDate(event.event_date) : 'Ongoing'}</span>
+    </div>
+    <div class="stat">
+      <User size={14} />
+      <span>{playerCount} {playerCount === 1 ? 'Player' : 'Players'}</span>
+    </div>
+  </div>
   <div class="event-buttons">
     <a class="edit-button" href={`/dashboard/${event.slug}/setup`}>
       <Pencil size="16" /> Edit
@@ -63,25 +98,83 @@
     transform: translateY(-4px);
   }
 
-  .event-title {
-    position: initial;
-    font-size: 1.1rem;
-    font-weight: 800;
-    margin-bottom: 1rem;
-    color: var(--color-black);
-  }
-
-  .event-line {
+  .event-status {
     display: flex;
     align-items: center;
-    background: white;
-    padding: 0.5rem;
-    border-radius: 80px;
-    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
     gap: 0.5rem;
-    color: #222;
     font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: var(--status-color);
+    font-family: 'Inter', sans-serif;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--status-color);
+    transition: background 0.2s;
+  }
+
+  .status-dot.flashing {
+    animation: status-flash 1.2s infinite alternate;
+  }
+
+  @keyframes status-flash {
+    0% { opacity: 1; }
+    100% { opacity: 0.3; }
+  }
+
+  .event-title {
+    position: initial;
+    font-family: 'Obviously Bold', 'Inter', sans-serif;
+    font-weight: 900;
+    margin-bottom: 0.25rem;
+    color: var(--color-black);
+    letter-spacing: 0.01em;
+    line-height: 1.1;
+    font-size: 1.25rem;
+  }
+
+  .event-shortcode {
     margin-bottom: 0.5rem;
+    font-family: 'JetBrains Mono', 'Fira Mono', 'Menlo', monospace;
+    font-size: 0.92rem;
+    color: #888;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-weight: 400;
+  }
+
+  .event-shortcode code {
+    font-size: 0.92em;
+    font-family: inherit;
+    color: #666;
+    letter-spacing: 0.02em;
+  }
+
+  .event-stats {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    background: rgba(245, 245, 250, 0.95);
+    border-radius: 10px;
+    padding: 0.35rem 0.75rem;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    color: #222;
+    font-weight: 500;
+  }
+
+  .stat {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-width: 0;
+    white-space: nowrap;
   }
 
   .event-buttons {

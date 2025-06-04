@@ -1,6 +1,7 @@
 // check supabase-tables.md at project root for supabase table schemas
 
 import { createBrowserClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { browser, dev } from '$app/environment';
 import type { Database } from './database.types';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -29,10 +30,19 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables');
 }
 
-// Create a typed Supabase client
+// Create typed Supabase clients
 let supabase: SupabaseClient<Database>;
 
-// Initialize Supabase client based on the environment
+/**
+ * Get the appropriate Supabase client based on context
+ * This function is safe to use in both client and server contexts
+ * @returns The Supabase client
+ */
+export function getSupabaseClient() {
+  return supabase;
+}
+
+// Initialize browser Supabase client
 if (browser) {
   // In the browser, create a real Supabase client
   supabase = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey, {
@@ -112,7 +122,6 @@ if (browser) {
         remove: () => Promise.resolve({ data: null, error: null }),
       }),
     },
-    // @ts-expect-error Mock implementation doesn't use the channel name
     channel: () => ({
       on: () => ({
         subscribe: () => ({}),
@@ -120,6 +129,35 @@ if (browser) {
     }),
     removeChannel: () => Promise.resolve(),
   } as unknown as SupabaseClient;
+}
+
+/**
+ * Securely verify a session by checking with the Supabase Auth server
+ * This should be used instead of directly accessing the session from storage
+ * @returns The verified session and user, or null if verification fails
+ */
+export async function getSecureSession() {
+  try {
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError || !session) {
+      console.log('No session found or session error:', sessionError?.message);
+      return { session: null, user: null };
+    }
+    
+    // Verify the session with the server
+    const { data: { user }, error: userError } = await supabase.auth.getUser(session.access_token);
+    
+    if (userError || !user) {
+      console.log('Session verification failed:', userError?.message);
+      return { session: null, user: null };
+    }
+    
+    return { session, user };
+  } catch (error) {
+    console.error('Error in getSecureSession:', error);
+    return { session: null, user: null };
+  }
 }
 
 export { supabase };

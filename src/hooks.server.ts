@@ -14,7 +14,7 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   // Create a Supabase client with the Auth context of the request
-  event.locals.supabase = createServerClient(
+  const supabase = createServerClient(
     PUBLIC_SUPABASE_URL,
     PUBLIC_SUPABASE_ANON_KEY,
     {
@@ -25,38 +25,45 @@ export const handle: Handle = async ({ event, resolve }) => {
         },
         remove: (key, options) => {
           event.cookies.delete(key, { ...options, path: '/' })
-        },
+        }
       },
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        flowType: 'pkce'
+      }
     }
   )
 
   // Helper to get both session and user
   event.locals.getSession = async () => {
     console.log('🔍 [hooks.server] Getting session...')
-    const { data: { session }, error: sessionError } = await event.locals.supabase.auth.getSession()
     
-    if (sessionError) {
-      console.error('❌ [hooks.server] Error getting session:', sessionError)
+    try {
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError || !session) {
+        console.error('❌ [hooks.server] Session error or no session:', sessionError?.message)
+        return { session: null, user: null }
+      }
+      
+      console.log('🔑 [hooks.server] Session found, verifying with getUser...')
+      
+      // Always verify the session by getting the user
+      const { data: { user }, error: userError } = await supabase.auth.getUser(session.access_token)
+      
+      if (userError || !user) {
+        console.error('❌ [hooks.server] Session verification failed:', userError?.message)
+        return { session: null, user: null }
+      }
+      
+      console.log('✅ [hooks.server] Session verified for user:', user.email)
+      return { session, user }
+    } catch (error) {
+      console.error('❌ [hooks.server] Unexpected error during session verification:', error)
       return { session: null, user: null }
     }
-    
-    if (!session) {
-      console.log('ℹ️ [hooks.server] No active session found')
-      return { session: null, user: null }
-    }
-    
-    console.log('🔑 [hooks.server] Session found, verifying with getUser...')
-    
-    // Always verify the session by getting the user
-    const { data: { user }, error: userError } = await event.locals.supabase.auth.getUser(session.access_token)
-    
-    if (userError || !user) {
-      console.error('❌ [hooks.server] Session verification failed:', userError)
-      return { session: null, user: null }
-    }
-    
-    console.log('✅ [hooks.server] Session verified for user:', user.email)
-    return { session, user }
   }
 
   // Get the current session and user

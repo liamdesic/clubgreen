@@ -209,25 +209,23 @@
       console.log('🔑 [settings] Getting session...');
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
-      if (sessionError) {
-        console.error('❌ [settings] Error getting session:', sessionError);
-        throw new Error('Failed to get session');
+      if (sessionError || !session) {
+        console.error('❌ [settings] No valid session found');
+        const errorMessage = 'Please log in to access settings';
+        window.location.href = `/login?redirectTo=${encodeURIComponent('/dashboard/settings')}&error=${encodeURIComponent(errorMessage)}`;
+        return;
       }
       
-      if (!session?.access_token) {
-        console.log('ℹ️ [settings] No active session found');
-        throw new Error('No active session');
-      }
-      
-      console.log('🔑 [settings] Session found, verifying user...');
-      
-      // Verify the session by getting the user
-      const { data: { user }, error: userError } = await supabase.auth.getUser(session.access_token);
+      // Get the current user
+      console.log('👤 [settings] Getting user...');
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError || !user) {
-        console.error('❌ [settings] Session verification failed:', userError);
+        console.error('❌ [settings] No valid user found');
+        const errorMessage = 'Your session has expired. Please log in again.';
         await supabase.auth.signOut();
-        throw new Error('Session verification failed');
+        window.location.href = `/login?redirectTo=${encodeURIComponent('/dashboard/settings')}&error=${encodeURIComponent(errorMessage)}`;
+        return;
       }
       
       console.log('✅ [settings] User verified:', user.email);

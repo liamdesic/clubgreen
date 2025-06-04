@@ -1,10 +1,12 @@
 import type { Session, User } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from './lib/database.types'
 
 declare global {
   namespace App {
     interface Locals {
-      supabase: ReturnType<typeof import('@supabase/ssr').createServerClient>
-      getSession: () => Promise<{ session: Session | null; user: User | null }>
+      supabase: SupabaseClient<Database>
+      getSession(): Promise<{ session: Session | null; user: User | null }>
       session: Session | null
       user: User | null
     }

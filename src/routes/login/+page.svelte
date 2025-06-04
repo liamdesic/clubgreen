@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { supabase, type Session } from '$lib/supabaseClient';
   import { Mail, Check, ArrowRight, RotateCcw, Eye, EyeOff, Lock, User } from 'lucide-svelte';
+  import { showToast } from '$lib/toastStore';
   
   // Error handling
   let authError: string | null = null;
@@ -50,7 +51,16 @@
       console.log('🔑 [AUTH] Auth state changed:', event);
       
       if (event === 'SIGNED_IN') {
-        console.log('✅ [AUTH] User signed in, redirecting to:', finalRedirectTo);
+        // Verify the session with getUser
+        const { data: { user }, error } = await supabase.auth.getUser();
+        
+        if (error || !user) {
+          console.error('❌ [AUTH] Session verification failed:', error?.message);
+          showToast('Authentication failed. Please try again.', 'error');
+          return;
+        }
+        
+        console.log('✅ [AUTH] User verified, redirecting to:', finalRedirectTo);
         window.location.href = finalRedirectTo;
       } else if (event === 'SIGNED_OUT') {
         console.log('User signed out');
@@ -82,10 +92,20 @@
     // Check for redirectTo query parameter from the server redirect or initial navigation
     const queryParams = new URLSearchParams(window.location.search);
     const serverRedirectTo = queryParams.get('redirectTo');
+    const errorMessage = queryParams.get('error');
     
     if (serverRedirectTo) {
       finalRedirectTo = serverRedirectTo;
       console.log('Login page: Final redirect destination set to:', finalRedirectTo);
+    }
+    
+    // Display error message as toast if present
+    if (errorMessage) {
+      showToast(decodeURIComponent(errorMessage), 'error');
+      // Remove the error parameter from URL to prevent showing it again on refresh
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('error');
+      window.history.replaceState({}, '', newUrl);
     }
 
     // Check if user is already signed in
@@ -298,9 +318,10 @@
       console.log('✅ [AUTH] Authentication successful, redirecting to:', finalRedirectTo);
       goto(finalRedirectTo, { replaceState: true });
       
-    } catch (err) {
+    } catch (error) {
+      const err = error as Error;
       console.error('Authentication error:', err);
-      error = err instanceof Error ? err.message : 'An unexpected error occurred';
+      error = err.message || 'An unexpected error occurred';
     } finally {
       loading = false;
       console.groupEnd();
@@ -550,7 +571,7 @@
 
 
 
-      {#if linkSent}
+      {#if linkSent || step === 'link-sent'}
         <div class="link-sent-view">
           <button class="retry-icon" on:click={resetToStart} title="Start Over">
             <RotateCcw size="24" />
