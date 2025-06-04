@@ -81,14 +81,12 @@
   
   {:else if status === 'success'}
     <div class="success-state">
-      <div class="icon">✅</div>
       <h2>Successfully logged in!</h2>
       <p>Redirecting you to your dashboard...</p>
     </div>
   
   {:else if status === 'pkce_verifier_missing'}
     <div class="pkce-missing-state">
-      <div class="icon">🔗</div>
       <h2>✅ Email Confirmed!</h2>
       <p class="message">
         <strong>For security, this link must be opened in the same browser tab where you signed up.</strong>
@@ -99,15 +97,11 @@
         <button class="button primary" on:click={closeTab}>
           Close Tab Now
         </button>
-        <a href="/login" class="button secondary">
-          Use Password Instead
-        </a>
       </div>
     </div>
   
   {:else if status === 'error'}
     <div class="error-state">
-      <div class="icon">❌</div>
       <h2>Authentication Error</h2>
       <p class="error-message">{error}</p>
       <a href="/login" class="button primary">Back to Login</a>
@@ -135,27 +129,22 @@
     flex-direction: column;
     align-items: center;
     gap: 1.5rem;
-    max-width: 500px;
-    width: 100%;
-    padding: 2.5rem;
+    max-width: 400px;
+    width: 95%;
+    padding: 2rem;
     background: var(--bg-surface);
     border-radius: 0.75rem;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-  }
-
-  .icon {
-    font-size: 3.5rem;
-    margin-bottom: 1rem;
-    line-height: 1;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
   }
 
   h2 {
-    font-size: 1.75rem;
+    font-size: 1.5rem;
     font-weight: 700;
     color: var(--text-primary);
     margin: 0 0 0.5rem;
   }
-
 
   .message {
     color: var(--text-secondary);
@@ -166,7 +155,7 @@
   .button-group {
     display: flex;
     gap: 1rem;
-    margin-top: 1.5rem;
+    margin-top: 1rem;
     flex-wrap: wrap;
     justify-content: center;
   }

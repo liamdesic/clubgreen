@@ -1,6 +1,19 @@
 import { createServerClient } from '@supabase/ssr';
 import { redirect, type Handle } from '@sveltejs/kit';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
+import type { SupabaseClient, User, Session } from '@supabase/supabase-js';
+
+// See https://kit.svelte.dev/docs/types#app
+// for information about these interfaces
+declare global {
+  namespace App {
+    interface Locals {
+      supabase: SupabaseClient
+      session: Session | null
+      user: User | null
+    }
+  }
+}
 
 export const handle: Handle = async ({ event, resolve }) => {
   // Handle Chrome DevTools specific requests
@@ -36,6 +49,9 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
   )
 
+  // Pass the supabase client to event.locals
+  event.locals.supabase = supabase
+
   // Helper to get both session and user
   event.locals.getSession = async () => {
     console.log('🔍 [hooks.server] Getting session...')
@@ -43,8 +59,13 @@ export const handle: Handle = async ({ event, resolve }) => {
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
-      if (sessionError || !session) {
-        console.error('❌ [hooks.server] Session error or no session:', sessionError?.message)
+      if (sessionError) {
+        console.error('❌ [hooks.server] Session error:', sessionError.message)
+        return { session: null, user: null }
+      }
+
+      if (!session) {
+        console.log('ℹ️ [hooks.server] No session found')
         return { session: null, user: null }
       }
       
@@ -53,8 +74,13 @@ export const handle: Handle = async ({ event, resolve }) => {
       // Always verify the session by getting the user
       const { data: { user }, error: userError } = await supabase.auth.getUser(session.access_token)
       
-      if (userError || !user) {
-        console.error('❌ [hooks.server] Session verification failed:', userError?.message)
+      if (userError) {
+        console.error('❌ [hooks.server] User verification failed:', userError.message)
+        return { session: null, user: null }
+      }
+
+      if (!user) {
+        console.error('❌ [hooks.server] Session verification failed: User from sub claim in JWT does not exist')
         return { session: null, user: null }
       }
       
@@ -71,8 +97,35 @@ export const handle: Handle = async ({ event, resolve }) => {
   event.locals.session = session
   event.locals.user = user
 
+  // If we're on the auth callback route, handle the callback
+  if (event.url.pathname === '/auth/callback') {
+    const code = event.url.searchParams.get('code')
+    const type = event.url.searchParams.get('type')
+    
+    if (code && !user) {
+      try {
+        await supabase.auth.exchangeCodeForSession(code)
+        // Re-check session after exchange
+        const { session: newSession, user: newUser } = await event.locals.getSession()
+        event.locals.session = newSession
+        event.locals.user = newUser
+
+        // If this is a new signup, redirect to onboarding
+        if (type === 'signup' || type === 'signup_confirm') {
+          throw redirect(303, '/onboarding')
+        }
+
+        // Otherwise redirect to dashboard
+        throw redirect(303, '/dashboard')
+      } catch (error) {
+        if (error instanceof Response) throw error // Rethrow redirect
+        console.error('❌ [hooks.server] Code exchange failed:', error)
+        throw redirect(303, '/login?error=' + encodeURIComponent('Authentication failed. Please try again.'))
+      }
+    }
+  }
+
   // Resolve the event
   const response = await resolve(event)
-
   return response
 }

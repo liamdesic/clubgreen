@@ -15,11 +15,12 @@
   import '$lib/styles/theme.css'
   import ToastHost from '$lib/ToastHost.svelte'
   import { page } from '$app/stores'
+  import type { Session } from '@supabase/supabase-js'
 
   export let data: LayoutData
 
-  let { session } = data;
-  $: ({ session } = data);
+  let session: Session | null;
+  $: session = data.session;
 
   onMount(() => {
     console.log('🔐 [AUTH] Setting up auth state change listener')

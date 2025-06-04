@@ -308,7 +308,8 @@
           // If email is not confirmed, show message to check email
           if (!result.data.user.email_confirmed_at) {
             console.log('📧 [SIGNUP] Email confirmation required, showing check email message');
-            step = 'check-email';
+            linkSent = true;
+            step = 'link-sent';
             return;
           }
         }
