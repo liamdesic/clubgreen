@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
+  import { goto } from '$app/navigation';
 
   type AuthStatus = 'processing' | 'success' | 'pkce_verifier_missing' | 'error';
   
@@ -31,7 +32,29 @@
 
   onMount(async () => {
     try {
-      // Check for modern PKCE code flow
+      // First check if we already have a session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        console.log('Session already exists, skipping code exchange');
+        status = 'success';
+        
+        // Check if this is a new signup
+        const url = new URL(window.location.href);
+        const type = url.searchParams.get('type');
+        if (type === 'signup' || type === 'signup_confirm') {
+          redirectPath = '/onboarding';
+        }
+        
+        // Use goto for client-side navigation instead of window.location
+        // This ensures SvelteKit handles the navigation properly
+        setTimeout(() => {
+          goto(redirectPath);
+        }, 500);
+        return;
+      }
+      
+      // No session exists, proceed with code exchange
       const url = new URL(window.location.href);
       const code = url.searchParams.get('code');
 
@@ -63,7 +86,10 @@
       }
 
       status = 'success';
-      window.location.href = redirectPath;
+      // Use goto for client-side navigation
+      setTimeout(() => {
+        goto(redirectPath);
+      }, 500);
     } catch (err) {
       console.error('Auth callback error:', err);
       error = err instanceof Error ? err.message : 'An unknown error occurred';

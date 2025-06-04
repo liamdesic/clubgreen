@@ -53,26 +53,15 @@ if (browser) {
     }
   });
 
-  // Add auth state change listener for debugging in development
+  // Add minimal auth state change listener for critical events only
   if (dev) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      const timestamp = new Date().toISOString();
+      // Only log sign in, sign out, and token refresh events
+      const criticalEvents = ['SIGNED_IN', 'SIGNED_OUT', 'TOKEN_REFRESHED'];
       
-      // Skip if no session
-      if (!session) {
-        console.log(`[${timestamp}] Auth state changed: ${event} - No session`);
-        return;
+      if (criticalEvents.includes(event)) {
+        console.log(`[AUTH] ${event} - User: ${session?.user?.email || 'none'}`);
       }
-      
-      // Verify the session by getting the user
-      const { data: { user }, error } = await supabase.auth.getUser(session.access_token);
-      
-      if (error || !user) {
-        console.log(`[${timestamp}] Auth state changed: ${event} - Session verification failed`);
-        return;
-      }
-      
-      console.log(`[${timestamp}] Auth state changed: ${event} - Verified user: ${user.email}`);
     });
 
     // Cleanup subscription on HMR updates

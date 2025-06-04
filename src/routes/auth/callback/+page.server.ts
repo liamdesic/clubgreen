@@ -1,31 +1,46 @@
 import { redirect, type Actions, type ServerLoad } from '@sveltejs/kit';
 
-export const load: ServerLoad = async ({ url, locals }) => {
+export const load: ServerLoad = async ({ url, locals, cookies, request }) => {
+  const logPrefix = '[AUTH:CALLBACK]';
   const code = url.searchParams.get('code');
   const type = url.searchParams.get('type');
+  const isDev = process.env.NODE_ENV === 'development';
+  
+  if (isDev) {
+    console.log(`🔍 ${logPrefix} Auth callback with code: ${code ? '✓' : '✗'} type: ${type || 'none'}`);
+  }
 
   // Check if already authenticated to avoid retrying code exchange
   const { session, user } = await locals.getSession();
+  
   if (session && user) {
-    console.log('✅ [auth/callback] User already authenticated, skipping code exchange');
-    throw redirect(303, '/dashboard');
+    if (isDev) {
+      console.log(`✅ ${logPrefix} User already authenticated: ${user.email}`);
+    }
+    return redirect(303, '/dashboard');
   }
 
   // Only proceed with code exchange if we have a code
   if (code) {
     try {
       // Exchange code for session
-      const { error: exchangeError } = await locals.supabase.auth.exchangeCodeForSession(code);
-      if (exchangeError) {
-        console.error('❌ [auth/callback] Code exchange failed:', exchangeError.message);
-        throw redirect(303, '/login?error=' + encodeURIComponent(exchangeError.message));
+      const exchangeResult = await locals.supabase.auth.exchangeCodeForSession(code);
+      
+      if (exchangeResult.error) {
+        if (isDev) {
+          console.error(`❌ ${logPrefix} Code exchange failed: ${exchangeResult.error.message}`);
+        }
+        return redirect(303, '/login?error=' + encodeURIComponent(exchangeResult.error.message));
       }
       
       // Refresh session after code exchange
       const { session: newSession, user: newUser } = await locals.getSession();
+      
       if (!newSession || !newUser) {
-        console.error('❌ [auth/callback] Failed to get session after code exchange');
-        throw redirect(303, '/login?error=session_failed');
+        if (isDev) {
+          console.error(`❌ ${logPrefix} Failed to get session after code exchange`);
+        }
+        return redirect(303, '/login?error=session_failed');
       }
 
       // Determine redirect path based on the type parameter
@@ -33,23 +48,32 @@ export const load: ServerLoad = async ({ url, locals }) => {
         ? '/onboarding'
         : '/dashboard';
       
-      console.log('✅ [auth/callback] Authentication successful for user:', newUser.email);
-      throw redirect(303, redirectTo);
+      if (isDev) {
+        console.log(`✅ ${logPrefix} Auth success: ${newUser.email} → ${redirectTo}`);
+      }
+      return redirect(303, redirectTo);
     } catch (error) {
-      if (error instanceof Response) {
-        // This is a redirect response, just pass it through
-        throw error;
+      // Check if this is a redirect response
+      if (error && typeof error === 'object' && 'status' in error && 'location' in error) {
+        // This is a redirect object, just return it
+        return error;
       }
       
-      console.error('❌ [auth/callback] Auth callback error:', error);
-      throw redirect(303, '/login?error=' + encodeURIComponent(
+      // Only non-redirect errors should reach this point
+      if (isDev) {
+        console.error(`❌ ${logPrefix} Auth error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+      
+      return redirect(303, '/login?error=' + encodeURIComponent(
         error instanceof Error ? error.message : 'Authentication failed. Please try again.'
       ));
     }
   } else {
     // No code provided
-    console.error('❌ [auth/callback] No code provided in URL');
-    throw redirect(303, '/login?error=missing_code');
+    if (isDev) {
+      console.error(`❌ ${logPrefix} No code provided in URL`);
+    }
+    return redirect(303, '/login?error=missing_code');
   }
 };
 

@@ -33,12 +33,31 @@ export const handle: Handle = async ({ event, resolve }) => {
     PUBLIC_SUPABASE_ANON_KEY,
     {
       cookies: {
-        get: (key) => event.cookies.get(key),
+        get: (key) => {
+          const cookie = event.cookies.get(key);
+          // Only log in development and only for debugging critical issues
+          const isDev = process.env.NODE_ENV === 'development';
+          const isDebug = isDev && false; // Set to true only when debugging cookie issues
+          
+          if (isDebug && key.startsWith('sb-')) {
+            console.log(`[COOKIE] GET ${key}: ${cookie ? 'present' : 'missing'}`);
+          }
+          return cookie;
+        },
         set: (key, value, options) => {
-          event.cookies.set(key, value, { ...options, path: '/' })
+          // Always set path to root to ensure cookies are available across the site
+          const cookieOptions = { 
+            ...options, 
+            path: '/',
+            // Ensure cookies work in development
+            secure: event.url.protocol === 'https:',
+            sameSite: 'lax'
+          };
+          
+          event.cookies.set(key, value, cookieOptions);
         },
         remove: (key, options) => {
-          event.cookies.delete(key, { ...options, path: '/' })
+          event.cookies.delete(key, { ...options, path: '/' });
         }
       },
       auth: {
@@ -56,31 +75,39 @@ export const handle: Handle = async ({ event, resolve }) => {
   // Define getSession but don't call it immediately
   // This improves performance for routes that don't need auth
   event.locals.getSession = async () => {
-    // Only log in development
     const isDev = process.env.NODE_ENV === 'development';
-    if (isDev) console.log('🔍 [hooks.server] Getting session and user...');
+    const logPrefix = `[AUTH:${event.url.pathname}]`;
     
     try {
       // Get user first for security (recommended by Supabase)
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError || !user) {
-        if (isDev && userError) console.error('❌ [hooks.server] User verification failed:', userError.message);
+        if (isDev) {
+          console.error(`❌ ${logPrefix} Auth failed: ${userError?.message || 'No user found'}`);
+        }
         return { session: null, user: null };
+      }
+      
+      if (isDev) {
+        console.log(`✅ ${logPrefix} User: ${user.email}`);
       }
 
       // Get session after verifying user
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError || !session) {
-        if (isDev && sessionError) console.error('❌ [hooks.server] Session error:', sessionError.message);
+        if (isDev) {
+          console.error(`❌ ${logPrefix} Session error: ${sessionError?.message || 'No session found'}`);
+        }
         return { session: null, user: null };
       }
       
-      if (isDev) console.log('✅ [hooks.server] Session verified for user:', user.email);
       return { session, user };
     } catch (error) {
-      if (isDev) console.error('❌ [hooks.server] Unexpected error during session verification:', error);
+      if (isDev) {
+        console.error(`❌ ${logPrefix} Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
       return { session: null, user: null };
     }
   };
