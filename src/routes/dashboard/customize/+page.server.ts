@@ -1,38 +1,20 @@
-import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ url, locals }) => {
+export const load: PageServerLoad = async ({ locals }) => {
   console.log('🔍 [customize] Starting customize page load...');
   
-  // 1. Get the current session and verify the user
-  const { data: { session }, error: sessionError } = await locals.supabase.auth.getSession();
+  // User and organization are already verified by +layout.server.ts
+  // We can access the user directly from locals
+  // We can safely use non-null assertion (!) because layout.server.ts guarantees user exists
+  const user = locals.user!;
   
-  if (sessionError || !session) {
-    console.error('❌ [customize] Session error or no session:', sessionError?.message);
-    const errorMessage = 'Please log in to access customization';
-    throw redirect(303, `/login?redirectTo=${encodeURIComponent('/dashboard/customize')}&error=${encodeURIComponent(errorMessage)}`);
-  }
-  
-  // Verify the user with a fresh call to getUser
-  const { data: { user }, error: userError } = await locals.supabase.auth.getUser(session.access_token);
-  
-  if (userError || !user) {
-    console.error('❌ [customize] User verification failed:', userError?.message);
-    const errorMessage = 'Your session has expired. Please log in again.';
-    throw redirect(303, `/login?redirectTo=${encodeURIComponent('/dashboard/customize')}&error=${encodeURIComponent(errorMessage)}`);
-  }
-  
-  console.log('🔑 [customize] User authenticated and verified:', { 
+  console.log('🔑 [customize] User from layout:', { 
     userId: user.id, 
     email: user.email 
   });
-  
-  // Update the session with the verified user
-  locals.user = user;
-  locals.session = session;
 
-  // Get user's organization
-  console.log('🔍 [customize] Fetching organization for user:', user.id);
+  // Get user's organization details
+  console.log('🔍 [customize] Fetching organization details for user:', user.id);
   const { data: organization, error: orgError } = await locals.supabase
     .from('organizations')
     .select('*')
@@ -40,13 +22,13 @@ export const load: PageServerLoad = async ({ url, locals }) => {
     .single();
 
   if (orgError) {
-    console.error('❌ [customize] Error fetching organization:', orgError);
-    throw redirect(303, '/onboarding');
+    console.error('❌ [customize] Error fetching organization details:', orgError);
+    return { error: 'Failed to load organization details' };
   }
 
   if (!organization) {
-    console.log('ℹ️ [customize] No organization found, redirecting to onboarding');
-    throw redirect(303, '/onboarding');
+    console.log('ℹ️ [customize] No organization details found');
+    return { error: 'Organization not found' };
   }
 
   console.log('✅ [customize] Organization loaded:', {

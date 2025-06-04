@@ -3,16 +3,24 @@ import { defineConfig, loadEnv } from 'vite';
 import commonjs from 'vite-plugin-commonjs';
 
 export default defineConfig(({ mode }) => {
-  // Load environment variables
+  // Load environment variables - load all env vars regardless of prefix
   const env = loadEnv(mode, process.cwd(), '');
+  
+  // Make all environment variables available to server-side code
+  process.env = { ...process.env, ...env };
   
   // Log environment variables for debugging (only in dev)
   if (mode === 'development') {
     console.log('Environment variables loaded:', {
       PUBLIC_STRIPE_PUBLISHABLE_KEY: env.PUBLIC_STRIPE_PUBLISHABLE_KEY ? '***' + 
         env.PUBLIC_STRIPE_PUBLISHABLE_KEY.slice(-4) : 'Not set',
+      STRIPE_SECRET_KEY: env.STRIPE_SECRET_KEY ? '***' + 
+        env.STRIPE_SECRET_KEY.slice(-4) : 'Not set',
+      STRIPE_PRICE_ID: env.STRIPE_PRICE_ID || 'Not set',
       MODE: mode
     });
+    
+    console.log('Environment variables injected into process.env');
   }
 
   return {

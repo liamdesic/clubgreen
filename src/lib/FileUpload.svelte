@@ -1,6 +1,7 @@
 <script>
   import { createEventDispatcher } from 'svelte';
-  import { supabase } from '$lib/supabaseClient';
+  import { createBrowserClient } from '@supabase/ssr';
+  import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
   import { CloudUpload } from 'lucide-svelte';
 
   export let id = `file-upload-${Math.random().toString(36).substr(2, 9)}`;
@@ -11,6 +12,12 @@
   export let theme = 'light'; // 'light' or 'dark'
 
   const dispatch = createEventDispatcher();
+  
+  // Initialize Supabase client
+  const supabase = createBrowserClient(
+    PUBLIC_SUPABASE_URL,
+    PUBLIC_SUPABASE_ANON_KEY
+  );
 
   let file = null;
   let status = '';
@@ -45,12 +52,15 @@
       
       // Only try to create the bucket if it doesn't exist
       if (!bucketExists) {
-        const { error: createError } = await supabase.storage
-          .createBucket(bucketName, { public: true })
-          .catch(() => ({}));
-          
-        if (createError && !createError.message.includes('already exists')) {
-          console.warn('Error creating bucket:', createError);
+        try {
+          const { error: createError } = await supabase.storage
+            .createBucket(bucketName, { public: true });
+            
+          if (createError && createError.message && !createError.message.includes('already exists')) {
+            console.warn('Error creating bucket:', createError);
+          }
+        } catch (err) {
+          console.warn('Error creating bucket:', err);
         }
       }
       
@@ -91,7 +101,8 @@
     } catch (err) {
       status = 'error';
       console.error('Upload error:', err);
-      showToast('Failed to upload file. Please try again.', 'error');
+      // Just log the error instead of using showToast
+      console.error('Failed to upload file. Please try again.');
     }
   }
 

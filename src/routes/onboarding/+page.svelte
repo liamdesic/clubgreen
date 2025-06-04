@@ -1,19 +1,61 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { supabase } from '$lib/supabaseClient';
+  import { createBrowserClient } from '@supabase/ssr';
+  import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
   import FileUpload from '$lib/FileUpload.svelte';
-  import { showToast } from '$lib/toastStore';
-  import { onMount } from 'svelte';
+  import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
+  import { z } from 'zod';
   import '$lib/styles/onboarding.css';
+  
+  // Get data from server load function with proper typing
+  export let data: {
+    user: any;
+    org: any;
+    redirectTo: string;
+    formValues?: {
+      name: string;
+      slug: string;
+      logoUrl?: string;
+    };
+    errors?: {
+      name?: string[];
+      slug?: string[];
+      logoUrl?: string[];
+    };
+    success?: boolean;
+  };
+  
+  // Initialize Supabase client
+  const supabase = createBrowserClient(
+    PUBLIC_SUPABASE_URL,
+    PUBLIC_SUPABASE_ANON_KEY
+  );
 
   // Form state
-  let organizationName = '';
-  let organizationSlug = '';
-  let logoUrl = '';
+  let name = data.formValues?.name || '';
+  let slug = data.formValues?.slug || '';
+  let logoUrl = data.formValues?.logoUrl || '';
   let isSubmitting = false;
-  let isStartingTrial = false;
   let error = '';
-  let successMessage = '';
+  let formEl: HTMLFormElement;
+  
+  // Define type for form errors
+  type FormErrors = {
+    name?: string[];
+    slug?: string[];
+    logoUrl?: string[];
+  };
+  
+  // Get errors from form action if any
+  const errors: FormErrors = data.errors || {};
+  
+  // Track if slug has been manually edited
+  let slugManuallyEdited = false;
+  
+  // Update slug when name changes if it hasn't been manually edited
+  $: if (name && !slugManuallyEdited) {
+    slug = generateSlug(name);
+  }
   
   // Generate slug from organization name
   function generateSlug(name: string, randomSuffix: boolean = false): string {
@@ -31,8 +73,9 @@
     return slug;
   }
   
-  $: if (organizationName) {
-    organizationSlug = generateSlug(organizationName);
+  // Handle slug manual edit
+  function handleSlugInput() {
+    slugManuallyEdited = true;
   }
 
   // Handle logo upload
@@ -40,125 +83,26 @@
     logoUrl = event.detail.url;
   }
   
-  // Check authentication when component mounts
-  onMount(async () => {
-    console.log('🚀 [onboarding] Component mounted, verifying authentication...');
-    
-    try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error || !session) {
-        console.error('Auth error on onboarding page:', error);
-        const errorMessage = 'Please log in to access the onboarding page';
-        goto(`/login?redirectTo=/onboarding&error=${encodeURIComponent(errorMessage)}`);
-        return;
-      }
-      
-      console.log('✅ [onboarding] User is authenticated');
-    } catch (error) {
-      console.error('🔥 [onboarding] Error checking authentication:', error);
-      showToast('An error occurred. Please refresh and try again.', 'error');
-    }
-  });
+  // No need to check authentication on mount since it's handled by the server
 
-  // Handle form submission
-  async function handleSubmit() {
-    if (!organizationName) {
+  // Handle form submission with validation
+  function handleSubmit(e: Event) {
+    // Prevent default form submission
+    e.preventDefault();
+    
+    // Basic validation
+    if (!name) {
       error = 'Organization name is required';
       return;
     }
-
-    isSubmitting = true;
-    error = '';
     
-    // Verify authentication before proceeding
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !session) {
-      showToast('Your session has expired. Please log in again.', 'error');
-      goto('/login?redirectTo=/onboarding');
-      return;
-    }
-
-    try {
-      // Get current user with fresh session
-      const { data, error: userError } = await supabase.auth.getUser();
-      const user = data?.user;
-      
-      if (userError || !user) {
-        console.error('Auth error:', userError);
-        // Try to refresh the session first
-        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-        
-        if (refreshError || !refreshData.user) {
-          const errorMessage = 'Session expired. Please log in again.';
-          goto(`/login?redirectTo=/onboarding&error=${encodeURIComponent(errorMessage)}`);
-          return;
-        }
-      }
-
-      if (!user) {
-        throw new Error('User session not found');
-      }
-      
-      // Create organization
-      const { data: orgData, error: orgError } = await supabase
-        .from('organizations')
-        .insert([
-          { 
-            name: organizationName,
-            slug: organizationSlug,
-            owner_id: user.id,
-            settings_json: {
-              logo_url: logoUrl
-            },
-            payment_up_to_date: false
-          }
-        ])
-        .select()
-        .single();
-
-      if (orgError) throw orgError;
-
-      // Update the displayed slug in case it was modified
-      organizationSlug = orgData.slug;
-      
-      // Start the free trial
-      isStartingTrial = true;
-      successMessage = 'Organization created! Starting your free trial...';
-      
-      try {
-        const response = await fetch('/api/start-trial', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-
-        const result = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(result.error || 'Failed to start trial');
-        }
-        
-        // Update success message before redirecting
-        successMessage = 'Trial started successfully! Redirecting to dashboard...';
-        
-        // Wait a moment to show the success message
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        // Redirect to dashboard
-        window.location.href = '/dashboard';
-      } catch (error) {
-        const trialError = error as Error;
-        console.error('Trial start error:', trialError);
-        throw new Error(`Organization created, but we couldn't start your trial: ${trialError.message || 'Unknown error'}. Please contact support.`);
-      }
-    } catch (error) {
-      const err = error as Error;
-      console.error('Error during onboarding:', err);
-      error = err.message || 'An error occurred during onboarding. Please try again.';
-    } finally {
-      isSubmitting = false;
+    // Clear any previous errors
+    error = '';
+    isSubmitting = true;
+    
+    // Manually submit the form if validation passes
+    if (formEl) {
+      formEl.submit();
     }
   }
 </script>
@@ -184,36 +128,32 @@
         </div>
         <p class="error-text">{error}</p>
       </div>
-    {:else if successMessage}
-      <div class="success-message">
-        <div class="success-icon">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-          </svg>
-        </div>
-        <p class="success-text">
-          {successMessage}
-          {#if isStartingTrial}
-            <span class="loading-dots">...</span>
-          {/if}
-        </p>
-      </div>
     {/if}
 
-    <form on:submit|preventDefault={handleSubmit}>
+    <form method="POST" bind:this={formEl} on:submit|preventDefault={handleSubmit}>
       <div class="form-group">
         <label for="organizationName" class="form-label">
           Organization Name
         </label>
         <input
+          type="hidden"
+          name="logoUrl"
+          value={logoUrl}
+        />
+        <input
           id="organizationName"
-          name="organizationName"
+          name="name"
           type="text"
           required
-          bind:value={organizationName}
+          bind:value={name}
           class="form-input"
           placeholder="Acme Inc."
+          aria-invalid={errors.name ? 'true' : undefined}
+          aria-describedby={errors.name ? 'name-error' : undefined}
         />
+        {#if errors.name}
+          <span class="error-text" id="name-error">{errors.name}</span>
+        {/if}
       </div>
 
       <div class="form-group">
@@ -225,11 +165,17 @@
           <input
             type="text"
             id="organizationSlug"
-            name="organizationSlug"
-            bind:value={organizationSlug}
+            name="slug"
+            bind:value={slug}
+            on:input={handleSlugInput}
             class="form-input url-input"
             placeholder="acme-inc"
+            aria-invalid={errors.slug ? 'true' : undefined}
+            aria-describedby={errors.slug ? 'slug-error' : undefined}
           />
+          {#if errors.slug}
+            <span class="error-text" id="slug-error">{errors.slug}</span>
+          {/if}
         </div>
         <p class="form-note">
           This will be your organization's unique URL
@@ -269,6 +215,11 @@
           class="btn btn-primary"
         >
           {isSubmitting ? 'Setting up...' : 'Get Started'}
+          {#if isSubmitting}
+            <span class="loading-spinner">
+              <LoadingSpinner size="sm" />
+            </span>
+          {/if}
         </button>
       </div>
     </form>
