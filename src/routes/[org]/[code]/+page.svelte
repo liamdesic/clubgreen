@@ -1,10 +1,10 @@
 <script lang="ts">
   import '$lib/styles/base.css';
   import '$lib/styles/theme.css';
-  
-  // Import scorecard.css directly
-  import { browser } from '$app/environment';
   import '$lib/styles/scorecard.css';
+  
+  // Import scorecard.css only when needed
+  import { browser } from '$app/environment';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import confetti from 'canvas-confetti';
@@ -14,8 +14,15 @@
   import { showToast } from '$lib/toastStore';
   import LeaderboardModal from '$lib/components/LeaderboardModal.svelte';
   import { v4 as uuidv4 } from 'uuid';
-  import profanity from 'leo-profanity'; 
+  import profanity from 'leo-profanity';
+  import { goto } from '$app/navigation';
+  import RecoveryPrompt from '$lib/components/RecoveryPrompt.svelte';
   
+  // Only import scorecard.css if we're in the browser and on the scorecard page
+  if (browser && window.location.pathname.includes('/scorecard')) {
+    import('$lib/styles/scorecard.css');
+  }
+
   const customEase = cubicOut;
 
   // 🧬 FETCH SETTINGS FROM EVENTS AND ORGANIZATIONS TABLES
@@ -40,8 +47,55 @@
   let state: PageState = 'loading';
   let errorMsg: string | null = null;
   
+  // Add recovery state
+  let showRecoveryPrompt = false;
+  let hasRecoveredGame = false;
 
-  
+  // Function to save game state to localStorage
+  function saveGameState() {
+    if (!browser) return;
+    
+    const gameState = {
+      players,
+      currentHole,
+      gameStarted,
+      allScored,
+      showFinal,
+      eventId,
+      orgId,
+      eventSettings,
+      orgSettings
+    };
+    
+    localStorage.setItem(`scorecard_${eventId}`, JSON.stringify(gameState));
+  }
+
+  // Function to load game state from localStorage
+  function loadGameState() {
+    if (!browser) return null;
+    
+    const savedState = localStorage.getItem(`scorecard_${eventId}`);
+    if (!savedState) return null;
+    
+    try {
+      return JSON.parse(savedState);
+    } catch (e) {
+      console.error('Error parsing saved game state:', e);
+      return null;
+    }
+  }
+
+  // Function to clear saved game state
+  function clearGameState() {
+    if (!browser) return;
+    localStorage.removeItem(`scorecard_${eventId}`);
+  }
+
+  // Watch for changes to save game state
+  $: if (browser && gameStarted && !showFinal) {
+    saveGameState();
+  }
+
   // Type definitions
   interface Player {
     id: string;
@@ -81,6 +135,10 @@
 
     if (eventError) {
       console.error('Error fetching event:', eventError.message);
+      // If the event doesn't exist, throw a 404 error
+      if (eventError.code === 'PGRST116') {
+        throw new Error('404');
+      }
       errorMsg = eventError.message;
       state = 'error';
       return;
@@ -201,8 +259,14 @@
       
       // Only initialize scorecard if access is granted (not in error state)
       if (state !== 'error') {
-        // Initialize scorecard data and UI
-        await initializeScorecard();
+        // Check for saved game state
+        const savedState = loadGameState();
+        if (savedState && !hasRecoveredGame) {
+          showRecoveryPrompt = true;
+        } else {
+          // Initialize scorecard data and UI
+          await initializeScorecard();
+        }
         
         // Set state to ready after initialization
         state = 'ready';
@@ -212,6 +276,11 @@
       }
     } catch (err: unknown) {
       const error = err as Error;
+      if (error.message === '404') {
+        // Redirect to the catch-all route for 404
+        goto('/[...rest]');
+        return;
+      }
       errorMsg = error.message || 'Failed to load event settings';
       state = 'error';
       console.log('❌ Error in loadEventSettings:', errorMsg);
@@ -396,11 +465,13 @@
     // Trigger reactivity
     players = [...players];
 
+    // Save state immediately after recording score
+    saveGameState();
+
     // Update the status message
     setTimeout(() => {
       updateStatusMessage();
     }, 500);
-
   }
 
   function editScore(player) {
@@ -448,6 +519,9 @@
   
     // Show final scores
     showFinal = true;
+
+    // Clear localStorage since game is finished
+    clearGameState();
   
     const finalHole = eventSettings?.hole_count || 9;
     const rowsToInsert = [];
@@ -490,27 +564,30 @@
   }
 
   async function nextHole() {
-  if (!allScored) return;
+    if (!allScored) return;
 
-  const finalHole = eventSettings?.hole_count || 9;
-  if (currentHole >= finalHole) {
-    console.log("🎯 Reached final hole — showing final screen.");
-    await showFinalScreen(); // ⬅️ Make sure we await final save
-    return;
+    const finalHole = eventSettings?.hole_count || 9;
+    if (currentHole >= finalHole) {
+      console.log("🎯 Reached final hole — showing final screen.");
+      await showFinalScreen(); // ⬅️ Make sure we await final save
+      return;
+    }
+
+    currentHole++;
+    currentPlayerIndex = 0;
+    allScored = false;
+    
+    // Reset all players to inactive except the first player
+    players = players.map((player, index) => ({
+      ...player,
+      isActive: index === 0 // Make the first player active
+    }));
+    
+    // Save state after moving to next hole
+    saveGameState();
+    
+    statusMessage = `Hole ${currentHole} – ${players[0].name}'s turn`;
   }
-
-  currentHole++;
-  currentPlayerIndex = 0;
-  allScored = false;
-  
-  // Reset all players to inactive except the first player
-  players = players.map((player, index) => ({
-    ...player,
-    isActive: index === 0 // Make the first player active
-  }));
-  
-  statusMessage = `Hole ${currentHole} – ${players[0].name}'s turn`;
-}
 
   async function saveScoresToSupabaseForHole(hole) {
     for (const player of players) {
@@ -543,6 +620,31 @@
     editingPlayerIndex = null;
     savedTurnIndex = null;
     statusMessage = '';
+    clearGameState();
+  }
+
+  // Function to recover saved game
+  function recoverGame() {
+    const savedState = loadGameState();
+    if (savedState) {
+      players = savedState.players;
+      currentHole = savedState.currentHole;
+      gameStarted = savedState.gameStarted;
+      allScored = savedState.allScored;
+      showFinal = savedState.showFinal;
+      eventSettings = savedState.eventSettings;
+      orgSettings = savedState.orgSettings;
+      hasRecoveredGame = true;
+      showRecoveryPrompt = false;
+      updateStatusMessage();
+    }
+  }
+
+  // Function to start new game
+  function startNewGame() {
+    clearGameState();
+    resetGame();
+    showRecoveryPrompt = false;
   }
 </script>
 
@@ -874,4 +976,11 @@
   </div>
 </footer>
 </div>
+
+<!-- Add recovery prompt modal -->
+<RecoveryPrompt
+  visible={showRecoveryPrompt}
+  onContinue={recoverGame}
+  onStartNew={startNewGame}
+/>
 {/if}

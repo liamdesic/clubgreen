@@ -1,20 +1,28 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import type { Event, Organization } from '$lib/types';
   import { showToast } from '$lib/toastStore.js';
+  import  '$lib/styles/base.css'
   import '$lib/styles/theme.css';
   import '$lib/styles/dashboard.css';
+  import { slide } from 'svelte/transition';
   import QRCodeModal from '$lib/QRCodeModal.svelte';
   import { supabase } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
+  import { invalidate } from '$app/navigation';
   import {
-    CloudUpload, Link, Calendar, Pencil, QrCode, Plus, User, Settings, Palette
-  } from 'lucide-svelte';
+    CloudUpload, Link, Calendar, Pencil, QrCode, Plus, User, Settings,
+    Palette
+  } from 'lucide-svelte/icons';
   import Tv from 'lucide-svelte/icons/tv';
   import TrialStatus from '$lib/TrialStatus.svelte';
-  import AddEventModal from '$lib/components/AddEventModal.svelte';
+  import NewRoundModal from '$lib/components/NewRoundModal.svelte';
   import EventCard from '$lib/components/EventCard.svelte';
   import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
+  import MainLeaderboardCard from '$lib/components/MainLeaderboardCard.svelte';
+  import EmptyDashboard from '$lib/components/EmptyDashboard.svelte';
+  import DashboardMainHeader from '$lib/components/DashboardMainHeader.svelte';
+  import ArchivedEventsSection from '$lib/components/ArchivedEventsSection.svelte';
 
   // --- DATA FROM SERVER ---
   export let data: {
@@ -42,9 +50,21 @@
   let selectedEvent: Event | null = null;
   let liveEvents: Event[] = [];
   let nonLiveEvents: Event[] = [];
+  let emptyState: HTMLDivElement | null = null;
+  let subscription: any = null;
+  let showArchivedEvents = false;
+  let deletingEvent: string | null = null;
+
+  $: archivedEvents = sortedEvents?.filter(event => event.settings_json?.archived) || [];
+  $: activeEvents = sortedEvents?.filter(event => !event.settings_json?.archived) || [];
 
   // Sort events by status
   function getEventStatus(event: Event) {
+    // Check if manually archived
+    if (event.settings_json?.archived) {
+      return { code: 3, label: 'Archived' };
+    }
+
     // Access the current score count from the shared state
     const hasScores = (scoreCounts[event.id] || 0) > 0;
     const today = new Date().toISOString().split('T')[0];
@@ -158,19 +178,20 @@
   $: {
     if (data.organizations?.[0]) {
       console.log('🏢 [dashboard] Initializing organization from server data');
-      
+
       // Set trial_ends_at to 14 days from now if not set
-      const trialEndsAt = data.organizations[0].trial_ends_at || 
+      const trialEndsAt = data.organizations[0].trial_ends_at ||
         new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
-      
-      organization = {
-        id: data.organizations[0].id,
-        name: data.organizations[0].name,
-        slug: data.organizations[0].slug,
-        trial_ends_at: trialEndsAt,
-        settings_json: data.organizations[0].settings_json || {}
-      };
-      
+
+      // Use the organization data directly and potentially update trial_ends_at if needed
+      organization = data.organizations[0];
+      if (!organization.trial_ends_at) {
+          organization.trial_ends_at = trialEndsAt;
+      }
+       if (!organization.settings_json) {
+           organization.settings_json = {}; // Ensure settings_json is an object if null/undefined
+       }
+
       console.log('✅ [dashboard] Organization initialized:', {
         ...organization,
         hasTrialEndsAt: !!organization.trial_ends_at,
@@ -214,15 +235,82 @@
     selectedEvent = null;
   }
 
+  // --- NEW ROUND MODAL ---
+  function openNewRoundModal() {
+    console.log('Attempting to open NewRoundModal');
+    if (!organization) {
+      showToast('No organization found. Please refresh the page.', 'error');
+      return;
+    }
+    showCreateModal = true;
+  }
+
+  function closeNewRoundModal() {
+    console.log('Attempting to close NewRoundModal');
+    showCreateModal = false;
+  }
+
   // --- SIGN OUT ---
   async function signOut() {
     await supabase.auth.signOut();
     goto('/login');
   }
 
+  // Function to refresh events from the database
+  async function refreshEvents() {
+    try {
+      console.log('🔄 [dashboard] Refreshing events...');
+      
+      // Invalidate the layout data to trigger a fresh server load
+      await invalidate('app:dashboard');
+      
+      // Directly fetch the latest events from Supabase as a backup mechanism
+      if (organization) {
+        const { data: freshEvents, error } = await supabase
+          .from('events')
+          .select('*')
+          .eq('organization_id', organization.id)
+          .order('created_at', { ascending: false });
+          
+        if (error) {
+          console.error('Error fetching events:', error);
+        } else if (freshEvents) {
+          console.log(`📊 [dashboard] Directly fetched ${freshEvents.length} events from Supabase`);
+          events = freshEvents;
+        }
+      }
+      
+      await loadScoreCounts(); // Refresh score counts after data is reloaded
+      console.log('✅ [dashboard] Events refreshed successfully');
+      
+      // Detailed logging of events after refresh
+      console.log('📋 [DEBUG] Current events after refresh:', events.map(e => ({
+        id: e.id,
+        title: e.title,
+        date: e.event_date,
+        archived: e.settings_json?.archived,
+        status: getEventStatus(e).label
+      })));
+      
+      console.log('📋 [DEBUG] Active events after refresh:', activeEvents.map(e => ({
+        id: e.id,
+        title: e.title,
+        date: e.event_date,
+        status: getEventStatus(e).label
+      })));
+      
+      // Force UI update by triggering reactivity
+      events = [...events];
+    } catch (err) {
+      console.error('Error refreshing events:', err);
+      showToast('Failed to refresh events', 'error');
+    }
+  }
+
   // --- INITIAL CLIENT-SIDE AUTH VERIFICATION ---
   onMount(async () => {
     console.log('🚀 [dashboard] Client-side mount started');
+    await autoArchiveEvents(); // Auto-archive past events on mount
     console.log('🔍 [dashboard] Initial data state:', {
       hasUser: !!data.user,
       organizationCount: data.organizations?.length || 0
@@ -295,6 +383,40 @@
       showToast('An error occurred. Please refresh the page.', 'error');
     }
   });
+
+  // Auto-archive past events that aren't manually archived
+  async function autoArchiveEvents() {
+    const today = new Date().toISOString().split('T')[0];
+    const pastEvents = events.filter(event => 
+      event.event_date && 
+      event.event_date < today && 
+      !event.settings_json?.archived
+    );
+
+    if (pastEvents.length > 0) {
+      console.log(`[Dashboard] Auto-archiving ${pastEvents.length} past events`);
+      
+      for (const event of pastEvents) {
+        const newSettings = {
+          ...event.settings_json,
+          archived: true,
+          autoArchived: true // Flag to indicate this was automatic
+        };
+
+        const { error } = await supabase
+          .from('events')
+          .update({ settings_json: newSettings })
+          .eq('id', event.id);
+
+        if (error) {
+          console.error(`Error auto-archiving event ${event.id}:`, error);
+        } else {
+          // Update local state
+          event.settings_json = newSettings;
+        }
+      }
+    }
+  }
 
   // Load score counts for all events
   async function loadScoreCounts() {
@@ -403,59 +525,7 @@
 <div class="dashboard-wrapper">
   <div class="dashboard-main">
     <!-- Header -->
-    <header class="dashboard-header">
-      <div class="dashboard-title">
-        {#if organization?.settings_json?.logo_url}
-          <img 
-            src={organization.settings_json.logo_url} 
-            alt="{organization.name} logo" 
-            class="org-logo"
-          />
-        {:else}
-          <h2>Your Events</h2>
-        {/if}
-      </div>
-      <img src="/logos/ldrb-logo-colourlight.svg" alt="ldrboard logo" class="dashboard-logo" />
-      <div class="header-right">
-        <div class="header-pills">
-        {#if organization?.trial_ends_at}
-          <TrialStatus 
-            trialEndsAt={organization.trial_ends_at} 
-            organizationId={organization.id} 
-          />
-        {/if}
-        {#if organization}
-        <a 
-          href="/dashboard/customise"
-          class="user-pill" 
-          aria-label="Customise your leaderboard"
-        >
-          <Palette size="16" />
-          <span>Customise</span>
-        </a>
-        <a 
-          href="/dashboard/settings"
-          class="user-pill" 
-          aria-label="Account settings"
-        >
-          <User size="16" />
-          <span>{organization.name || 'My Organization'}</span>
-          <Settings size="16" class="gear-button" />
-        </a>
-      {:else if loading}
-        <div class="user-pill">
-          <div class="skeleton-loader" style="width: 120px; height: 24px;"></div>
-        </div>
-      {:else}
-        <a href="/dashboard/settings" class="user-pill">
-          <User size="16" />
-          <span>Set Up Organization</span>
-        </a>
-      {/if}
-    </div>
-  </div>
-
-    </header>
+    <DashboardMainHeader {organization} {loading} />
 
     <!-- Debug Info -->
     {#if loading}
@@ -463,115 +533,85 @@
     {:else if error}
       <div class="error">{error}</div>
     {:else if !events.length}
-      <div class="no-events">No events found. Create your first event!</div>
+      <EmptyDashboard on:createEvent={() => showCreateModal = true} />
     {/if}
 
     <!-- Live Section -->
-    {#if organization} <!-- Always show live section if organization exists -->
-      <section class="live-section" style="border: 1px solid rgba(255, 255, 255, 0.15); padding: 1.5rem; margin-bottom: 2.5rem; box-shadow: 0 4px 24px 0 rgba(0,0,0,0.12); position: relative; background: #181828; border-radius: 1.5rem; max-width: 1100px; margin: 0 auto 2.5rem auto;">
-        {#if liveEvents.length > 0}
-          <!-- Removed debug paragraph -->
-        {:else}
-          <p style="margin: 0 0 1.5rem 0; font-family: 'Inter', sans-serif; color: rgba(255, 255, 255, 0.8);">Add events to make them live on your leaderboard.</p>
-        {/if}
-        <div class="live-event-grid">
-          <!-- Main Leaderboard Card -->
-          <div class="main-leaderboard-card">
-            <div class="card-header">
-              <span class="live-indicator"><span class="flashing-circle"></span> Live</span>
-              <h3 class="card-title main-leaderboard-card-title">
-                <Tv size="20" style="margin-right: 0.5rem;" />
-                Main Leaderboard
-              </h3>
-            </div>
-
-            <div class="card-section url-section">
-              <label for="leaderboard-url" style="font-family: 'Inter', sans-serif;">URL</label>
-              <div class="url-input-container">
-                <input
-                  id="leaderboard-url"
-                  type="text"
-                  value={`https://ldrboard.co/${organization?.slug || ''}/${organization?.org_leaderboard_codes?.[0] || ''}`}
-                  readonly
-                  aria-label="Main Leaderboard URL"
-                  style="font-family: 'Inter', sans-serif;"
-                />
-                <button class="copy-button" aria-label="Copy URL">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    class="lucide lucide-copy"
-                  >
-                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
-                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            <div class="card-section settings-section">
-              <label for="transition-time" style="font-family: 'Inter', sans-serif;">Settings</label>
-              <div class="transition-time-dropdown">
-                <label for="transition-time" style="font-family: 'Inter', sans-serif;">Transition Time</label>
-                <select id="transition-time" style="font-family: 'Inter', sans-serif;">
-                  <option value="3">3 seconds</option>
-                  <option value="5">5 seconds</option>
-                  <option value="10">10 seconds</option>
-                  <option value="15">15 seconds</option>
-                  <option value="20">20 seconds</option>
-                </select>
-                <span class="dropdown-arrow">▼</span>
-              </div>
-            </div>
-          </div>
-
-          {#each liveEvents as event}
-            <EventCard 
-              {event} 
-              {organization} 
-              scoreCount={scoreCounts[event.id] || 0}
-              playerCount={playerCounts[event.id] || 0}
-              on:openQrModal={(e: CustomEvent<Event>) => openQrModal(e.detail)}
-            />
-          {/each}
-        </div>
+    {#if organization && events.length > 0}
+      <section class="live-section">
+        <MainLeaderboardCard 
+          organizationSlug={organization.slug} 
+          orgLeaderboardCodes={
+            Array.isArray(organization.org_leaderboard_codes) && 
+            organization.org_leaderboard_codes.every(code => 
+              typeof code === 'object' && code !== null && 'code' in code && typeof code.code === 'string'
+            ) 
+              ? organization.org_leaderboard_codes as { code: string }[] 
+              : []
+          }
+          {events}
+          {scoreCounts}
+        />
       </section>
     {/if}
 
-    <!-- Events Grid -->
-    {#if !scoreCountsLoaded}
+    <!-- Active Events Grid -->
+    {#if !scoreCountsLoaded && events.length > 0}
       <div class="event-grid-loading">
         <LoadingSpinner />
       </div>
-    {:else}
+    {:else if activeEvents.length > 0}
       <div class="event-grid">
-        {#each nonLiveEvents as event}
+        {#each activeEvents.filter(e => !e.settings_json?.archived) as event}
           <EventCard 
             {event} 
-            {organization} 
             scoreCount={scoreCounts[event.id] || 0}
             playerCount={playerCounts[event.id] || 0}
-            on:openQrModal={(e: CustomEvent<Event>) => openQrModal(e.detail)}
+            organization={organization}
+            on:openQrModal={(e) => {
+              selectedEvent = e.detail;
+              showQrModal = true;
+            }}
           />
         {/each}
-        
-        <!-- Add Event card -->
-        <div class="event-card {showCreateModal ? 'add-card-active' : 'add-card'}" role="region" aria-label="Add new event">
-          <AddEventModal 
-            {organization}
-            {showCreateModal}
-            on:open={() => showCreateModal = true}
-            on:close={() => showCreateModal = false}
-          />
-        </div>
+        <button 
+          class="add-round-card"
+          on:click={openNewRoundModal}
+          on:keydown={(e) => e.key === 'Enter' && openNewRoundModal()}
+          aria-label="Add new round"
+        >
+          <div class="add-round-content">
+            <Plus size={48} />
+            <span>Add Round</span>
+          </div>
+        </button>
       </div>
+    {/if}
+
+    <ArchivedEventsSection 
+      events={archivedEvents}
+      on:eventDeleted={({ detail }) => {
+        events = events.filter(e => e.id !== detail.eventId);
+      }}
+    />
+
+    <!-- Add Event Modal -->
+    {#if showCreateModal && organization}
+      <NewRoundModal 
+        bind:showModal={showCreateModal} 
+        {organization}
+        on:close={closeNewRoundModal}
+        on:eventCreated={async (event) => {
+          console.log('📣 [dashboard] Received eventCreated event:', event.detail);
+          // First add the new event to the local array to ensure immediate UI update
+          if (event.detail && event.detail.event) {
+            console.log('➕ [dashboard] Adding new event to local state:', event.detail.event.title);
+            events = [event.detail.event, ...events];
+          }
+          // Then refresh all events from the server
+          await refreshEvents();
+        }}
+      />
     {/if}
 
     <footer class="dashboard-footer">
@@ -579,40 +619,33 @@
     </footer>
   </div>
 
-
-  
-  {#if showQrModal && selectedEvent}
+  <!-- QR Code Modal -->
+  {#if showQrModal && selectedEvent && organization}
     <QRCodeModal
-      organization={organization?.slug || 'org'}
-      shortCode={selectedEvent.short_code || ''}
-      accessUuid={selectedEvent.access_uuid || ''}
-      onClose={closeQrModal}
+      organization={organization.slug}
+      shortCode={selectedEvent.short_code}
+      accessUuid={selectedEvent.access_uuid}
+      onClose={() => {
+        showQrModal = false;
+        selectedEvent = null;
+      }}
     />
   {/if}
 </div>
 
 <style>
-  /* Styles for the add-card-button have been moved to the AddEventModal component */
-  .dashboard-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem 0;
-    margin-bottom: 2rem;
-    font-family: 'Inter', sans-serif; /* Apply Inter font */
+  :global(body) {
+    margin: 0;
+    padding: 0;
   }
 
-  .dashboard-title {
-    display: flex;
-    align-items: center;
-    min-height: 40px;
+  .dashboard-wrapper {
+    min-height: 100vh;
+    background: #0f0f1a;
   }
 
-  .org-logo {
-    height: 40px;
-    width: auto;
-    object-fit: contain;
-    display: block;
+  .dashboard-main {
+    padding: 2rem;
   }
 
   .live-section {
@@ -622,193 +655,95 @@
     margin-bottom: 2.5rem;
     box-shadow: 0 4px 24px 0 rgba(0,0,0,0.12);
     position: relative;
-    border: 1px solid rgba(255, 255, 255, 0.15); /* Subtle border */
-    max-width: 1200px; /* Limit the maximum width */
-    margin: 0 auto 2.5rem auto; /* Center the section and add bottom margin */
-  }
-  .live-section-label {
-    position: absolute;
-    top: 1rem;
-    left: 1.5rem;
-    color: #fff;
-    font-size: 1.1rem;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    opacity: 0.85;
-    z-index: 2;
-    font-family: 'Inter', sans-serif; /* Apply Inter font */
-  }
-  .live-event-grid {
-    display: flex;
-    gap: 1.5rem;
-    margin-top: 1.5rem;
-    flex-wrap: wrap;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    max-width: 1200px;
+    margin: 0 auto 2.5rem auto;
   }
 
-  /* Styles for the Main Leaderboard Card */
-  .main-leaderboard-card {
-    background-color: #181828; /* Dark background */
-    border-radius: 1.5rem; /* Rounded corners */
+  .event-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 2rem;
+    padding: 1rem 0;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .event-grid-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+  }
+
+  .loading, .error {
+    text-align: center;
+    padding: 2rem;
+    color: white;
+  }
+
+  .error {
+    color: #ff6b6b;
+  }
+
+  .dashboard-footer {
+    text-align: center;
     padding: 1.5rem;
-    color: #fff; /* White text - fallback */
-    font-family: 'Inter', sans-serif; /* Inter font - fallback */
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    min-width: 300px;
-    max-width: 350px;
+    color: #666;
+    font-size: 0.875rem;
+    margin-top: 2rem;
+  }
+
+  .add-round-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1.5rem;
+    padding: 2rem;
     width: 100%;
-    border: 1px solid rgba(255, 255, 255, 0.15); /* Subtle border */
-  }
-
-  .main-leaderboard-card .card-header {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-    justify-content: center; /* Center header content */
-  }
-
-  .main-leaderboard-card .live-indicator {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
-
-  .main-leaderboard-card .main-leaderboard-card-title { /* Updated selector */
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin: 0;
-    display: flex;
-    align-items: center; /* Vertically align icon and text */
-    color: #fff; /* Ensure text color is white */
-    font-family: 'Inter', sans-serif; /* Ensure Inter font is applied */
-    text-align: center; /* Center text within the title element */
-    justify-content: center; /* Center flex items (icon and text) */
-    width: 100%; /* Allow title to take full width for centering */
-  }
-
-  .main-leaderboard-card .card-section {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .main-leaderboard-card .card-section label {
-    font-size: 0.8rem;
-    color: rgba(255, 255, 255, 0.7);
-    margin-bottom: 0.5rem;
-    font-family: 'Inter', sans-serif; /* Apply Inter font */
-  }
-
-  .main-leaderboard-card .url-input-container {
-    display: flex;
-    background-color: rgba(255, 255, 255, 0.08); /* Slightly lighter input background */
-    border-radius: 0.5rem;
-    overflow: hidden;
-  }
-
-  .main-leaderboard-card .url-input-container input[type="text"] {
-    flex-grow: 1;
-    background: none;
-    border: none;
-    padding: 0.75rem 1rem;
-    color: #fff;
-    font-size: 1rem;
-    font-family: 'Inter', sans-serif; /* Apply Inter font */
-    outline: none;
-  }
-
-  .main-leaderboard-card .copy-button {
-    background: none;
-    border: none;
-    padding: 0.75rem 1rem;
+    height: 100%;
+    min-height: 280px;
     cursor: pointer;
-    color: rgba(255, 255, 255, 0.7); /* Icon color */
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: color 0.2s ease-in-out;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
 
-  .main-leaderboard-card .copy-button:hover {
-    color: #fff;
+  .add-round-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
   }
 
-  .main-leaderboard-card .transition-time-dropdown {
-    position: relative;
-    display: inline-block;
-    width: 100%;
+  .add-round-card:active {
+    transform: translateY(-2px);
   }
 
-  .main-leaderboard-card .transition-time-dropdown label {
-      /* Hide this label visually if the section label is sufficient */
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      border: 0;
+  .add-round-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    color: rgba(255, 255, 255, 0.9);
   }
 
-  .main-leaderboard-card .transition-time-dropdown select {
-    width: 100%;
-    padding: 0.75rem 2.5rem 0.75rem 1rem; /* Adjust padding for arrow */
-    background-color: rgba(255, 255, 255, 0.08); /* Slightly lighter dropdown background */
-    border: none;
-    border-radius: 0.5rem;
-    color: #fff;
-    font-size: 1rem;
-    font-family: 'Inter', sans-serif; /* Apply Inter font */
-    -webkit-appearance: none; /* Remove default arrow */
-    -moz-appearance: none; /* Remove default arrow */
-    appearance: none; /* Remove default arrow */
-    cursor: pointer;
-    outline: none;
+  .add-round-content span {
+    font-size: 1.25rem;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
   }
 
-  .main-leaderboard-card .dropdown-arrow {
-    position: absolute;
-    top: 50%;
-    right: 1rem;
-    transform: translateY(-50%);
-    color: rgba(255, 255, 255, 0.7); /* Arrow color */
-    pointer-events: none; /* Don't block clicks on the select */
+  .add-round-content :global(svg) {
+    color: rgba(255, 255, 255, 0.9);
+    transition: transform 0.3s ease;
   }
 
-  /* Styles for the Add Event card to match the others */
-  .event-grid .event-card {
-    max-width: 350px; /* Apply the same max-width as other cards */
-    width: 100%; /* Ensure it behaves correctly in flex layout */
-    /* Inherits other styles from .event-card */
+  .add-round-card:hover :global(svg) {
+    transform: scale(1.1);
   }
 
-  /* Flashing red circle animation */
-  .flashing-circle {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    background-color: red;
-    border-radius: 50%;
-    animation: pulse 1.5s infinite ease-out;
-  }
 
-  @keyframes pulse {
-    0% {
-      transform: scale(0.8);
-      opacity: 1;
-    }
-    50% {
-      transform: scale(1.2);
-      opacity: 0.6;
-    }
-    100% {
-      transform: scale(0.8);
-      opacity: 1;
-    }
-  }
 </style>

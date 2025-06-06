@@ -4,6 +4,8 @@
   import { supabase } from '$lib/supabaseClient';
   import { browser } from '$app/environment';
   import QRCode from 'qrcode';
+  import '$lib/styles/theme.css';
+  import '$lib/styles/leaderboard.css';
   import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
   import TimeRangeBadge from '$lib/components/TimeRangeBadge.svelte';
   import { getTimeRangeLabel } from '$lib/utils/timeFilters';

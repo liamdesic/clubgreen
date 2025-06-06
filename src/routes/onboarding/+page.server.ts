@@ -4,6 +4,7 @@ import type { PageServerLoad, Actions } from './$types';
 import { stripe } from '$lib/server/stripe/client';
 import { STRIPE_PRICE_ID } from '$env/static/private';
 import type Stripe from 'stripe';
+import { generateUniqueOrgLeaderboardCode } from '$lib/utils/codeUtils';
 
 // Define organization settings type
 type OrganizationSettings = {
@@ -145,6 +146,9 @@ export const actions: Actions = {
         });
       }
       
+      // Generate a unique org leaderboard code
+      const orgLeaderboardCode = await generateUniqueOrgLeaderboardCode();
+      
       // Create organization in Supabase
       const { data: orgData, error: orgError } = await locals.supabase
         .from('organizations')
@@ -156,6 +160,7 @@ export const actions: Actions = {
             settings_json: {
               logo_url: validData.logoUrl || null
             },
+            org_leaderboard_codes: [{ code: orgLeaderboardCode }],
             payment_up_to_date: false
           }
         ])

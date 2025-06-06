@@ -6,8 +6,7 @@
   import { page } from '$app/stores';
   import TransitionOverlay from '$lib/components/TransitionOverlay.svelte';
   import LeaderboardManager from '$lib/components/LeaderboardManager.svelte';
-  import '$lib/styles/theme.css';
-  import '$lib/styles/leaderboard.css';
+
 
   // Page state management
   type LoadState = 'loading' | 'transition' | 'ready' | 'error';
@@ -61,6 +60,9 @@
       if (browser) {
         document.documentElement.style.setProperty('--accent-color', accentColor);
         console.log(`[Org Leaderboard] Set accent color to ${accentColor}`);
+        
+        // We'll load CSS directly in the component instead of dynamically
+        // This ensures the styles are properly bundled with the component
       }
       
       // Brief delay before showing transition
@@ -126,14 +128,9 @@
     // Set up periodic cleanup
     setupPeriodicCleanup();
     
-    // Log CSS loading for debugging
+    // CSS is now loaded in EventLeaderboardView component
     if (browser) {
-      console.log('[CSS Debug] Checking loaded stylesheets:');
-      const cssFiles = Array.from(document.styleSheets).map(sheet => sheet.href);
-      cssFiles.forEach(href => console.log(href));
-      
-      const leaderboardCssLoaded = cssFiles.some(href => href && href.includes('leaderboard.css'));
-      console.log(`[CSS Debug] Leaderboard CSS loaded: ${leaderboardCssLoaded}`);
+      console.log('[CSS Debug] CSS loading delegated to EventLeaderboardView');
     }
     
     // Cleanup on unmount
@@ -160,26 +157,28 @@
     <!-- Always render both components, control visibility with CSS -->
     {#if organizationId && organizationSlug}
       <!-- LeaderboardManager loads in the background while transition is visible -->
-      <div class="leaderboard-container" class:visible={state === 'ready'} bind:this={leaderboardManagerRef}>
-        <LeaderboardManager
-          organizationId={organizationId}
-          organizationSlug={organizationSlug}
-          organizationSettings={organizationSettings}
-          rotationInterval={15000}
-          showControls={false}
-          on:ready={handleLeaderboardReady}
-        />
-      </div>
-      
-      <!-- TransitionOverlay is positioned above the LeaderboardManager -->
-      <div class="transition-container" class:hidden={state === 'ready'}>
-        <TransitionOverlay
-          active={state === 'transition'}
-          logoUrl={logoUrl}
-          duration={800}
-          accentColor={accentColor}
-          on:complete={() => state = 'ready'}
-        />
+      <div class="page-container" style="background-color: black;">
+        <div class="leaderboard-container" class:visible={state === 'ready'} bind:this={leaderboardManagerRef}>
+          <LeaderboardManager
+            organizationId={organizationId}
+            organizationSlug={organizationSlug}
+            organizationSettings={organizationSettings}
+            rotationInterval={15000}
+            showControls={false}
+            on:ready={handleLeaderboardReady}
+          />
+        </div>
+        
+        <!-- TransitionOverlay is positioned above the LeaderboardManager -->
+        <div class="transition-container" class:hidden={state === 'ready'}>
+          <TransitionOverlay
+            active={state === 'transition'}
+            logoUrl={logoUrl}
+            duration={800}
+            accentColor={accentColor}
+            on:complete={() => state = 'ready'}
+          />
+        </div>
       </div>
     {/if}
   {/if}

@@ -2,8 +2,7 @@
   import { createEventDispatcher, onMount } from 'svelte';
   import { fly, scale, slide } from 'svelte/transition';
   import { quintInOut, elasticOut, quintIn, quintOut } from 'svelte/easing';
-  import SlidingBarsBackground from './SlidingBarsBackground.svelte';
-  import '../styles/theme.css';
+
   
   export let accentColor = '#3498db'; // Default accent color
   export let logoUrl = ''; // Organization logo URL
@@ -194,6 +193,8 @@
     transform-origin: bottom center;
     z-index: 990;
     opacity: 1; /* Ensure full opacity */
+    will-change: transform; /* Optimize for animations */
+    transform: translateZ(0); /* Force GPU acceleration */
   }
   
   .wipe-bottom-first {
@@ -202,6 +203,8 @@
     height: 125%;
     background: var(--accent-gradient-light, var(--overlay-accent-color));
     bottom: -5px;
+    will-change: transform; /* Optimize for animations */
+    transform: translateZ(0); /* Force GPU acceleration */
   }
   
   .logo-container {
@@ -217,6 +220,8 @@
   .logo {
     max-width: 35vw;
     max-height: 35vh;
+    width: 350px; /* Add explicit width */
+    height: auto; /* Maintain aspect ratio */
     filter: drop-shadow(0 0 15px rgba(0, 0, 0, 0.6));
     object-fit: contain;
     will-change: transform; /* Improves animation performance */

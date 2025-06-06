@@ -12,7 +12,7 @@
   // Generate the correct URLs for the new routing system
   $: baseUrl = window.location.origin;
   $: leaderboardUrl = `${baseUrl}/${organization}/lb/${shortCode}`;
-  $: scorecardUrl = `${baseUrl}/${organization}/${shortCode}?access=${accessUuid}`;
+  $: scorecardUrl = `${baseUrl}/${organization}/${shortCode}?access=${accessUuid}&view=scorecard`;
   export let onClose;
   
   let leaderboardQrCode = '';

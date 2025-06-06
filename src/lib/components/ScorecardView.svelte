@@ -35,7 +35,7 @@
   };
   
   $: currentOrg = organization?.slug || '';
-  $: currentEvent = event?.slug || '';
+  $: currentEvent = event?.short_code || '';
   $: eventId = event?.id || '';
   $: orgId = organization?.id || '';
   $: eventName = event?.name || 'Scorecard';

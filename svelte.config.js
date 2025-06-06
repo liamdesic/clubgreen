@@ -10,6 +10,10 @@ const config = {
       // See https://github.com/sveltejs/kit/tree/master/packages/adapter-vercel#configuration
       // for more information
     })
+  },
+  // Move Vite config outside of kit
+  vitePlugin: {
+    // Add Vite plugin options here
   }
 };
 

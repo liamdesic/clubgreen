@@ -165,7 +165,7 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
 
   // Determine subscription status
   const now = Math.floor(Date.now() / 1000);
-  const trialHasEnded = subscription.trial_end ? subscription.trial_end <= now : true;
+  const trialHasEnded = subscription.trial_end ? subscription.trial_end <= now : false;
   
   // Get the latest invoice if available
   const latestInvoice = subscription.latest_invoice as ExpandedInvoice | undefined;

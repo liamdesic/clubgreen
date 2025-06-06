@@ -56,7 +56,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, #572b86, #1c1821);
+  background: #0f0f1a;
   color: white;
   box-sizing: border-box;
 }
@@ -137,12 +137,17 @@
 .event-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 0.5rem;
+  gap: 2rem;
+  padding: 1rem 0;
   max-width: 1200px;
-  width: 100%;
   margin: 0 auto;
-  padding: 0 1rem;
-  box-sizing: border-box;
+}
+
+.event-grid-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
 }
 
 /* ===== Event Cards ===== */
@@ -281,7 +286,6 @@
   }
 }
 
-
 /* ===== Footer ===== */
 .dashboard-footer {
   text-align: center;
@@ -301,9 +305,8 @@
 /* 📦 Main Content */
 .dashboard-main {
   flex: 1;
-  padding: 2rem;
-  box-sizing: border-box;
   overflow-y: auto;
+  padding: 2rem;
 }
 
 /* 🪄 Sidebar Panel */
@@ -491,4 +494,34 @@
   color: #ff6b6b;
   margin-top: 1rem;
   font-size: 0.9rem;
+}
+
+/* ===== Live Section ===== */
+.live-section {
+  background: rgba(0,0,0,0.12);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  margin-bottom: 2.5rem;
+  box-shadow: 0 4px 24px 0 rgba(0,0,0,0.12);
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  max-width: 1200px;
+  margin: 0 auto 2.5rem auto;
+}
+
+/* ===== Responsive Design ===== */
+@media (max-width: 768px) {
+  .dashboard-main {
+    padding: 1rem;
+  }
+
+  .event-grid {
+    gap: 1rem;
+    padding: 0.5rem;
+  }
+
+  .live-section {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+  }
 }

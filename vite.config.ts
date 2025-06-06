@@ -42,6 +42,25 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.PUBLIC_STRIPE_PUBLISHABLE_KEY': JSON.stringify(env.PUBLIC_STRIPE_PUBLISHABLE_KEY || ''),
       // App mode
       'import.meta.env.MODE': JSON.stringify(mode)
+    },
+    // Add optimizeDeps configuration for @svelte-plugins/datepicker
+    optimizeDeps: {
+      include: ['@svelte-plugins/datepicker']
+    },
+    // Add ssr configuration
+    ssr: {
+      noExternal: ['@svelte-plugins/datepicker']
+    },
+    // Optimize CSS loading
+    css: {
+      devSourcemap: true,
+      // Optimize CSS delivery
+      modules: {
+        // Use a more specific naming pattern for CSS modules
+        generateScopedName: mode === 'production'
+          ? '[hash:base64:8]'
+          : '[name]__[local]__[hash:base64:5]'
+      }
     }
   };
 });

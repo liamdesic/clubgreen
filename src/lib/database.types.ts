@@ -9,6 +9,38 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      event_logs: {
+        Row: {
+          context: Json | null
+          created_at: string | null
+          event_type: string
+          id: string
+          org_id: string | null
+        }
+        Insert: {
+          context?: Json | null
+          created_at?: string | null
+          event_type: string
+          id?: string
+          org_id?: string | null
+        }
+        Update: {
+          context?: Json | null
+          created_at?: string | null
+          event_type?: string
+          id?: string
+          org_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           access_uuid: string
@@ -19,7 +51,6 @@ export type Database = {
           published: boolean | null
           settings_json: Json | null
           short_code: string
-          slug: string
           title: string
         }
         Insert: {
@@ -31,7 +62,6 @@ export type Database = {
           published?: boolean | null
           settings_json?: Json | null
           short_code: string
-          slug: string
           title: string
         }
         Update: {
@@ -43,7 +73,6 @@ export type Database = {
           published?: boolean | null
           settings_json?: Json | null
           short_code?: string
-          slug?: string
           title?: string
         }
         Relationships: [

@@ -5,7 +5,9 @@
   --color-gray: #e6ecef;
   --color-accent-blue: #689ef9;
   --color-accent-purple: #6e4ef4;
+  --color-accent-dark-purple: #5135c4;
   --color-deep-purple: #572b86;
+  --color-accent-light-purple: #8975f9;
   --color-purple-dark: #281735;
   --color-purple-deepest: #1c1821;
   --color-soft-blue: #b3e8ff;
@@ -51,9 +53,10 @@
   /* 🧱 Layout & Spacing */
   --radius: 12px;
   --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  --transition: all 0.25s ease-in-out;
+  --transition: background-color 0.25s ease-in-out, color 0.25s ease-in-out, border-color 0.25s ease-in-out, transform 0.25s ease-in-out;
 
   /* 🧠 Typography System */
+}
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-header);
@@ -89,11 +92,23 @@ a {
   font-weight: 500;
   text-decoration: none;
   transition: color 0.2s ease;
+  cursor: pointer;
 }
 
 a:hover {
   color: var(--color-accent-purple);
 }
 
-
+/* Global cursor styles for interactive elements */
+button,
+[role="button"],
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+.clickable,
+[on\:click],
+[on\:keydown],
+[on\:mousedown],
+[on\:mouseup] {
+  cursor: pointer;
 }

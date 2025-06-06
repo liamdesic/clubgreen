@@ -12,6 +12,6 @@
     "moduleResolution": "bundler",
     "types": ["svelte"]
   },
-  "include": ["src/**/*.d.ts", "src/**/*.js", "src/**/*.ts", "src/**/*.svelte", "src/types/**/*.d.ts"],
+  "include": ["src/**/*.d.ts", "src/**/*.js", "src/**/*.ts", "src/**/*.svelte", "src/types/**/*.d.ts", "src/routes/[org]/[code]/+page.server.ts.backup", "src/routes/[org]/[code]/+page.svelte.backup"],
   "exclude": ["node_modules"]
 }

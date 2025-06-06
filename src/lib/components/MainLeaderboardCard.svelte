@@ -1,20 +1,70 @@
 <script lang="ts">
-  export let organizationSlug: string | null;
+  import { Link, Calendar, Pencil, QrCode, User, CloudUpload } from 'lucide-svelte';
+  import type { Database } from '$lib/database.types';
+  import { createEventDispatcher } from 'svelte';
+  import Tippy from 'tippy.js';
+  import '$lib/styles/tippy.css';
+  import { getEventStatus } from '$lib/utils/eventStatus';
+
+  type Event = Database['public']['Tables']['events']['Row'] & {
+    settings_json?: {
+      accent_color?: string;
+      score_time_range?: string;
+      hole_count?: number;
+      show_hole_in_ones?: boolean;
+      show_ads?: boolean;
+      ad_image_url?: string;
+      ad_link?: string;
+      show_leaderboard?: boolean;
+      show_scorecard?: boolean;
+      show_leaderboard_ads?: boolean;
+      ads_image_url?: string;
+    } | null;
+  };
+
+  // Props
+  export let organizationSlug: string;
+  export let orgLeaderboardCodes: { code: string }[] = [];
+  export let events: Event[] = [];
+  export let scoreCounts: Record<string, number> = {};
+
+  const dispatch = createEventDispatcher();
 
   // Placeholder for transition time value
-  let transitionTime = '5 seconds'; // Example value
+  let transitionTime = '10s'; // Default value
 
-  // Example options for the dropdown
   const transitionOptions = [
-    '3 seconds',
-    '5 seconds',
-    '10 seconds',
-    '15 seconds',
-    '20 seconds'
+    { value: '5s', label: '5 seconds' },
+    { value: '10s', label: '10 seconds' },
+    { value: '15s', label: '15 seconds' },
+    { value: '30s', label: '30 seconds' },
+    { value: '60s', label: '1 minute' }
   ];
 
   // Construct the example URL
-  $: leaderboardUrl = organizationSlug ? `https://ldrboard.com/leaderboard/${organizationSlug}` : '';
+  $: leaderboardUrl = organizationSlug && orgLeaderboardCodes?.length > 0 
+    ? `https://www.ldrboard.co/${organizationSlug}/ob/${orgLeaderboardCodes[0].code}` 
+    : '';
+
+  // Check if any events are live
+  $: hasLiveEvents = events.some(event => {
+    const status = getEventStatus(event, scoreCounts[event.id] || 0);
+    return status.isLive;
+  });
+
+  // Initialize Tippy tooltip
+  let statusElement: HTMLElement;
+  $: if (statusElement) {
+    Tippy(statusElement, {
+      content: !hasLiveEvents ? 
+        "To make an event go live:<br>1. Create an event<br>2. Add players and scores<br>3. The event will automatically appear in the main leaderboard when it has scores" : 
+        undefined,
+      allowHTML: true,
+      placement: 'top',
+      theme: 'glass',
+      arrow: true
+    });
+  }
 
   async function copyUrl() {
     if (leaderboardUrl) {
@@ -31,11 +81,14 @@
 
 <div class="main-leaderboard-card">
   <div class="card-header">
-    <span class="live-indicator">🔴 Live</span>
+    <div class="event-status {!hasLiveEvents ? 'waiting' : ''}" bind:this={statusElement}>
+      <div class="status-dot {hasLiveEvents ? 'flashing' : ''}"></div>
+      {hasLiveEvents ? 'Live' : 'Waiting for live leaderboards'}
+    </div>
     <h3 class="card-title">Main Leaderboard</h3>
   </div>
 
-  <div class="card-section url-section">
+  <div class="card-section">
     <label for="leaderboard-url">URL</label>
     <div class="url-input-container">
       <input
@@ -65,49 +118,103 @@
     </div>
   </div>
 
-  <div class="card-section settings-section">
-    <label for="transition-time">Settings</label>
-    <div class="transition-time-dropdown">
-      <label for="transition-time">Transition Time</label>
-      <select id="transition-time" bind:value={transitionTime}>
-        {#each transitionOptions as option}
-          <option value={option}>{option}</option>
-        {/each}
-      </select>
-      <span class="dropdown-arrow">▼</span>
-    </div>
+  <div class="card-section">
+    <label for="transition-time">Interval Time</label>
+    <p class="setting-description">How long to display each leaderboard before rotating to the next one</p>
+    <select id="transition-time" bind:value={transitionTime}>
+      {#each transitionOptions as option}
+        <option value={option.value}>{option.label}</option>
+      {/each}
+    </select>
   </div>
 </div>
 
 <style>
   .main-leaderboard-card {
-    background-color: #181828; /* Dark background */
-    border-radius: 1.5rem; /* Rounded corners */
+    background-color: #181828;
+    border-radius: 1.5rem;
     padding: 1.5rem;
-    color: #fff; /* White text */
-    font-family: 'Inter', sans-serif; /* Inter font */
+    color: #fff;
+    font-family: 'Inter', sans-serif;
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    min-width: 300px; /* Ensure it has a reasonable minimum width */
+    min-width: 300px;
+    max-width: 350px;
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.15);
   }
 
   .card-header {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
   }
 
-  .live-indicator {
+  .event-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     font-size: 0.9rem;
     font-weight: 600;
-    color: red; /* Red dot */
+    color: #ff4444;
+    font-family: 'Inter', sans-serif;
+    cursor: help;
+  }
+
+  .event-status.waiting {
+    color: #fff;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #ff4444;
+    display: inline-block;
+    animation: pulse 2s infinite;
+  }
+
+  .event-status.waiting .status-dot {
+    background-color: #9c27b0;
+    animation: none;
+  }
+
+  .status-dot.flashing {
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0% {
+      transform: scale(0.95);
+      box-shadow: 0 0 0 0 rgba(255, 68, 68, 0.7);
+    }
+    
+    70% {
+      transform: scale(1);
+      box-shadow: 0 0 0 6px rgba(255, 68, 68, 0);
+    }
+    
+    100% {
+      transform: scale(0.95);
+      box-shadow: 0 0 0 0 rgba(255, 68, 68, 0);
+    }
   }
 
   .card-title {
     font-size: 1.5rem;
     font-weight: 700;
     margin: 0;
+    display: flex;
+    align-items: flex-start;
+    color: #fff;
+    font-family: 'Obviously', sans-serif;
+    text-align: left;
+    justify-content: center;
+    width: 100%;
+    letter-spacing: 0.5px;
   }
 
   .card-section {
@@ -116,14 +223,21 @@
   }
 
   .card-section label {
-    font-size: 0.8rem;
-    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
     margin-bottom: 0.5rem;
+  }
+
+  .setting-description {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.5);
+    margin: 0 0 0.5rem 0;
   }
 
   .url-input-container {
     display: flex;
-    background-color: rgba(255, 255, 255, 0.08); /* Slightly lighter input background */
+    background-color: rgba(255, 255, 255, 0.08);
     border-radius: 0.5rem;
     overflow: hidden;
   }
@@ -144,7 +258,7 @@
     border: none;
     padding: 0.75rem 1rem;
     cursor: pointer;
-    color: rgba(255, 255, 255, 0.7); /* Icon color */
+    color: rgba(255, 255, 255, 0.7);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -155,46 +269,21 @@
     color: #fff;
   }
 
-  .transition-time-dropdown {
-    position: relative;
-    display: inline-block;
+  select {
     width: 100%;
-  }
-
-  .transition-time-dropdown label {
-      /* Hide this label visually if the section label is sufficient */
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      border: 0;
-  }
-
-  .transition-time-dropdown select {
-    width: 100%;
-    padding: 0.75rem 2.5rem 0.75rem 1rem; /* Adjust padding for arrow */
-    background-color: rgba(255, 255, 255, 0.08); /* Slightly lighter dropdown background */
+    padding: 0.75rem 1rem;
+    background-color: rgba(255, 255, 255, 0.08);
     border: none;
     border-radius: 0.5rem;
     color: #fff;
     font-size: 1rem;
     font-family: 'Inter', sans-serif;
-    -webkit-appearance: none; /* Remove default arrow */
-    -moz-appearance: none; /* Remove default arrow */
-    appearance: none; /* Remove default arrow */
     cursor: pointer;
     outline: none;
   }
 
-  .dropdown-arrow {
-    position: absolute;
-    top: 50%;
-    right: 1rem;
-    transform: translateY(-50%);
-    color: rgba(255, 255, 255, 0.7); /* Arrow color */
-    pointer-events: none; /* Don't block clicks on the select */
+  select option {
+    background-color: #181828;
+    color: #fff;
   }
 </style> 

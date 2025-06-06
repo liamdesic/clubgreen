@@ -69,11 +69,10 @@
 
       // Validate event title
       if (!newTitle.trim()) {
-        const errorMsg = 'Please enter an event title';
+        const errorMsg = 'Please enter a title';
         console.error('❌ [createEvent] Validation error:', errorMsg);
         createError = errorMsg;
         creating = false;
-        logStep(`Validation failed: ${errorMsg}`);
         return;
       }
       
@@ -82,49 +81,30 @@
         console.error('❌ [createEvent] Validation error:', errorMsg);
         createError = errorMsg;
         creating = false;
-        logStep(`Validation failed: ${errorMsg}`);
-        return;
-      }
-
-      // Generate a slug from the title
-      const slug = newTitle
-        .toLowerCase()
-        .replace(/[^\w\s-]/g, '')  // Remove special chars except spaces and hyphens
-        .replace(/\s+/g, '-')      // Replace spaces with hyphens
-        .replace(/-+/g, '-')       // Replace multiple hyphens with single hyphen
-        .trim();
-      
-      if (!slug) {
-        const errorMsg = 'Unable to generate a valid URL for this event title. Please use a different title.';
-        console.error('❌ [createEvent] Validation error:', errorMsg);
-        createError = errorMsg;
-        creating = false;
-        logStep(`Validation failed: ${errorMsg}`);
         return;
       }
 
       // Prepare event date
       let event_date = null;
       if (eventType === 'single' && newDate) {
+        // Ensure we're sending a proper ISO string to Supabase
         event_date = new Date(newDate).toISOString();
       }
 
-      // Generate short code and access UUID for the new event
-      logStep('Generating short code and access UUID...');
-      const shortCodeStart = Date.now();
+      // Generate short code and access UUID
       const [short_code, access_uuid] = await Promise.all([
         generateUniqueShortCode(),
         generateUniqueAccessUUID()
       ]);
-      logStep(`Code generation completed in ${Date.now() - shortCodeStart}ms`);
       
       // Prepare event data
       const eventData = { 
         title: newTitle, 
-        slug, 
         event_date, 
         organization_id: organization.id,
-        settings_json: {},
+        settings_json: {
+          hole_count: holeCount
+        },
         created_at: new Date().toISOString(),
         published: false,
         short_code,
@@ -260,7 +240,15 @@
   </button>
 {:else}
   <div class="add-event-form">
-    <h3>Create New Event</h3>
+    <div class="modal-header">
+      <h3>Add New Event</h3>
+      <button class="close-button" on:click={closeModal} aria-label="Close modal">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
     <div class="form-group">
       <label for="event-title">Event Name</label>
       <input 
@@ -344,25 +332,129 @@
   }
 
   .add-event-form {
-    padding: 1rem;
+    padding: 1.5rem;
+    width: 100%;
+    box-sizing: border-box;
+    max-width: 100%;
+  }
+
+  .add-event-form h3 {
+    margin-bottom: 1.5rem;
+    width: 100%;
+    color: white;
+    font-family: 'Inter', sans-serif;
+    box-sizing: border-box;
   }
 
   .form-group {
     margin-bottom: 1rem;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .form-group label {
     display: block;
     margin-bottom: 0.5rem;
     font-weight: 500;
+    width: 100%;
+    color: rgba(255, 255, 255, 0.9);
+    box-sizing: border-box;
   }
 
   .form-group input[type="text"],
   .form-group input[type="date"] {
     width: 100%;
-    padding: 0.5rem;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    padding: 0.75rem 1rem;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.75rem;
+    color: white;
+    font-size: 1rem;
+    font-family: 'Inter', sans-serif;
+    backdrop-filter: blur(10px);
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+  }
+
+  .form-group input[type="text"]:focus,
+  .form-group input[type="date"]:focus {
+    outline: none;
+    border-color: var(--color-accent-purple);
+    box-shadow: 0 0 0 2px rgba(110, 78, 244, 0.2);
+  }
+
+  .form-group input[type="text"]::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .form-group input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.7;
+  }
+
+  .form-group input[type="date"]::-webkit-datetime-edit {
+    color: white;
+  }
+
+  .form-group input[type="date"]::-webkit-datetime-edit-fields-wrapper {
+    color: white;
+  }
+
+  .form-group label[for] {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    color: rgba(255, 255, 255, 0.9);
+    box-sizing: border-box;
+  }
+
+  .form-group input[type="radio"] {
+    appearance: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s ease;
+  }
+
+  .form-group input[type="radio"]:checked {
+    border-color: var(--color-accent-purple);
+    background: var(--color-accent-purple);
+  }
+
+  .form-group input[type="radio"]:checked::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 0.5rem;
+    height: 0.5rem;
+    background: white;
+    border-radius: 50%;
+  }
+
+  .form-group input[type="radio"]:hover {
+    border-color: var(--color-accent-purple);
+    background: rgba(110, 78, 244, 0.1);
+  }
+
+  .form-group input[type="radio"]:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(110, 78, 244, 0.3);
+  }
+
+  .form-group label:not([for]) {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    color: rgba(255, 255, 255, 0.9);
+    box-sizing: border-box;
   }
 
   .form-actions {
@@ -370,29 +462,52 @@
     justify-content: flex-end;
     gap: 0.5rem;
     margin-top: 1rem;
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .cancel-button,
   .save-button {
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.75rem;
     font-weight: 500;
     cursor: pointer;
+    min-width: 100px;
+    box-sizing: border-box;
+    font-family: 'Inter', sans-serif;
   }
 
   .cancel-button {
     background-color: transparent;
-    border: 1px solid #ddd;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
   }
 
   .save-button {
-    background-color: var(--accent-color, #4f46e5);
+    background: var(--color-accent-purple);
     color: white;
     border: none;
+    border-radius: 0.75rem;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    cursor: pointer;
+    min-width: 100px;
+    box-sizing: border-box;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.2s ease;
+  }
+
+  .save-button:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--color-accent-purple) 80%, white);
+    transform: translateY(-1px);
+  }
+
+  .save-button:active:not(:disabled) {
+    transform: translateY(0);
   }
 
   .save-button:disabled {
-    background-color: #ccc;
+    opacity: 0.6;
     cursor: not-allowed;
   }
 
@@ -400,5 +515,38 @@
     color: #e53e3e;
     margin-top: 0.5rem;
     font-size: 0.875rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    width: 100%;
+  }
+
+  .close-button {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .close-button:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .close-button svg {
+    width: 1.5rem;
+    height: 1.5rem;
   }
 </style>

@@ -53,5 +53,45 @@ const authGuard: Handle = async ({ event, resolve }) => {
   return resolve(event);
 };
 
+// Performance optimization handler
+const performanceHandler: Handle = async ({ event, resolve }) => {
+  const response = await resolve(event);
+  
+  // Add performance headers for all responses
+  response.headers.set('Cache-Control', 'public, max-age=300'); // 5 minutes cache
+  
+  // Special handling for leaderboard pages
+  if (event.url.pathname.includes('/ob/')) {
+    // Add preload headers for critical resources
+    const linkHeaders = [
+      // Critical CSS for black background - must be first
+      '</leaderboard-preload.css>; rel="preload"; as="style"; fetchpriority="high"',
+      
+      // Preconnect to external domains
+      '<https://cdnjs.cloudflare.com>; rel="preconnect"; crossorigin',
+      '<https://use.typekit.net>; rel="preconnect"; crossorigin',
+      '<https://p.typekit.net>; rel="preconnect"; crossorigin',
+      
+      // DNS prefetch for performance
+      '<https://cdnjs.cloudflare.com>; rel="dns-prefetch"',
+      '<https://use.typekit.net>; rel="dns-prefetch"',
+      '<https://p.typekit.net>; rel="dns-prefetch"',
+      
+      // Preload critical fonts to avoid FOIT (Flash of Invisible Text)
+      '<https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/webfonts/fa-solid-900.woff2>; rel="preload"; as="font"; type="font/woff2"; crossorigin',
+      
+      // Preload our stylesheet - these are already imported in the component
+      '</fontawesome-subset.css>; rel="preload"; as="style"'
+    ];
+    
+    response.headers.set('Link', linkHeaders.join(', '));
+    
+    // Set font-display optimization
+    response.headers.set('Font-Display', 'swap');
+  }
+  
+  return response;
+};
+
 // Combine handlers using sequence
-export const handle: Handle = sequence(supabaseHandler, authGuard);
+export const handle: Handle = sequence(supabaseHandler, authGuard, performanceHandler);

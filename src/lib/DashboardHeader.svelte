@@ -2,7 +2,6 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import '$lib/styles/theme.css';
-  import '$lib/styles/dashboard.css';
   import ChevronRight from 'lucide-svelte/icons/chevron-right';
   import { getTimeRangeLabel } from '$lib/utils/timeFilters';
   import type { ScoreTimeRange } from '$lib/utils/timeFilters';

@@ -1,112 +1,183 @@
 <script lang="ts">
-  import { Link, Calendar, Pencil, QrCode, User, CloudUpload } from 'lucide-svelte';
-  import type { Event, Organization } from '$lib/types/database';
   import { createEventDispatcher } from 'svelte';
+  import type { Event, Organization } from '$lib/types';
+  import { QrCode, User, Trophy } from 'lucide-svelte/icons';
+  import EventManagement from './EventManagement.svelte';
+  import { getEventStatus } from '$lib/utils/eventStatus';
 
   // Props
   export let event: Event;
-  export let organization: Organization | null = null;
-  export let scoreCount: number = 0;
-  export let playerCount: number = 0;
+  export let organization: Organization;
+  export let scoreCount = 0;
+  export let playerCount = 0;
 
   const dispatch = createEventDispatcher();
 
-  function openQrModal() {
+  // Get event status
+  $: eventStatus = getEventStatus(event, scoreCount);
+
+  function handleQrClick() {
     dispatch('openQrModal', event);
   }
 
-  // Format date helper
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', { 
-      day: 'numeric', 
-      month: 'short', 
-      year: 'numeric' 
+  function handleEdit(e: CustomEvent<{ event: Event }>) {
+    console.log('🎯 [EventCard] Handling edit event:', {
+      id: e.detail.event.id,
+      title: e.detail.event.title,
+      short_code: e.detail.event.short_code
     });
-  };
+    dispatch('edit', e.detail.event);
+  }
 
-  // Get event status
-  $: eventStatus = (() => {
-    const today = new Date().toISOString().split('T')[0];
-    const eventDate = event.event_date;
-    
-    // If no event date, it's an ongoing event
-    if (!eventDate) {
-      return scoreCount > 0 
-        ? { text: 'Live', color: '#E53935', isLive: true } // Red
-        : { text: 'Waiting for Scores', color: '#9E9E9E' }; // Grey
-    }
-    
-    const isToday = eventDate === today;
-    const isFuture = new Date(eventDate) > new Date(today);
-    
-    if (isFuture) {
-      return { text: 'Upcoming', color: '#2196F3' }; // Blue
-    } else if (isToday) {
-      return scoreCount > 0
-        ? { text: 'Live', color: '#E53935', isLive: true } // Red
-        : { text: 'Waiting for Scores', color: '#9E9E9E' }; // Grey
-    } else {
-      return { text: 'Archived', color: '#757575' }; // Dark Grey
-    }
-  })();
+  function handleArchived() {
+    dispatch('archived', { eventId: event.id });
+  }
+
+  function handleDeleted() {
+    dispatch('deleted', { eventId: event.id });
+  }
 </script>
 
 <div class="event-card">
-  <div class="event-status" style="--status-color: {eventStatus.color}">
-    <div class="status-dot {eventStatus.isLive ? 'flashing' : ''}"></div>
-    {eventStatus.text}
+  <div class="event-header">
+    <div class="title-section">
+      <h3>{event.title}</h3>
+      <div class="event-status" style="--status-color: {eventStatus.color}">
+        <div class="status-dot {eventStatus.isLive ? 'flashing' : ''}"></div>
+        {eventStatus.label}
+      </div>
+    </div>
+    <EventManagement 
+      {organization}
+      {event}
+      on:edit={handleEdit}
+      on:archived={handleArchived}
+      on:deleted={handleDeleted}
+    />
   </div>
-  <h2 class="event-title">{event.title}</h2>
-  <div class="event-shortcode"><code>/{event.short_code}</code></div>
+
   <div class="event-stats">
     <div class="stat">
-      <Calendar size={14} />
-      <span>{event.event_date ? formatDate(event.event_date) : 'Ongoing'}</span>
+      <Trophy size={20} />
+      <span>{scoreCount} scores</span>
     </div>
     <div class="stat">
-      <User size={14} />
-      <span>{playerCount} {playerCount === 1 ? 'Player' : 'Players'}</span>
+      <User size={20} />
+      <span>{playerCount} players</span>
     </div>
   </div>
-  <div class="event-buttons">
-    <a class="edit-button" href={`/dashboard/${event.slug}/setup`}>
-      <Pencil size="16" /> Edit
-    </a>
-    <button class="qr-button" on:click={openQrModal}>
-      <QrCode size="16" /> Get Links
+
+  <div class="event-actions">
+    <button 
+      class="qr-button"
+      on:click={handleQrClick}
+      aria-label="Show QR code"
+    >
+      <QrCode size={24} />
+      <span>Show QR</span>
     </button>
   </div>
 </div>
 
 <style>
   .event-card {
-    background: var(--gradient-light);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1.5rem;
     padding: 1.5rem;
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    width: 100%;
-    max-width: 320px;
-    margin: 0 auto;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    transition: transform 0.2s ease;
-    position: relative;
+    gap: 1rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
 
   .event-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
     transform: translateY(-4px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  }
+
+  .event-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .title-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex: 1;
+  }
+
+  .event-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: white;
+  }
+
+  .event-stats {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .stat {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.875rem;
+  }
+
+  .stat :global(svg) {
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .event-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .qr-button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0.75rem;
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .qr-button:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-1px);
+  }
+
+  .qr-button:active {
+    transform: translateY(0);
+  }
+
+  .qr-button :global(svg) {
+    color: rgba(255, 255, 255, 0.9);
   }
 
   .event-status {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 0.9rem;
-    font-weight: 600;
-    margin-bottom: 0.75rem;
+    font-size: 0.75rem;
     color: var(--status-color);
-    font-family: 'Inter', sans-serif;
+    font-weight: 500;
   }
 
   .status-dot {
@@ -114,97 +185,15 @@
     height: 8px;
     border-radius: 50%;
     background-color: var(--status-color);
-    transition: background 0.2s;
   }
 
   .status-dot.flashing {
-    animation: status-flash 1.2s infinite alternate;
+    animation: flash 1.5s infinite;
   }
 
-  @keyframes status-flash {
+  @keyframes flash {
     0% { opacity: 1; }
-    100% { opacity: 0.3; }
-  }
-
-  .event-title {
-    position: initial;
-    font-family: 'Obviously Bold', 'Inter', sans-serif;
-    font-weight: 900;
-    margin-bottom: 0.25rem;
-    color: var(--color-black);
-    letter-spacing: 0.01em;
-    line-height: 1.1;
-    font-size: 1.25rem;
-  }
-
-  .event-shortcode {
-    margin-bottom: 0.5rem;
-    font-family: 'JetBrains Mono', 'Fira Mono', 'Menlo', monospace;
-    font-size: 0.92rem;
-    color: #888;
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    font-weight: 400;
-  }
-
-  .event-shortcode code {
-    font-size: 0.92em;
-    font-family: inherit;
-    color: #666;
-    letter-spacing: 0.02em;
-  }
-
-  .event-stats {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-    background: rgba(245, 245, 250, 0.95);
-    border-radius: 10px;
-    padding: 0.35rem 0.75rem;
-    font-family: 'Inter', sans-serif;
-    font-size: 0.85rem;
-    color: #222;
-    font-weight: 500;
-  }
-
-  .stat {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    min-width: 0;
-    white-space: nowrap;
-  }
-
-  .event-buttons {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 1rem;
-    gap: 0.5rem;
-  }
-
-  .edit-button,
-  .qr-button {
-    padding: 0.4rem 0.75rem;
-    font-weight: 600;
-    border-radius: var(--radius);
-    font-size: 0.9rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    border: none;
-    cursor: pointer;
-    transition: background 0.2s ease;
-  }
-
-  .edit-button {
-    background: var(--gradient-color);
-    color: white;
-  }
-
-  .qr-button {
-    background: white;
-    color: var(--color-black);
+    50% { opacity: 0.4; }
+    100% { opacity: 1; }
   }
 </style>
