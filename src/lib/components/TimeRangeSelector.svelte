@@ -24,7 +24,8 @@
     'past_month',
     'past_week',
     'past_day',
-    'past_hour'
+    'past_hour',
+    'on_the_hour'
   ];
   
   // Handle change

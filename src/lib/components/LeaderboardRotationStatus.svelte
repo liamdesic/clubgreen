@@ -3,9 +3,14 @@
   import { fade } from 'svelte/transition';
   import { browser } from '$app/environment';
 
+  import { getTimeRangeLabel } from '$lib/utils/timeFilters';
+  import type { ScoreTimeRange } from '$lib/utils/timeFilters';
+  import type { Event } from '$lib/types/event';
+
   // Props
-  export let events: any[] = [];
+  export let events: Event[] = [];
   export let currentEventId: string;
+  export let currentTimeFilter: ScoreTimeRange;
   export let timeRemaining: number;
   export let rotationInterval: number;
   export let accentColor: string = '#4CAF50';
@@ -30,8 +35,13 @@
                class:active={event.id === currentEventId}
                style="{event.id === currentEventId ? `background:${accentColor}; color: white;` : 'color: rgba(255, 255, 255, 0.8);'}"
           >
-            {event.title}
+            {event.title || 'Untitled Event'}
           </div>
+          {#if event.id === currentEventId}
+            <div class="time-filter-pill" style="background: {accentColor}">
+              {getTimeRangeLabel(currentTimeFilter)}
+            </div>
+          {/if}
         </div>
       {/each}
     </div>
@@ -150,8 +160,18 @@
   letter-spacing: 0.05em;
   user-select: none;
 }
-/* Removed unused time-range and time-filter-pill CSS */
-/* Removed unused CSS selector */
+.time-filter-pill {
+  position: absolute;
+  top: -1rem;
+  right: 0.5rem;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 1rem;
+  color: white;
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 2;
+}
 @media (max-width: 900px) {
   .rotation-status-inner { padding: 0.3rem 1.5rem 0.3rem 1.2rem; gap: 1.5rem; }
   .board-item { font-size: 1rem; padding: 0.4rem 1rem; }

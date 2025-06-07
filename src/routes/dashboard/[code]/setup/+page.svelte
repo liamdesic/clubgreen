@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
+  import type { Event, EventSettings } from '$lib/types/event';
+  import type { ScoreTimeRange } from '$lib/utils/timeFilters';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { showToast } from '$lib/toastStore';
@@ -13,16 +15,10 @@
   import BackToDashboardButton from './BackToDashboardButton.svelte';
   import '$lib/styles/EditEvent.css';
 
-  interface Settings {
+  interface FormSettings extends EventSettings {
     event_name: string;
     hole_count: number;
     accent_color: string;
-    archived: boolean;
-    scorecard_ad_text: string;
-    scorecard_ad_url: string;
-    show_on_main_leaderboard: boolean;
-    event_type?: 'single' | 'ongoing';
-    score_time_range: string;
   }
 
   interface PlayerScore {
@@ -44,7 +40,7 @@
   let eventUuid = '';
   let event: any = null;
   let organization: Organization = { name: '', settings_json: { color_palette: ['#00c853'] } };
-  let settings: Settings = {
+  let settings: FormSettings = {
     event_name: '',
     hole_count: 9,
     accent_color: '#00c853',
@@ -53,7 +49,8 @@
     scorecard_ad_url: 'https://clubgreen.au',
     show_on_main_leaderboard: true,
     event_type: 'single',
-    score_time_range: 'all_time'
+    score_time_range: 'all_time',
+    additional_time_filters: []
   };
   let playerScores: PlayerScore[] = [];
   let modifiedScores = new Map<string, boolean>();
@@ -110,7 +107,8 @@
         scorecard_ad_url: eventData.settings_json?.scorecard_ad_url ?? 'https://clubgreen.au',
         show_on_main_leaderboard: eventData.settings_json?.show_on_main_leaderboard ?? true,
         event_type: eventData.settings_json?.event_type ?? 'single',
-        score_time_range: eventData.settings_json?.score_time_range ?? 'all_time'
+        score_time_range: (eventData.settings_json as EventSettings)?.score_time_range ?? 'all_time',
+        additional_time_filters: (eventData.settings_json as EventSettings)?.additional_time_filters ?? []
       };
       eventDate = eventData.event_date ? new Date(eventData.event_date).toISOString().split('T')[0] : '';
       await loadPlayerScores();
@@ -233,8 +231,15 @@
     settings.show_on_main_leaderboard = val;
     unsavedChanges = true;
   }
-  function handleScoreTimeRangeChange(val: string) {
+  function handleScoreTimeRangeChange(val: ScoreTimeRange) {
     settings.score_time_range = val;
+    // Remove the new primary filter from additional filters if it exists
+    settings.additional_time_filters = settings.additional_time_filters?.filter(f => f !== val) ?? [];
+    unsavedChanges = true;
+  }
+
+  function handleAdditionalTimeFiltersChange(filters: ScoreTimeRange[]) {
+    settings.additional_time_filters = filters;
     unsavedChanges = true;
   }
   function handleAdTextChange(val: string) {
@@ -283,6 +288,8 @@
           onShowOnMainLeaderboardChange={handleShowOnMainLeaderboardChange}
           scoreTimeRange={settings.score_time_range}
           onScoreTimeRangeChange={handleScoreTimeRangeChange}
+          additionalTimeFilters={settings.additional_time_filters}
+          onAdditionalTimeFiltersChange={handleAdditionalTimeFiltersChange}
         />
         <AdvertisementSettings
           adText={settings.scorecard_ad_text}

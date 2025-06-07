@@ -1,7 +1,12 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import QRCode from 'qrcode';
-  import { Check, Phone, Monitor, Download, Copy, ExternalLink } from 'lucide-svelte';
+  import Check from 'lucide-svelte/icons/check';
+  import Smartphone from 'lucide-svelte/icons/smartphone';
+  import Monitor from 'lucide-svelte/icons/monitor';
+  import Download from 'lucide-svelte/icons/download';
+  import Copy from 'lucide-svelte/icons/copy';
+  import ExternalLink from 'lucide-svelte/icons/external-link';
   
   type QRCodeType = 'leaderboard' | 'scorecard';
   
@@ -12,7 +17,7 @@
   // Generate the correct URLs for the new routing system
   $: baseUrl = window.location.origin;
   $: leaderboardUrl = `${baseUrl}/${organization}/lb/${shortCode}`;
-  $: scorecardUrl = `${baseUrl}/${organization}/${shortCode}?access=${accessUuid}&view=scorecard`;
+  $: scorecardUrl = `${baseUrl}/${organization}/${shortCode}?access=${accessUuid}`;
   export let onClose;
   
   let leaderboardQrCode = '';
@@ -133,7 +138,7 @@
       <!-- Scorecard QR -->
       <div class="qr-item">
         <div class="qr-icon">
-          <Phone size={90} />
+          <Smartphone size={90} />
         </div>
         <h3>Scorecard</h3>
         <img src={scorecardQrCode} alt="Scorecard QR Code" />
@@ -266,10 +271,6 @@
     align-items: center;
     justify-content: center;
     margin-bottom: 1rem;
-  }
-
-  .qr-icon svg {
-    color: white;
   }
 
   h3 {

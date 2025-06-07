@@ -2,6 +2,7 @@
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import { fade, crossfade } from 'svelte/transition';
   import { supabase } from '$lib/supabaseClient';
+  import type { ScoreTimeRange } from '$lib/utils/timeFilters';
   import { browser } from '$app/environment';
   import { 
     getDisplayableEvents, 
@@ -11,8 +12,25 @@
   import EventLeaderboardView from './EventLeaderboardView.svelte';
   import TransitionOverlay from './TransitionOverlay.svelte';
   import TimeRangeBadge from '$lib/components/TimeRangeBadge.svelte';
-  import type { Event } from '$lib/types/database';
-  import type { PlayerScore, OrganizationSettings } from '$lib/types/application/leaderboard';
+  import type { Event, EventSettings } from '$lib/types/event';
+  import type { OrganizationSettings } from '$lib/types/application/leaderboard';
+
+  interface Score {
+    id: string;
+    player_id: string;
+    event_id: string;
+    created_at: string;
+    hole_in_ones: number;
+    score: number;
+    player_name: string;
+    total_score?: number;
+  }
+
+  interface PlayerScore extends Score {
+    total_score: number;
+    hole_in_ones: number;
+  }
+
   import LoadingSpinner from './LoadingSpinner.svelte';
   import LeaderboardRotationStatus from './LeaderboardRotationStatus.svelte';
 
@@ -33,14 +51,18 @@
   let events: Event[] = [];
   let displayableEvents: Event[] = [];
   let currentEventIndex = 0;
+  let currentFilterIndex = 0;
   let scoreCounts: Record<string, number> = {};
-  let eventLeaderboards: Record<string, PlayerScore[]> = {};
+  let eventLeaderboards: Record<string, Partial<Record<ScoreTimeRange, PlayerScore[]>>> = {};
   let rotationPaused = false;
   let rotationTimer: ReturnType<typeof setTimeout> | null = null;
   let realtimeChannel: any = null;
   let transitioning = false;
   let showTransitionOverlay = false;
   let isMounted = false;
+  let currentTimeFilter: ScoreTimeRange = 'all_time';
+  let leaderboardViewInstance: any; // Instance of EventLeaderboardView
+  let rotationStatusInstance: any; // Instance of LeaderboardRotationStatus
   
   // Debounce management for realtime updates
   let pendingUpdates: Set<string> = new Set();
@@ -57,10 +79,33 @@
   // Transition settings
   let transitionDuration = 1000; // 1 second transition
 
+  // State for time filters
+  let timeFilters: ScoreTimeRange[] = ['all_time'];
+
   // Derived state
-  $: currentEvent = displayableEvents[currentEventIndex] || null;
+  $: currentEvent = displayableEvents[currentEventIndex];
+  $: {
+    if (currentEvent) {
+      const newFilters = [
+        currentEvent.settings_json?.score_time_range || 'all_time',
+        ...(currentEvent.settings_json?.additional_time_filters || [])
+      ] as ScoreTimeRange[];
+      timeFilters = newFilters;
+      console.log(`[LeaderboardManager] Time filters updated for ${currentEvent.title}:`, timeFilters);
+    }
+  }
   $: hasEvents = displayableEvents.length > 0;
-  $: currentLeaderboard = currentEvent ? eventLeaderboards[currentEvent.id] || [] : [];
+  $: {
+    if (timeFilters.length > 0) {
+      if (!timeFilters.includes(currentTimeFilter)) {
+        currentTimeFilter = timeFilters[0];
+        currentFilterIndex = 0;
+      }
+    }
+  }
+  $: currentLeaderboard = currentEvent?.id && currentTimeFilter
+    ? (eventLeaderboards[currentEvent.id]?.[currentTimeFilter] || []) 
+    : [] as Score[];
 
   // Crossfade transition (removed fallback: fade)
   const [send, receive] = crossfade({
@@ -91,7 +136,7 @@
         await loadLeaderboardForEvent(initialEventId);
         
         // Set current leaderboard
-        currentLeaderboard = eventLeaderboards[initialEventId] || [];
+        currentLeaderboard = eventLeaderboards[initialEventId] && eventLeaderboards[initialEventId][currentTimeFilter] || [];
         console.log(`[LeaderboardManager] Loaded initial leaderboard for event ${initialEventId}:`, currentLeaderboard);
       }
       
@@ -120,15 +165,32 @@
   // Load all events for the organization
   async function loadEvents() {
     try {
-      const { data, error: err } = await supabase
+      const { data, error } = await supabase
         .from('events')
         .select('*')
-        .eq('organization_id', organizationId);
+        .eq('organization_id', organizationId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      if (!data) return;
+
+      // Type assertion for events data
+      events = data.map(event => ({
+        ...event,
+        settings_json: event.settings_json as EventSettings
+      })) as Event[];
       
-      if (err) throw err;
-      
-      events = data || [];
+      // Events already set above
       console.log(`[LeaderboardManager] Loaded ${events.length} events`);
+      
+      // Debug: Log event settings
+      events.forEach(event => {
+        console.log(`[LeaderboardManager] Event ${event.title} full settings:`, event.settings_json);
+        console.log(`[LeaderboardManager] Computed time filters for ${event.title}:`, [
+          event.settings_json?.score_time_range || 'all_time',
+          ...(event.settings_json?.additional_time_filters || [])
+        ]);
+      });
       
     } catch (err) {
       console.error('Error loading events:', err);
@@ -151,16 +213,16 @@
       });
       
       // Fetch all published scorecards for these events
-      const { data, error: err } = await supabase
+      const { data: scores, error: scoresError } = await supabase
         .from('scorecard')
         .select('event_id')
-        .in('event_id', eventIds)
+        .in('event_id', eventIds.filter((id): id is string => id !== null))
         .eq('published', true);
       
-      if (err) throw err;
+      if (scoresError) throw scoresError;
       
       // Count manually
-      (data || []).forEach(row => {
+      (scores || []).forEach(row => {
         counts[row.event_id] = (counts[row.event_id] || 0) + 1;
       });
       
@@ -203,13 +265,13 @@
   }
 
   // Load leaderboard for a specific event
-  async function loadLeaderboardForEvent(eventId: string) {
+  async function loadLeaderboardForEvent(eventId: string, timeFilter: ScoreTimeRange = 'all_time') {
     try {
       // Find the event to get its time range setting
       const event = events.find(e => e.id === eventId);
       if (!event) {
         console.error(`Event ${eventId} not found`);
-        eventLeaderboards[eventId] = [];
+        eventLeaderboards[eventId] = {};
         return;
       }
       
@@ -225,7 +287,7 @@
       // Build the query
       let query = supabase
         .from('scorecard')
-        .select('player_id, name, score, hole_number, hole_in_ones, published, created_at')
+        .select('id, event_id, player_id, name, score, hole_in_ones, published, created_at')
         .eq('event_id', eventId)
         .eq('published', true);
       
@@ -241,13 +303,37 @@
       if (err) throw err;
       
       if (!data || data.length === 0) {
-        eventLeaderboards[eventId] = [];
+        // Ensure the event entry exists before trying to set a filter property
+        if (!eventLeaderboards[eventId]) {
+          eventLeaderboards[eventId] = {};
+        }
+        eventLeaderboards[eventId][timeFilter] = []; // Set empty array for this specific filter
+        // Trigger Svelte reactivity for the deep change
+        eventLeaderboards = { ...eventLeaderboards };
         return;
       }
       
       // Process scores
-      const processedScores = processScores(data);
-      eventLeaderboards = { ...eventLeaderboards, [eventId]: processedScores };
+      const scores = data?.map((score: any) => ({
+        id: score.id,
+        player_id: score.player_id,
+        event_id: score.event_id,
+        created_at: score.created_at,
+        hole_in_ones: score.hole_in_ones,
+        score: score.score,
+        player_name: score.name
+      })) as PlayerScore[];
+      // Initialize the cache for this event if needed
+      if (!eventId || !timeFilter) return;
+      if (!eventLeaderboards[eventId]) {
+        eventLeaderboards[eventId] = {} as Partial<Record<ScoreTimeRange, PlayerScore[]>>;
+      }
+      eventLeaderboards[eventId][timeFilter] = scores;
+      
+      // Update currentTimeFilter after loading
+      currentTimeFilter = timeFilter;
+      console.log(`[LeaderboardManager] Updated time filter to: ${timeFilter}`);
+
       
     } catch (err) {
       console.error(`Error loading leaderboard for event ${eventId}:`, err);
@@ -256,12 +342,8 @@
   }
 
   // Process scores from scorecard data
-  function processScores(rows: Array<{
-    player_id: string;
-    name?: string;
-    score?: number;
-    hole_in_ones?: number;
-  }>): PlayerScore[] {
+  function processScores(rows: Score[]): Score[] {
+    if (!rows) return [];
     const playerMap = new Map<string, PlayerScore>();
     
     for (const row of rows) {
@@ -363,9 +445,11 @@
         console.log(`[LeaderboardManager] Processing updates for events:`, Array.from(pendingUpdates));
         
         // Process each event that needs updating
-        const updatePromises = Array.from(pendingUpdates).map(eventId => 
-          loadLeaderboardForEvent(eventId)
-        );
+        const updatePromises = Array.from(pendingUpdates).map(eventId => {
+          // If this is the current event, use the current time filter
+          const timeFilter = (currentEvent?.id === eventId) ? currentTimeFilter : 'all_time';
+          return loadLeaderboardForEvent(eventId, timeFilter);
+        });
         
         await Promise.all(updatePromises);
         
@@ -382,12 +466,18 @@
 
   // Start rotation timer
   function startRotation() {
-    if (rotationPaused || rotationTimer || displayableEvents.length <= 1) return;
+    if (rotationTimer || rotationPaused) return;
     
-    // Reset time remaining display
+    // Reset time remaining and ensure we have the right time filter
     timeRemaining = rotationInterval / 1000;
+    if (currentEvent && timeFilters.length > 0) {
+      currentTimeFilter = timeFilters[currentFilterIndex];
+      console.log(`[LeaderboardManager] Starting rotation with filter:`, {
+        currentFilter: currentTimeFilter,
+        availableFilters: timeFilters
+      });
+    }
     
-    // --- Start smooth countdown display using requestAnimationFrame ---
     let startTime = performance.now();
 
     function updateCountdown(currentTime: number) {
@@ -399,22 +489,17 @@
 
       if (remainingTimeMs > 0) {
         animationFrameId = requestAnimationFrame(updateCountdown);
-      } else {
-        // Countdown finished, rotate to next event
-        rotateToNext();
       }
     }
     
-    // Start the animation loop
+    // Start the animation loop for countdown display
     animationFrameId = requestAnimationFrame(updateCountdown);
     
-    // --- End smooth countdown display ---
-
-    // Set the rotation timer (this is still needed to trigger rotateToNext after rotationInterval)
-    // We clear the requestAnimationFrame loop inside the updateCountdown function when timeRemainingMs <= 0
-    rotationTimer = setTimeout(() => {
-      // This timeout acts as the primary trigger for rotation completion
-      // The animationFrame loop handles the visual countdown
+    // Set up the rotation timer
+    rotationTimer = setInterval(async () => {
+      await rotateToNext();
+      startTime = performance.now(); // Reset startTime for the next countdown
+      animationFrameId = requestAnimationFrame(updateCountdown);
     }, rotationInterval);
     
     console.log(`[LeaderboardManager] Started rotation timer: ${rotationInterval}ms`);
@@ -435,44 +520,71 @@
 
   // Rotate to next event
   async function rotateToNext() {
-    if (displayableEvents.length <= 1) return;
+    if (!displayableEvents.length) return;
     
     transitioning = true;
     
-    // Stop current timer
-    stopRotation();
-    
-    // Show transition overlay
-    showTransitionOverlay = true;
-    
-    // Calculate next event index
-    const nextEventIndex = (currentEventIndex + 1) % displayableEvents.length;
-    const nextEvent = displayableEvents[nextEventIndex];
-    const newEventId = nextEvent.id;
-    
-    // Store the next event's accent color to apply during the transition
-    const nextAccentColor = nextEvent?.settings_json?.accent_color;
-    
-    // Wait for half the transition duration before changing the event and accent color
-    setTimeout(() => {
-      // Move to next index
-      currentEventIndex = nextEventIndex;
-      
-      // Update current leaderboard
-      currentLeaderboard = eventLeaderboards[newEventId] || [];
-      
-      // Apply the accent color at the midpoint of the transition
-      if (browser && nextAccentColor) {
-        document.documentElement.style.setProperty('--accent-color', nextAccentColor);
-        console.log(`[LeaderboardManager] Set accent color to ${nextAccentColor} for event ${nextEvent.title}`);
+    try {
+      // First try to rotate through time filters
+      if (timeFilters.length > 1) {
+        // Calculate next filter index
+        const nextFilterIndex = (currentFilterIndex + 1) % timeFilters.length;
+        const nextTimeFilter = timeFilters[nextFilterIndex] as ScoreTimeRange;
+        
+        console.log(`[LeaderboardManager] Rotating time filter:`, {
+          from: timeFilters[currentFilterIndex],
+          to: nextTimeFilter,
+          availableFilters: timeFilters
+        });
+        
+        // Update filter index and load new data
+        currentFilterIndex = nextFilterIndex;
+        currentTimeFilter = nextTimeFilter;
+        
+        if (currentEvent?.id) {
+          await loadLeaderboardForEvent(currentEvent.id, nextTimeFilter);
+          transitioning = false;
+          return; // Don't rotate to next event if we changed time filter
+        }
       }
-    }, transitionDuration / 2);
-    
-    // Load the leaderboard data for the new event
-    if (!eventLeaderboards[newEventId]) {
-      await loadLeaderboardForEvent(newEventId);
+      
+      // If we get here, we need to move to the next event
+      currentFilterIndex = 0;
+      const nextEventIndex = (currentEventIndex + 1) % displayableEvents.length;
+      const nextEvent = displayableEvents[nextEventIndex];
+      
+      if (!nextEvent?.settings_json?.score_time_range) {
+        console.warn(`[LeaderboardManager] Next event ${nextEvent?.title} has no time range settings`);
+        transitioning = false;
+        return;
+      }
+
+      // Update current event index and current event
+      currentEventIndex = nextEventIndex;
+      currentEvent = nextEvent;
+      
+      // Get all time filters for the next event
+      timeFilters = [
+        nextEvent.settings_json.score_time_range,
+        ...(nextEvent.settings_json.additional_time_filters || [])
+      ];
+      
+      console.log(`[LeaderboardManager] Moving to next event:`, {
+        event: nextEvent.title,
+        timeFilters
+      });
+      
+      // Load the first time filter for the new event
+      if (nextEvent.id) {
+        await loadLeaderboardForEvent(nextEvent.id, timeFilters[0]);
+      }
+    } catch (error) {
+      console.error(`[LeaderboardManager] Error rotating:`, error);
+    } finally {
+      transitioning = false;
     }
   }
+
 
   // Rotate to previous event
   async function rotateToPrevious() {
@@ -499,7 +611,7 @@
       currentEventIndex = prevIndex;
       
       // Update current leaderboard
-      currentLeaderboard = eventLeaderboards[newEventId] || [];
+      currentLeaderboard = (prevEvent?.id && currentTimeFilter && eventLeaderboards[prevEvent.id]?.[currentTimeFilter]) || [];
       
       // Apply the accent color at the midpoint of the transition
       if (browser && prevAccentColor) {
@@ -672,21 +784,26 @@
     <!-- Current event leaderboard -->
     {#key currentEvent?.id}
       <div 
-        in:receive={{key: currentEvent?.id}}
+        class="event-container" 
+        in:receive={{key: currentEvent?.id}} 
         out:send={{key: currentEvent?.id}}
-        class="event-container"
       >
+        <div class="time-range-badge-container">
+          <TimeRangeBadge timeRange={currentTimeFilter} compact={true} />
+        </div>
         {#if currentEvent}
-          <EventLeaderboardView
-            organization={{ slug: organizationSlug, id: organizationId }}
-            org={organizationSlug}
-            event={currentEvent}
-            organizationSettings={organizationSettings}
-            preloadedLeaderboard={currentLeaderboard}
-            showQr={true}
-            showAds={true}
-            hydrateFromSupabase={false}
-          />
+          <div class="event-header">
+            <EventLeaderboardView
+              organization={{ slug: organizationSlug, id: organizationId }}
+              org={organizationSlug}
+              event={currentEvent}
+              organizationSettings={organizationSettings}
+              preloadedLeaderboard={currentLeaderboard}
+              showQr={true}
+              showAds={true}
+              hydrateFromSupabase={false}
+            />
+          </div>
         {/if}
       </div>
     {/key}
@@ -699,6 +816,7 @@
       totalEvents={displayableEvents.length}
       timeRemaining={timeRemaining}
       rotationInterval={rotationInterval}
+      currentTimeFilter={currentTimeFilter}
       accentColor={currentEvent?.settings_json?.accent_color || organizationSettings?.accent_color || '#4CAF50'}
     />
     
@@ -768,6 +886,14 @@
   .event-container {
     width: 100%;
     height: 100%;
+    position: relative;
+  }
+
+  .time-range-badge-container {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 10;
   }
   
   /* Loading and Error States */

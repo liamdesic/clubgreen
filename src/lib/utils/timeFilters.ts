@@ -2,7 +2,7 @@
  * Utility functions for time-based filtering of scores
  */
 
-export type ScoreTimeRange = 'all_time' | 'past_day' | 'past_hour' | 'past_week' | 'past_month';
+export type ScoreTimeRange = 'all_time' | 'past_day' | 'past_hour' | 'past_week' | 'past_month' | 'on_the_hour';
 
 /**
  * Get the timestamp for the cutoff date based on the specified time range
@@ -31,6 +31,10 @@ export function getTimeRangeCutoff(timeRange: ScoreTimeRange): string | null {
     case 'past_month':
       cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30 days ago
       break;
+    case 'on_the_hour':
+      // Set to the start of the current hour
+      cutoffDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours());
+      break;
     default:
       return null;
   }
@@ -55,6 +59,8 @@ export function getTimeRangeLabel(timeRange: ScoreTimeRange): string {
       return 'Past Week';
     case 'past_month':
       return 'Past Month';
+    case 'on_the_hour':
+      return 'Since Top of Hour';
     default:
       return 'All Time';
   }

@@ -23,25 +23,28 @@
   .time-range-badge {
     display: inline-flex;
     align-items: center;
-    background-color: rgba(0, 0, 0, 0.05);
-    border-radius: 4px;
-    padding: 0.25rem 0.5rem;
+    background-color: rgba(0, 0, 0, 0.8);
+    border-radius: 1rem;
+    padding: 0.375rem 0.75rem;
     font-size: 0.875rem;
-    color: var(--color-text-secondary);
+    color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
   
   .time-range-badge.compact {
-    padding: 0.125rem 0.375rem;
+    padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
+    background-color: rgba(0, 0, 0, 0.6);
   }
   
   .label {
-    margin-right: 0.25rem;
+    margin-right: 0.375rem;
     font-weight: 500;
     opacity: 0.8;
   }
   
   .value {
     font-weight: 600;
+    letter-spacing: 0.01em;
   }
 </style>

@@ -1,17 +1,22 @@
-import type { Tables } from '$lib/database.types';
+import type { Database } from '$lib/database.types';
 import type { ScoreTimeRange } from '$lib/utils/timeFilters';
 
-export type Event = Tables<'events'>;
+export type Score = Database['public']['Tables']['scorecard']['Row'];
 
-// Keep the settings type as it's specific to our application
-export type EventSettings = {
-  hole_count?: number;
+export interface EventSettings {
   accent_color?: string;
+  score_time_range?: ScoreTimeRange;
+  hole_count?: number;
   show_hole_in_ones?: boolean;
   enable_ads?: boolean;
-  ads_text?: string;
   scorecard_ad_text?: string;
   scorecard_ad_url?: string;
   show_on_main_leaderboard?: boolean;
-  score_time_range?: ScoreTimeRange;
+  event_type?: 'single' | 'ongoing';
+  additional_time_filters?: ScoreTimeRange[];
+  archived?: boolean;
+}
+
+export type Event = Omit<Database['public']['Tables']['events']['Row'], 'settings_json'> & {
+  settings_json: EventSettings | null;
 };

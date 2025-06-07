@@ -1,12 +1,11 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { fade } from 'svelte/transition';
   import { browser } from '$app/environment';
-  import { supabase } from '$lib/supabaseClient';
   import { page } from '$app/stores';
+  import { supabase } from '$lib/supabaseClient';
   import TransitionOverlay from '$lib/components/TransitionOverlay.svelte';
-  import LeaderboardManager from '$lib/components/LeaderboardManager.svelte';
-
+  import LeaderboardController from '$lib/components/LeaderboardController.svelte';
 
   // Page state management
   type LoadState = 'loading' | 'transition' | 'ready' | 'error';
@@ -24,11 +23,6 @@
   let leaderboardLoaded = false;
   let eventCode = '';
   
-  // Cleanup and stability management
-  let pageVisible = true;
-  let periodicCleanupTimer: ReturnType<typeof setTimeout> | null = null;
-  let leaderboardManagerRef: HTMLDivElement | null = null;
-
   // Helper function for delays
   function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
   
@@ -42,7 +36,7 @@
       organizationSlug = $page.params.org;
       eventCode = $page.params.code;
       
-      console.log(`[Org Leaderboard] Initializing for org: ${organizationSlug}, code: ${eventCode}`);
+      console.log(`[MB Leaderboard] Initializing for org: ${organizationSlug}, code: ${eventCode}`);
       
       // Fetch organization data and get logo URL from settings_json
       const { data, error } = await supabase
@@ -58,15 +52,6 @@
       logoUrl = organizationSettings.logo_url || '';
       accentColor = organizationSettings.accent_color || '#4CAF50';
       
-      // Apply accent color to CSS variable
-      if (browser) {
-        document.documentElement.style.setProperty('--accent-color', accentColor);
-        console.log(`[Org Leaderboard] Set accent color to ${accentColor}`);
-        
-        // We'll load CSS directly in the component instead of dynamically
-        // This ensures the styles are properly bundled with the component
-      }
-      
       // Brief delay before showing transition
       await delay(500);
       
@@ -74,7 +59,7 @@
       state = 'transition';
       
     } catch (err) {
-      console.error('[Org Leaderboard] Error loading data:', err);
+      console.error('[MB Leaderboard] Error loading data:', err);
       errorMsg = err instanceof Error ? err.message : 'Failed to load organization';
       state = 'error';
     }
@@ -82,45 +67,11 @@
   
   // Handle leaderboard loaded event
   function handleLeaderboardReady() {
-    console.log('[Org Leaderboard] LeaderboardManager is ready');
+    console.log('[MB Leaderboard] LeaderboardController is ready');
     leaderboardLoaded = true;
   }
   
-  // Handle page visibility changes
-  function handleVisibilityChange() {
-    pageVisible = !document.hidden;
-    console.log(`[Org Leaderboard] Page visibility changed: ${pageVisible ? 'visible' : 'hidden'}`);
-    
-    // When page becomes visible again after being hidden, check if we need to refresh
-    if (pageVisible && state === 'ready') {
-      // Optional: could trigger a data refresh here if needed
-    }
-  }
-  
-  // Periodic cleanup to prevent memory leaks during long-running sessions
-  function setupPeriodicCleanup() {
-    // Clean up any existing timer
-    if (periodicCleanupTimer) {
-      clearTimeout(periodicCleanupTimer);
-    }
-    
-    // Set up a new cleanup timer - runs every 3 hours
-    periodicCleanupTimer = setTimeout(() => {
-      console.log('[Org Leaderboard] Running periodic cleanup');
-      
-      // Force garbage collection by refreshing key components
-      if (state === 'ready' && leaderboardManagerRef) {
-        // Trigger a refresh of the LeaderboardManager component
-        const event = new CustomEvent('refresh');
-        leaderboardManagerRef.dispatchEvent(event);
-      }
-      
-      // Set up the next cleanup
-      setupPeriodicCleanup();
-    }, 3 * 60 * 60 * 1000); // 3 hours
-  }
-  
-  // Initialize on mount
+  // Handle mouse movement to show/hide fullscreen button
   function handleMouseMove() {
     showFullscreenButton = true;
     
@@ -130,46 +81,44 @@
     
     mouseTimer = setTimeout(() => {
       showFullscreenButton = false;
-    }, 2000); // Hide after 2 seconds of inactivity
+    }, 3000);
   }
-
+  
+  // Toggle fullscreen
   function toggleFullscreen() {
+    if (!browser) return;
+    
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
     } else {
-      document.exitFullscreen();
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
     }
   }
-
+  
+  // Initialize on mount
   onMount(() => {
+    if (browser) {
+      document.addEventListener('mousemove', handleMouseMove);
+    }
+    
     initPage();
     
-    // Set up mouse movement detection
-    document.addEventListener('mousemove', handleMouseMove);
-    
-    // Set up page visibility handling
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Set up periodic cleanup
-    setupPeriodicCleanup();
-    
-    // CSS is now loaded in EventLeaderboardView component
-    if (browser) {
-      console.log('[CSS Debug] CSS loading delegated to EventLeaderboardView');
-    }
-    
-    // Cleanup on unmount
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (periodicCleanupTimer) {
-        clearTimeout(periodicCleanupTimer);
+      if (browser) {
+        document.removeEventListener('mousemove', handleMouseMove);
+      }
+      if (mouseTimer) {
+        clearTimeout(mouseTimer);
       }
     };
   });
 </script>
 
-<div class="logo-display-page" class:accent-background={state === 'ready'}>
+<div class="mb-display-page" class:accent-background={state === 'ready'} on:mousemove={handleMouseMove}>
   {#if state === 'error'}
     <div class="error-message" role="alert">
       <p>{errorMsg}</p>
@@ -182,10 +131,10 @@
   {:else if state === 'transition' || state === 'ready'}
     <!-- Always render both components, control visibility with CSS -->
     {#if organizationId && organizationSlug}
-      <!-- LeaderboardManager loads in the background while transition is visible -->
+      <!-- LeaderboardController loads in the background while transition is visible -->
       <div class="page-container" style="background-color: black;">
-        <div class="leaderboard-container" class:visible={state === 'ready'} bind:this={leaderboardManagerRef}>
-          <LeaderboardManager
+        <div class="leaderboard-container" class:visible={state === 'ready'}>
+          <LeaderboardController
             organizationId={organizationId}
             organizationSlug={organizationSlug}
             organizationSettings={organizationSettings}
@@ -195,7 +144,7 @@
           />
         </div>
         
-        <!-- TransitionOverlay is positioned above the LeaderboardManager -->
+        <!-- TransitionOverlay is positioned above the LeaderboardController -->
         <div class="transition-container" class:hidden={state === 'ready'}>
           <TransitionOverlay
             active={state === 'transition'}
@@ -223,7 +172,7 @@
 {/if}
 
 <style>
-  .logo-display-page {
+  .mb-display-page {
     position: fixed;
     inset: 0;
     background-color: #000;

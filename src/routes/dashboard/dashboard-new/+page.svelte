@@ -188,7 +188,12 @@
       title: e.detail.title,
       short_code: e.detail.short_code
     });
-    goto(`/${e.detail.short_code}/setup`);
+    if (!organization?.slug) {
+      console.error('❌ [dashboard-new] No organization slug available');
+      showToast('Error accessing event setup', 'error');
+      return;
+    }
+    goto(`/${organization.slug}/${e.detail.short_code}/setup`);
   }
 
   async function handleEventCreated(event: CustomEvent) {

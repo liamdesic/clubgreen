@@ -12,20 +12,24 @@
   }>();
 
   function increment() {
-    value = +value + 1;
-    dispatch('change', { value });
+    const newValue = Math.max(minValue, Number(value) + 1);
+    value = newValue;
+    dispatch('change', { value: newValue });
   }
 
   function decrement() {
-    if (+value > minValue) {
-      value = +value - 1;
-      dispatch('change', { value });
+    if (Number(value) > minValue) {
+      const newValue = Number(value) - 1;
+      value = newValue;
+      dispatch('change', { value: newValue });
     }
   }
 
-  function handleInput() {
-    value = Math.max(minValue, +value);
-    dispatch('change', { value });
+  function handleInput(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const newValue = input.value === '' ? minValue : Math.max(minValue, Number(input.value));
+    value = newValue;
+    dispatch('change', { value: newValue });
   }
 </script>
 
@@ -37,7 +41,7 @@
         class="number-box"
         type="number"
         min={minValue}
-        bind:value
+        {value}
         on:input={handleInput}
       />
       <div class="button-group">
@@ -54,7 +58,7 @@
           class="number-btn" 
           on:click={decrement} 
           aria-label="Decrease holes" 
-          disabled={+value <= minValue}
+          disabled={Number(value) <= minValue}
         >
           <Minus size={28} />
         </button>

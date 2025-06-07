@@ -26,7 +26,7 @@
 <section class="form-block">
   <h2 class="form-block-title">Event Details</h2>
   <label for="event-name" class="form-label">Event Name</label>
-  <input id="event-name" class="input" type="text" bind:value={eventName} on:input={e => onEventNameChange(e.target.value)} placeholder="Enter event name" />
+  <input id="event-name" class="input" type="text" bind:value={eventName} on:input={e => onEventNameChange((e.target as HTMLInputElement).value)} placeholder="Enter event name" />
 
   <label for="event-date" class="form-label">Event Date</label>
   <DatePicker 
@@ -47,10 +47,10 @@
     </button>
   </DatePicker>
 
-  <label class="form-label">Hole Count</label>
-  <HoleSelector bind:value={holeCount} on:change={e => onHoleCountChange(e.detail)} />
+  <label for="hole-count" class="form-label">Hole Count</label>
+  <HoleSelector id="hole-count" bind:value={holeCount} on:change={e => onHoleCountChange(e.detail.value)} />
 
-  <label class="form-label">Accent Colour</label>
+  <label for="accent-color" class="form-label">Accent Colour</label>
   <div class="color-picker">
     <div class="color-palette">
       {#each colorPalette as color}
