@@ -5,25 +5,32 @@
   import FileUpload from '$lib/FileUpload.svelte';
   import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
   import { z } from 'zod';
+  import type { User } from '@supabase/supabase-js';
+  import type { Organization } from '$lib/validations';
   import '$lib/styles/onboarding.css';
   
   // Get data from server load function with proper typing
-  export let data: {
-    user: any;
-    org: any;
-    redirectTo: string;
-    formValues?: {
-      name: string;
-      slug: string;
-      logoUrl?: string;
-    };
-    errors?: {
-      name?: string[];
-      slug?: string[];
-      logoUrl?: string[];
-    };
-    success?: boolean;
-  };
+  const props = $props<{
+    data: {
+      user: User | null;
+      org: Organization | null;
+      redirectTo: string;
+      formValues?: {
+        name: string;
+        slug: string;
+        logoUrl?: string;
+      };
+      errors?: {
+        name?: string[];
+        slug?: string[];
+        logoUrl?: string[];
+      };
+      success?: boolean;
+    }
+  }>();
+  
+  // Destructure data from props
+  const { data } = props;
   
   // Initialize Supabase client
   const supabase = createBrowserClient(
@@ -32,12 +39,14 @@
   );
 
   // Form state
-  let name = data.formValues?.name || '';
-  let slug = data.formValues?.slug || '';
-  let logoUrl = data.formValues?.logoUrl || '';
-  let isSubmitting = false;
-  let error = '';
-  let formEl: HTMLFormElement;
+  let organizationName = $state(props.data.formValues?.name || '');
+  let organizationSlug = $state(props.data.formValues?.slug || '');
+  let logoUrl = $state(props.data.formValues?.logoUrl || '');
+  let logoFile = $state<File | null>(null);
+  let logoPreview = $state('');
+  let isSubmitting = $state(false);
+  let formError = $state<string>('');
+  let formEl: HTMLFormElement | null = null;
   
   // Define type for form errors
   type FormErrors = {
@@ -47,15 +56,17 @@
   };
   
   // Get errors from form action if any
-  const errors: FormErrors = data.errors || {};
+  const errors = $derived(data.errors || {} as FormErrors);
   
   // Track if slug has been manually edited
-  let slugManuallyEdited = false;
+  let slugManuallyEdited = $state(false);
   
   // Update slug when name changes if it hasn't been manually edited
-  $: if (name && !slugManuallyEdited) {
-    slug = generateSlug(name);
-  }
+  $effect(() => {
+    if (organizationName && !slugManuallyEdited) {
+      organizationSlug = generateSlug(organizationName);
+    }
+  });
   
   // Generate slug from organization name
   function generateSlug(name: string, randomSuffix: boolean = false): string {
@@ -79,30 +90,51 @@
   }
 
   // Handle logo upload
-  function handleLogoUpload(event: CustomEvent) {
+  function handleLogoUpload(event: CustomEvent<{ url: string }>) {
     logoUrl = event.detail.url;
   }
   
   // No need to check authentication on mount since it's handled by the server
 
   // Handle form submission with validation
-  function handleSubmit(e: Event) {
-    // Prevent default form submission
-    e.preventDefault();
-    
-    // Basic validation
-    if (!name) {
-      error = 'Organization name is required';
-      return;
-    }
-    
-    // Clear any previous errors
-    error = '';
+  async function handleSubmit(event: Event) {
+    event.preventDefault();
     isSubmitting = true;
+    formError = '';
     
-    // Manually submit the form if validation passes
-    if (formEl) {
-      formEl.submit();
+    try {
+      // Basic validation
+      if (!organizationName.trim()) {
+        throw new Error('Organization name is required');
+      }
+      
+      const formData = new FormData();
+      formData.append('name', organizationName);
+      formData.append('slug', organizationSlug);
+      if (logoUrl) formData.append('logoUrl', logoUrl);
+      
+      const response = await fetch('/onboarding', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+      
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(responseData.message || 'Failed to submit form');
+      }
+      
+      // Redirect on success
+      if (responseData.redirectTo) {
+        goto(responseData.redirectTo);
+      }
+    } catch (err) {
+      formError = err instanceof Error ? err.message : 'An error occurred';
+    } finally {
+      isSubmitting = false;
     }
   }
 </script>
@@ -119,18 +151,18 @@
   </div>
 
   <div class="onboarding-card">
-    {#if error}
+    {#if formError}
       <div class="error-message">
         <div class="error-icon">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
           </svg>
         </div>
-        <p class="error-text">{error}</p>
+        <p class="error-text">{formError}</p>
       </div>
     {/if}
 
-    <form method="POST" bind:this={formEl} on:submit|preventDefault={handleSubmit}>
+    <form onsubmit={handleSubmit} class="onboarding-form" bind:this={formEl}>
       <div class="form-group">
         <label for="organizationName" class="form-label">
           Organization Name
@@ -145,14 +177,14 @@
           name="name"
           type="text"
           required
-          bind:value={name}
+          bind:value={organizationName}
           class="form-input"
           placeholder="Acme Inc."
           aria-invalid={errors.name ? 'true' : undefined}
           aria-describedby={errors.name ? 'name-error' : undefined}
         />
         {#if errors.name}
-          <span class="error-text" id="name-error">{errors.name}</span>
+          <span class="error-text" id="name-error">{errors.name.join(', ')}</span>
         {/if}
       </div>
 
@@ -166,15 +198,15 @@
             type="text"
             id="organizationSlug"
             name="slug"
-            bind:value={slug}
-            on:input={handleSlugInput}
+            bind:value={organizationSlug}
+            oninput={handleSlugInput}
             class="form-input url-input"
-            placeholder="acme-inc"
+            required
             aria-invalid={errors.slug ? 'true' : undefined}
             aria-describedby={errors.slug ? 'slug-error' : undefined}
           />
           {#if errors.slug}
-            <span class="error-text" id="slug-error">{errors.slug}</span>
+            <span class="error-text" id="slug-error">{errors.slug.join(', ')}</span>
           {/if}
         </div>
         <p class="form-note">
@@ -199,11 +231,9 @@
             }
           </p>
           <FileUpload 
-            id="logo-upload"
-            label="Choose a file" 
-            folder="organization-logos"
-            on:upload={handleLogoUpload}
-            ariaDescribedBy="logo-upload-hint"
+            on:uploaded={handleLogoUpload}
+            initialUrl={logoUrl}
+            folder="organizations"
           />
         </div>
       </div>

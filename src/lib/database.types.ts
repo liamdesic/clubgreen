@@ -1,3 +1,4 @@
+
 export type Json =
   | string
   | number
@@ -43,36 +44,63 @@ export type Database = {
       }
       events: {
         Row: {
+          accent_color: string | null
           access_uuid: string
+          ads_image_url: string | null
+          ads_text: string | null
+          ads_url: string | null
+          archived: boolean | null
           created_at: string | null
           event_date: string | null
+          hole_count: number | null
           id: string
+          logo_url: string | null
           organization_id: string | null
           published: boolean | null
           settings_json: Json | null
           short_code: string
+          show_on_main_leaderboard: boolean | null
+          time_filters: Json | null
           title: string
         }
         Insert: {
+          accent_color?: string | null
           access_uuid: string
+          ads_image_url?: string | null
+          ads_text?: string | null
+          ads_url?: string | null
+          archived?: boolean | null
           created_at?: string | null
           event_date?: string | null
+          hole_count?: number | null
           id?: string
+          logo_url?: string | null
           organization_id?: string | null
           published?: boolean | null
           settings_json?: Json | null
           short_code: string
+          show_on_main_leaderboard?: boolean | null
+          time_filters?: Json | null
           title: string
         }
         Update: {
+          accent_color?: string | null
           access_uuid?: string
+          ads_image_url?: string | null
+          ads_text?: string | null
+          ads_url?: string | null
+          archived?: boolean | null
           created_at?: string | null
           event_date?: string | null
+          hole_count?: number | null
           id?: string
+          logo_url?: string | null
           organization_id?: string | null
           published?: boolean | null
           settings_json?: Json | null
           short_code?: string
+          show_on_main_leaderboard?: boolean | null
+          time_filters?: Json | null
           title?: string
         }
         Relationships: [
@@ -87,9 +115,13 @@ export type Database = {
       }
       organizations: {
         Row: {
+          ads_image_url: string | null
+          billing_email: string | null
+          color_palette: Json | null
           created_at: string | null
           current_period_end: string | null
           id: string
+          logo_url: string | null
           name: string
           org_leaderboard_codes: Json
           owner_id: string | null
@@ -103,9 +135,13 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          ads_image_url?: string | null
+          billing_email?: string | null
+          color_palette?: Json | null
           created_at?: string | null
           current_period_end?: string | null
           id?: string
+          logo_url?: string | null
           name: string
           org_leaderboard_codes?: Json
           owner_id?: string | null
@@ -119,9 +155,13 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          ads_image_url?: string | null
+          billing_email?: string | null
+          color_palette?: Json | null
           created_at?: string | null
           current_period_end?: string | null
           id?: string
+          logo_url?: string | null
           name?: string
           org_leaderboard_codes?: Json
           owner_id?: string | null
@@ -140,6 +180,7 @@ export type Database = {
         Row: {
           created_at: string | null
           event_id: string | null
+          game_id: string | null
           hole_in_ones: number | null
           hole_number: number | null
           id: string
@@ -152,6 +193,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           event_id?: string | null
+          game_id?: string | null
           hole_in_ones?: number | null
           hole_number?: number | null
           id?: string
@@ -164,6 +206,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           event_id?: string | null
+          game_id?: string | null
           hole_in_ones?: number | null
           hole_number?: number | null
           id?: string

@@ -1,3 +1,49 @@
+. Types
+What: Canonical TypeScript types (models.ts) that match your DB schema and app needs.
+Why: They are the “contract” for all data, ensuring type safety and clarity everywhere.
+2. Stores (Source Stores)
+What: Table-aligned, session-scoped Svelte stores (e.g., scoresSource, eventSource, orgSource).
+Why: Hold and sync the actual data you care about, fetched from Supabase, with real-time updates if needed.
+3. Utils
+What: Pure, stateless functions for grouping, aggregating, sorting, formatting, and calculating.
+Why: Keep business logic DRY, testable, and reusable across stores, views, and components.
+4. View Stores (Feature/Derived Stores)
+What: Svelte stores (often derived) that combine, transform, or aggregate data from one or more source stores, tailored for a specific page or feature (e.g., liveLeaderboardStore, rotatingOrgLeaderboardStore).
+Why: Present data in exactly the shape needed for the UI, without polluting the raw data stores.
+5. Components
+What: Svelte components that render UI, subscribe to view stores, and use utils for formatting or business logic.
+Why: Keep UI logic clean, declarative, and reactive—no data fetching or business logic here.
+6. Pages (+page.svelte / +page.ts)
+What: Route-level SvelteKit files that compose components, wire up stores, and handle page-level logic (e.g., routing, layout).
+Why: Serve as the entry point for each user-facing screen.
+Visual Flow
+CopyInsert
+Types (models.ts)
+      ↓
+Source Stores (table-aligned, e.g., scoresSource)
+      ↓
+Utils (pure functions for grouping, ranking, etc.)
+      ↓
+View Stores (feature/derived, e.g., liveLeaderboardStore)
+      ↓
+Components (UI, subscribe to view stores)
+      ↓
++page.svelte (+page.ts) (route logic, layout, composition)
+Why This Order?
+Each layer builds on the guarantees and structure of the previous one.
+Types are the foundation for everything.
+Source stores are the single source of truth for data.
+Utils keep logic DRY and reusable.
+View stores shape data for the UI, without duplicating or mutating the source.
+Components and pages focus only on presentation and composition, not data management.
+This approach gives you:
+
+Maximum clarity and maintainability.
+Zero duplication or data drift.
+Easy onboarding for new devs.
+A clean path for scaling up features and complexity.
+If you’d like, I can help scaffold this structure for your repo, or walk through a real example for one feature!
+
 # Dashboard Refactor Tasks
 
 ## Phase 1: Project Setup and Structure ✅

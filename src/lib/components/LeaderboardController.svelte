@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount, onDestroy, createEventDispatcher } from 'svelte';
-  import { leaderboardStore, currentEvent, currentLeaderboard, hasEvents } from '$lib/stores/LeaderboardStore';
-  import { rotationStore, timeRemaining, isPaused } from '$lib/stores/RotationStore';
-  import { themeStore } from '$lib/stores/ThemeStore';
+  import { leaderboardStore, currentEvent, currentLeaderboard, hasEvents } from '../../backup/LeaderboardStore';
+  import { rotationStore, timeRemaining, isPaused } from '../../backup/RotationStore';
+  import { themeStore } from '../../backup/ThemeStore';
   import EventLeaderboardView from './EventLeaderboardView.svelte';
   import TransitionOverlay from './TransitionOverlay.svelte';
   import TimeRangeBadge from './TimeRangeBadge.svelte';

@@ -8,7 +8,7 @@
   import { supabase } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
   import { invalidate } from '$app/navigation';
-  import { eventStore, scoreStore } from '$lib/stores/eventStore';
+  import { eventStore, scoreStore } from '../../../backup/eventStore';
   import EventSections from '$lib/components/EventSections/index.svelte';
   import NewRoundModal from '$lib/components/NewRoundModal.svelte';
   import QRCodeModal from '$lib/QRCodeModal.svelte';

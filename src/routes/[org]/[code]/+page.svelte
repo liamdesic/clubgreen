@@ -17,6 +17,7 @@
   import profanity from 'leo-profanity';
   import { goto } from '$app/navigation';
   import RecoveryPrompt from '$lib/components/RecoveryPrompt.svelte';
+  import { createBlankPlayer, isValidScore, isGameComplete, formatScore, generateGameId } from '$lib/utils/scoreUtils';
   
   // Only import scorecard.css if we're in the browser and on the scorecard page
   if (browser && window.location.pathname.includes('/scorecard')) {
@@ -338,13 +339,7 @@
       return;
     }
     
-    players = [...players, { 
-      id: uuidv4(), 
-      name: trimmed, 
-      scores: Array(eventSettings.hole_count).fill(null), 
-      holeInOnes: 0, 
-      totalScore: 0 
-    }];
+    players = [...players, createBlankPlayer(trimmed, eventSettings.hole_count)];
     playerName = '';
     console.log('Player added successfully');
   }
@@ -356,10 +351,10 @@
   function addTestPlayers() {
   const holeCount = eventSettings.hole_count;
   players = [
-    { id: uuidv4(), name: 'Mark', scores: Array(holeCount).fill(null), holeInOnes: 0, totalScore: 0 },
-    { id: uuidv4(), name: 'Lisa', scores: Array(holeCount).fill(null), holeInOnes: 0, totalScore: 0 },
-    { id: uuidv4(), name: 'Jim', scores: Array(holeCount).fill(null), holeInOnes: 0, totalScore: 0 },
-    { id: uuidv4(), name: 'Pam', scores: Array(holeCount).fill(null), holeInOnes: 0, totalScore: 0 }
+    createBlankPlayer('Mark', holeCount),
+    createBlankPlayer('Lisa', holeCount),
+    createBlankPlayer('Jim', holeCount),
+    createBlankPlayer('Pam', holeCount)
   ];
 }
 
@@ -516,13 +511,16 @@
   async function showFinalScreen() {
     // First sort by total score
     players.sort((a, b) => a.totalScore - b.totalScore);
-  
+
+    // Generate a single game_id for this game session
+    const gameId = generateGameId();
+
     // Show final scores
     showFinal = true;
 
     // Clear localStorage since game is finished
     clearGameState();
-  
+
     const finalHole = eventSettings?.hole_count || 9;
     const rowsToInsert = [];
 
@@ -533,6 +531,7 @@
 
         rowsToInsert.push({
           player_id: player.id,
+          game_id: gameId,
           name: player.name,
           score: strokes,
           hole_number: hole,

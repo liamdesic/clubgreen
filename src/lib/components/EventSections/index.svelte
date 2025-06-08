@@ -1,7 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import type { Organization } from '$lib/types';
-  import { eventStore, liveEvents, activeEvents, archivedEvents } from '$lib/stores/eventStore';
+  import { eventStore, liveEvents, activeEvents, archivedEvents } from '../../../backup/eventStore';
   import MainLeaderboardCard from '../MainLeaderboardCard.svelte';
   import EventCard from '../EventCard.svelte';
   import AddEventCard from '../AddEventCard.svelte';

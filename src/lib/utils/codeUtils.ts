@@ -1,7 +1,10 @@
+// Unified code/UUID utility module for ldrboard
+// All code/UUID generation, uniqueness, validation, and parsing logic is here.
+// This is the single source of truth for code-related logic, used by both client and server.
+
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
 
-// Initialize Supabase client
 const supabase = createClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY);
 
 /**
@@ -10,13 +13,12 @@ const supabase = createClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY);
  * @returns Random alphanumeric string in uppercase
  */
 export function generateShortCode(length: number = 7): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed confusing chars like 0/O, 1/I
+  // Excludes ambiguous chars (0/O, 1/I)
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let result = '';
-  
   for (let i = 0; i < length; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  
   return result;
 }
 
@@ -39,7 +41,6 @@ async function shortCodeExists(code: string): Promise<boolean> {
     .select('id')
     .eq('short_code', code)
     .limit(1);
-  
   return Boolean(data && data.length > 0);
 }
 
@@ -54,7 +55,6 @@ async function accessUUIDExists(uuid: string): Promise<boolean> {
     .select('id')
     .eq('access_uuid', uuid)
     .limit(1);
-  
   return Boolean(data && data.length > 0);
 }
 
@@ -69,7 +69,6 @@ async function orgLeaderboardCodeExists(code: string): Promise<boolean> {
     .select('id')
     .contains('org_leaderboard_codes', [{ code }])
     .limit(1);
-  
   return Boolean(data && data.length > 0);
 }
 
@@ -82,16 +81,13 @@ export async function generateUniqueShortCode(length: number = 7): Promise<strin
   let code = generateShortCode(length);
   let attempts = 0;
   const maxAttempts = 10;
-  
   while (await shortCodeExists(code)) {
     code = generateShortCode(length);
     attempts++;
-    
     if (attempts >= maxAttempts) {
       throw new Error('Failed to generate a unique short code after multiple attempts');
     }
   }
-  
   return code;
 }
 
@@ -103,16 +99,13 @@ export async function generateUniqueAccessUUID(): Promise<string> {
   let uuid = generateAccessUUID();
   let attempts = 0;
   const maxAttempts = 10;
-  
   while (await accessUUIDExists(uuid)) {
     uuid = generateAccessUUID();
     attempts++;
-    
     if (attempts >= maxAttempts) {
       throw new Error('Failed to generate a unique UUID after multiple attempts');
     }
   }
-  
   return uuid;
 }
 
@@ -125,16 +118,13 @@ export async function generateUniqueOrgLeaderboardCode(length: number = 7): Prom
   let code = generateShortCode(length);
   let attempts = 0;
   const maxAttempts = 10;
-  
   while (await orgLeaderboardCodeExists(code)) {
     code = generateShortCode(length);
     attempts++;
-    
     if (attempts >= maxAttempts) {
       throw new Error('Failed to generate a unique org leaderboard code after multiple attempts');
     }
   }
-  
   return code;
 }
 
@@ -144,8 +134,8 @@ export async function generateUniqueOrgLeaderboardCode(length: number = 7): Prom
  * @returns Boolean indicating if the code is valid
  */
 export function isValidShortCode(code: string): boolean {
-  // Short code should be 6-8 uppercase alphanumeric characters
-  return /^[A-Z0-9]{6,8}$/.test(code);
+  // Short code should be 6-8 uppercase alphanumeric characters (no ambiguous chars)
+  return /^[A-HJ-NP-Z2-9]{6,8}$/.test(code);
 }
 
 /**
@@ -164,18 +154,16 @@ export function isValidAccessUUID(uuid: string): boolean {
  * @returns Object with code and uuid properties, or null if invalid
  */
 export function parseCodeAndUUID(combined: string): { code: string; uuid: string } | null {
-  const parts = combined.split('-');
-  
-  // Check if we have enough parts for a code and UUID
-  if (parts.length < 5) return null;
-  
-  // The first part is the code, the rest form the UUID
-  const code = parts[0];
-  const uuid = parts.slice(1).join('-');
-  
-  if (isValidShortCode(code) && isValidAccessUUID(uuid)) {
-    return { code, uuid };
+  // Accepts 'SHORTCODE-UUID' or 'SHORTCODE+UUID'
+  if (!combined) return null;
+  const uuidRegex = /^([A-HJ-NP-Z2-9]{6,8})[-+]([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+  const match = combined.match(uuidRegex);
+  if (match) {
+    const code = match[1];
+    const uuid = match[2];
+    if (isValidShortCode(code) && isValidAccessUUID(uuid)) {
+      return { code, uuid };
+    }
   }
-  
   return null;
 }

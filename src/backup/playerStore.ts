@@ -1,17 +1,17 @@
 import { writable, derived } from 'svelte/store';
-import type { Score } from '$lib/types';
+import type { Scorecard, PlayerScore } from '$lib/validations';
 
 // Create a writable store for player scores
 const createPlayerStore = () => {
-  const { subscribe, set, update } = writable<Score[]>([]);
+  const { subscribe, set, update } = writable<Scorecard[]>([]);
 
   return {
     subscribe,
     set,
     // Add new scores
-    addScores: (scores: Score[]) => update(current => [...current, ...scores]),
+    addScores: (scores: Scorecard[]) => update(current => [...current, ...scores]),
     // Update scores for an event
-    updateEventScores: (eventId: string, scores: Score[]) => 
+    updateEventScores: (eventId: string, scores: Scorecard[]) => 
       update(current => {
         const filtered = current.filter(score => score.event_id !== eventId);
         return [...filtered, ...scores];
@@ -29,7 +29,7 @@ export const playerStore = createPlayerStore();
 
 // Derived store for scores by event
 export const scoresByEvent = derived(playerStore, $scores => {
-  const scoresByEventId = new Map<string, Score[]>();
+  const scoresByEventId = new Map<string, Scorecard[]>();
   
   $scores.forEach(score => {
     if (!score.event_id) return;
@@ -38,6 +38,26 @@ export const scoresByEvent = derived(playerStore, $scores => {
   });
   
   return scoresByEventId;
+});
+
+// Derived store for aggregated player scores (PlayerScore[])
+export const playerScores = derived(playerStore, $scores => {
+  const map = new Map<string, PlayerScore>();
+  for (const score of $scores) {
+    if (!score.player_id) continue;
+    if (!map.has(score.player_id)) {
+      map.set(score.player_id, {
+        id: score.player_id,
+        name: score.name || 'Unknown Player',
+        totalScore: 0,
+        holeInOnes: 0,
+      });
+    }
+    const player = map.get(score.player_id)!;
+    player.totalScore += score.score || 0;
+    player.holeInOnes += score.hole_in_ones || 0;
+  }
+  return Array.from(map.values());
 });
 
 // Helper function to get score stats for an event
