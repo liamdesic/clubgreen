@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import type { Event, EventSettings } from '$lib/types/event';
-  import type { ScoreTimeRange } from '$lib/utils/timeFilters';
+  import type { ScoreTimeRange } from '$lib/utils/timeFilterUtils';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { showToast } from '$lib/toastStore';

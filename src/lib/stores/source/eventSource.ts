@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 import { supabase } from '$lib/supabaseClient';
-import { eventSchema, type Event, type TimeFilter, normalizeEvent } from '$lib/validation';
+import { eventSchema, type Event, normalizeEvent } from '$lib/validations';
+import type { TimeFilter } from '$lib/validations/timeFilter';
 
 // Helper function to convert Date objects to ISO strings for Supabase
 function prepareForSupabase<T extends Record<string, any>>(data: T): T {

@@ -24,15 +24,14 @@
 
   // Props
   export let organizationSlug: string;
-  export let orgLeaderboardCodes: { code: string }[] = [];
+  export let orgLeaderboardCodes: Array<{ code: string }> = [];
+  export let leaderboardRotationInterval: string = '10s';
   export let events: Event[] = [];
   export let scoreCounts: Record<string, number> = {};
 
   const dispatch = createEventDispatcher();
 
-  // Placeholder for transition time value
-  let transitionTime = '10s'; // Default value
-
+  // Default transition options
   const transitionOptions = [
     { value: '5s', label: '5 seconds' },
     { value: '10s', label: '10 seconds' },
@@ -41,9 +40,14 @@
     { value: '60s', label: '1 minute' }
   ];
 
+  // Update the interval when it changes
+  $: if (leaderboardRotationInterval) {
+    dispatch('intervalChange', { interval: leaderboardRotationInterval });
+  }
+
   // Construct the example URL
-  $: leaderboardUrl = organizationSlug && orgLeaderboardCodes?.length > 0 
-    ? `https://www.ldrboard.co/${organizationSlug}/ob/${orgLeaderboardCodes[0].code}` 
+  $: leaderboardUrl = organizationSlug && orgLeaderboardCodes?.[0]?.code
+    ? `https://www.ldrboard.co/${organizationSlug}/ob/${orgLeaderboardCodes[0].code}`
     : '';
 
   // Check if any events are live
@@ -121,9 +125,18 @@
   <div class="card-section">
     <label for="transition-time">Interval Time</label>
     <p class="setting-description">How long to display each leaderboard before rotating to the next one</p>
-    <select id="transition-time" bind:value={transitionTime}>
+    <select 
+      id="transition-time" 
+      bind:value={leaderboardRotationInterval}
+      on:change={() => dispatch('intervalChange', { interval: leaderboardRotationInterval })}
+    >
       {#each transitionOptions as option}
-        <option value={option.value}>{option.label}</option>
+        <option 
+          value={option.value}
+          selected={leaderboardRotationInterval === option.value}
+        >
+          {option.label}
+        </option>
       {/each}
     </select>
   </div>

@@ -3,8 +3,8 @@
   import { fade } from 'svelte/transition';
   import { browser } from '$app/environment';
 
-  import { getTimeRangeLabel } from '$lib/utils/timeFilters';
-  import type { ScoreTimeRange } from '$lib/utils/timeFilters';
+  import { getTimeRangeLabel } from '$lib/utils/timeFilterUtils';
+  import type { ScoreTimeRange } from '$lib/utils/timeFilterUtils';
   import type { Event } from '$lib/types/event';
 
   // Props

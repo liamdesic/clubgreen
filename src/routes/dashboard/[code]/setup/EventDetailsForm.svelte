@@ -4,7 +4,7 @@
   import HoleSelector from '$lib/components/HoleSelector.svelte';
   import type { Writable } from 'svelte/store';
   import type { Event } from '$lib/types/event';
-  import type { ScoreTimeRange } from '$lib/utils/timeFilters';
+  import type { ScoreTimeRange } from '$lib/utils/timeFilterUtils';
   import '$lib/styles/EditEvent.css';
 
   export let eventName: string;

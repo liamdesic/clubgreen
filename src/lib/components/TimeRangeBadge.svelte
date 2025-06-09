@@ -3,8 +3,8 @@
   A simple badge component to display the current time range filter
 -->
 <script lang="ts">
-  import type { ScoreTimeRange } from '$lib/utils/timeFilters';
-  import { getTimeRangeLabel } from '$lib/utils/timeFilters';
+  import type { ScoreTimeRange } from '$lib/utils/timeFilterUtils';
+  import { getTimeRangeLabel } from '$lib/utils/timeFilterUtils';
   
   // Props
   export let timeRange: ScoreTimeRange = 'all_time';

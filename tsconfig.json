@@ -10,7 +10,13 @@
     "sourceMap": true,
     "strict": true,
     "moduleResolution": "bundler",
-    "types": ["svelte"]
+    "types": ["svelte"],
+    "paths": {
+      "$lib": ["./src/lib/index.ts"],
+      "$lib/*": ["./src/lib/*"],
+      "$lib/validations/*": ["src/lib/validations/*"]
+    },
+    "baseUrl": "."
   },
   "include": ["src/**/*.d.ts", "src/**/*.js", "src/**/*.ts", "src/**/*.svelte", "src/types/**/*.d.ts", "src/routes/[org]/[code]/+page.server.ts.backup", "src/routes/[org]/[code]/+page.svelte.backup"],
   "exclude": ["node_modules"]

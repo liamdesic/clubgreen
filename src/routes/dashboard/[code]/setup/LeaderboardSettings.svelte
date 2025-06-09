@@ -1,7 +1,7 @@
 <script lang="ts">
   import TimeRangeSelector from '$lib/components/TimeRangeSelector.svelte';
-  import { getTimeRangeLabel } from '$lib/utils/timeFilters';
-  import type { ScoreTimeRange } from '$lib/utils/timeFilters';
+  import { getTimeRangeLabel } from '$lib/utils/timeFilterUtils';
+  import type { ScoreTimeRange } from '$lib/utils/timeFilterUtils';
   import '$lib/styles/EditEvent.css';
 
   export let showOnMainLeaderboard: boolean;

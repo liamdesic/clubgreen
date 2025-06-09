@@ -8,8 +8,8 @@
   import '$lib/styles/leaderboard.css';
   import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
   import TimeRangeBadge from '$lib/components/TimeRangeBadge.svelte';
-  import { getTimeRangeLabel } from '$lib/utils/timeFilters';
-  import type { ScoreTimeRange } from '$lib/utils/timeFilters';
+  import { getTimeRangeLabel } from '$lib/utils/timeFilterUtils';
+  import type { ScoreTimeRange } from '$lib/utils/timeFilterUtils';
   import type { Event, Organization } from '$lib/types/database';
   import type { 
     PlayerScore, 

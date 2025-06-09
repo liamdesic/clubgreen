@@ -1,4 +1,3 @@
-
 export type Json =
   | string
   | number
@@ -121,6 +120,7 @@ export type Database = {
           created_at: string | null
           current_period_end: string | null
           id: string
+          leaderboard_rotation_interval: string
           logo_url: string | null
           name: string
           org_leaderboard_codes: Json
@@ -141,6 +141,7 @@ export type Database = {
           created_at?: string | null
           current_period_end?: string | null
           id?: string
+          leaderboard_rotation_interval?: string
           logo_url?: string | null
           name: string
           org_leaderboard_codes?: Json
@@ -161,6 +162,7 @@ export type Database = {
           created_at?: string | null
           current_period_end?: string | null
           id?: string
+          leaderboard_rotation_interval?: string
           logo_url?: string | null
           name?: string
           org_leaderboard_codes?: Json

@@ -79,8 +79,13 @@
       <MainLeaderboardCard 
         organizationSlug={organization.slug} 
         {orgLeaderboardCodes}
+        leaderboardRotationInterval={organization.leaderboard_rotation_interval || '10s'}
         events={$liveEvents}
         {scoreCounts}
+        on:intervalChange={e => {
+          // Forward the interval change event up to the parent
+          dispatch('intervalChange', e.detail);
+        }}
       />
       <div class="event-grid">
         {#each $liveEvents as event}

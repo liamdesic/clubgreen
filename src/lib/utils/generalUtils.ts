@@ -2,9 +2,37 @@
 // General-purpose utility functions for date/time, data transformation, and formatting
 // All functions are type-safe and documented
 
+// --- Date Utilities ---
+
+/**
+ * Convert a value to a Date if it's a valid date string
+ */
+export function toDate(value: unknown): Date | null {
+  if (value instanceof Date) return value;
+  if (typeof value === 'string') {
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+}
+
+/**
+ * Convert a value to an ISO string if it's a Date or date string
+ */
+export function toISOString(value: unknown): string | null {
+  if (value == null) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'string') {
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? null : date.toISOString();
+  }
+  return null;
+}
+
 /**
  * Formats a JS Date or ISO string to a consistent, human-friendly format.
- * Example: "8 Jun 2025, 3:00 PM"
+ * @example
+ * formatDateTime('2025-06-08T10:30:00Z') // Returns formatted date string
  */
 export function formatDateTime(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
