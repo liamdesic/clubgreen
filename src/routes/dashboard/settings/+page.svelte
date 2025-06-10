@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import { page } from '$app/stores';
-  import { showToast } from '$lib/toastStore';
+  import { showToast } from '$lib/stores/toastStore';
   import DashboardHeader from '$lib/DashboardHeader.svelte';
   import FileUpload from '$lib/FileUpload.svelte';
   import '$lib/styles/theme.css';

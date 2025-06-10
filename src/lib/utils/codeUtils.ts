@@ -10,11 +10,11 @@ const supabase = createClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY);
 /**
  * Generates a random alphanumeric short code of specified length
  * @param length - Length of the code to generate (default: 7)
- * @returns Random alphanumeric string in uppercase
+ * @returns Random alphanumeric string in lowercase
  */
 export function generateShortCode(length: number = 7): string {
   // Excludes ambiguous chars (0/O, 1/I)
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const chars = 'abcdefghjklmnpqrstuvwxyz23456789';
   let result = '';
   for (let i = 0; i < length; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));

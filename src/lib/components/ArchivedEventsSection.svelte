@@ -3,7 +3,7 @@
   import { slide } from 'svelte/transition';
   import { ChevronDown, ChevronRight, Settings, Trash2 } from 'lucide-svelte/icons';
   import { supabase } from '$lib/supabaseClient';
-  import { showToast } from '$lib/toastStore';
+  import { showToast } from '$lib/stores/toastStore';
   import type { Event } from '$lib/types';
 
   export let events: Event[] = [];

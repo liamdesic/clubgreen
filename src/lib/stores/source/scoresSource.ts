@@ -117,7 +117,7 @@ function createScoresSource() {
     }
   }
 
-  async function addScore(score: ScorecardInsert): Promise<PlayerHoleScore> {
+  async function addScore(score: ScorecardInsert, supabaseClient = supabase): Promise<PlayerHoleScore> {
     // Add to pending writes if offline
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       pendingWrites.update(q => [...q, score]);
@@ -131,7 +131,7 @@ function createScoresSource() {
       // This will validate the score data
       const scoreData = prepareForSupabase(score);
       
-      const { data, error: insertError } = await supabase
+      const { data, error: insertError } = await supabaseClient
         .from('scorecard')
         .insert(scoreData)
         .select()

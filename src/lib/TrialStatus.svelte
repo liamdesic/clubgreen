@@ -3,7 +3,7 @@
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
-  import { showToast } from '$lib/toastStore';
+  import { showToast } from '$lib/stores/toastStore';
 
   export let trialEndsAt: string | null = null;
   export let organizationId: string | null = null;

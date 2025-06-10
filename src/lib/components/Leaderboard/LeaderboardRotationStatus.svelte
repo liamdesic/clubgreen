@@ -2,10 +2,12 @@
   import { onMount, onDestroy } from 'svelte';
   import { fade } from 'svelte/transition';
   import { browser } from '$app/environment';
+  import { boardRuntime, runtimeStatus } from '$lib/runtime';
 
-  import { getTimeRangeLabel } from '$lib/utils/timeFilterUtils';
+  import { getTimeRangeLabel } from '$lib/utils/timeFiltersUtils';
   import type { ScoreTimeRange } from '$lib/utils/timeFilterUtils';
   import type { Event } from '$lib/types/event';
+  import type { BoardRuntimeStatus } from '$lib/runtime';
 
   // Props
   export let events: Event[] = [];
@@ -24,6 +26,24 @@
   $: radius = 30; // New smaller radius
   $: circumference = 2 * Math.PI * radius;
   $: strokeDashoffset = circumference * (1 - progress);
+
+  let status: BoardRuntimeStatus = {
+    activeBoardId: null,
+    timeUntilRotation: 0,
+    isRotating: false,
+    lastUpdated: null,
+    boardCount: 0
+  };
+
+  onMount(() => {
+    const unsubscribe = runtimeStatus.subscribe(value => {
+      status = value;
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  });
 </script>
 
 <div class="rotation-status-outer">
@@ -74,6 +94,15 @@
     
     <!-- Time range pill removed as requested -->
   </div>
+</div>
+
+<div class="rotation-status">
+  {#if status.isRotating}
+    <div class="countdown" transition:fade>
+      <div class="progress-bar" style="width: {(status.timeUntilRotation / 10000) * 100}%"></div>
+      <span class="time">{Math.ceil(status.timeUntilRotation / 1000)}s</span>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -180,5 +209,43 @@
   .timer-text { font-size: 0.9rem; }
   .progress-ring-bg, .progress-ring-fg { stroke-width: 6; r: 17; cx: 20; cy: 20; }
   .progress-ring { transform: rotate(-90deg); }
+}
+
+.rotation-status {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  padding: 0.5rem 1rem;
+  border-radius: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  z-index: 100;
+}
+
+.countdown {
+  width: 100%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 1px;
+  position: relative;
+}
+
+.progress-bar {
+  height: 100%;
+  background: white;
+  border-radius: 1px;
+  transition: width 1s linear;
+}
+
+.time {
+  position: absolute;
+  right: 0;
+  top: -1.5rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
 }
 </style> 

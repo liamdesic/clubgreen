@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
-  import { showToast } from '$lib/toastStore';
+  import { showToast } from '$lib/stores/toastStore';
   import DashboardHeader from '$lib/DashboardHeader.svelte';
   import FileUpload from '$lib/FileUpload.svelte';
   import ColorPalette from '$lib/components/ColorPalette.svelte';

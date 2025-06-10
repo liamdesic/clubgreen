@@ -10,6 +10,10 @@ function prepareForSupabase<T extends Record<string, any>>(data: T): T {
       if (value instanceof Date) {
         return [key, value.toISOString()];
       }
+      // Transform settings to settings_json for database
+      if (key === 'settings') {
+        return ['settings_json', value];
+      }
       return [key, value];
     })
   ) as T;
@@ -26,7 +30,7 @@ function createEventSource() {
     const { data, error: err } = await supabase
       .from('events')
       .select('*')
-      .eq('org_id', orgId);
+      .eq('organization_id', orgId);
     if (err) {
       error.set(err.message);
       set([]);
@@ -44,22 +48,34 @@ function createEventSource() {
     loading.set(true);
     error.set(null);
     const eventData = prepareForSupabase(newEvent);
+    console.log('📝 [eventSource] Attempting to create event:', eventData);
+    
     const { data, error: err } = await supabase
       .from('events')
       .insert(eventData)
       .select()
       .single();
+      
     if (err) {
+      console.error('❌ [eventSource] Error creating event:', {
+        message: err.message,
+        code: err.code,
+        details: err.details,
+        hint: err.hint
+      });
       error.set(err.message);
       loading.set(false);
-      return;
+      throw err; // Re-throw to be caught by the component
     }
+    
+    console.log('✅ [eventSource] Event created successfully:', data);
     const normalized = normalizeEvent(data);
     const parsed = eventSchema.safeParse(normalized);
     if (!parsed.success) {
+      console.error('❌ [eventSource] Validation failed after insert:', parsed.error);
       error.set('Validation failed after insert');
       loading.set(false);
-      return;
+      throw new Error('Validation failed after insert');
     }
     update(events => [...events, parsed.data]);
     loading.set(false);

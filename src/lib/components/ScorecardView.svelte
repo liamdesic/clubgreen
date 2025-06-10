@@ -5,7 +5,7 @@
   import { supabase } from '$lib/supabaseClient';
   import { fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { showToast } from '$lib/toastStore';
+  import { showToast } from '$lib/stores/toastStore';
   import LeaderboardModal from '$lib/components/LeaderboardModal.svelte';
   import { v4 as uuidv4 } from 'uuid';
   import profanity from 'leo-profanity'; 

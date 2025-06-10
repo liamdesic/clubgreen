@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Event } from '$lib/validations';
   import type { PlayerTotalScore } from '$lib/validations/playerScore';
+  import { fade } from 'svelte/transition';
 
   export let event: Event;
   export let leaderboard: PlayerTotalScore[] = [];
@@ -21,7 +22,7 @@
       </div>
     </div>
     {#each leaderboard.slice(0, 5) as player, index}
-      <div class="row">
+      <div class="row" in:fade={{ duration: 300, delay: index * 50 }}>
         <div class="rank">
           {#if index === 0}
             <img src="/badges/gold-badge.png" alt="1st Place" class="rank-badge" />
@@ -61,7 +62,7 @@
     </div>
 
     {#each leaderboard.slice(5, 10) as player, index}
-      <div class="row">
+      <div class="row" in:fade={{ duration: 300, delay: (index + 5) * 50 }}>
         <div class="rank">{index + 6}</div>
         <div class="name">
           {player.name}
@@ -178,28 +179,22 @@
   }
 
   .hio-note {
-    font-size: 0.85rem;
-    font-weight: 500;
-    padding-left: 2rem;
+    font-size: 1.2rem;
+    color: #e53935;
+    margin-left: 1rem;
     display: flex;
     align-items: center;
-    gap: 0.3rem;
-  }
-
-  .hio-note i {
-    color: #e53935;
+    gap: 0.5rem;
   }
 
   .score-pill {
     background: var(--accent-color);
     color: white;
-    font-weight: bold;
-    border-radius: 999px;
-    padding: 0.6rem;
-    margin-right: 20px;
+    padding: 0.5rem 1rem;
+    border-radius: 2rem;
+    font-size: 1.8rem;
+    min-width: 4rem;
     text-align: center;
-    min-width: 85px;
-    font-size: 2.5rem;
   }
 
   /* Responsive Styles */

@@ -4,14 +4,16 @@
   import { X, HelpCircle, Calendar } from 'lucide-svelte/icons'; // Corrected import
   import tippy from 'tippy.js'; // Import Tippy
   import '$lib/styles/tippy.css'; // Custom Tippy CSS
-  import type { Organization } from '$lib/types/database';
-  import { showToast } from '$lib/toastStore.js';
-  import { supabase } from '$lib/supabaseClient';
+  import { eventSource } from '$lib/stores/source/eventSource';
+  import { showToast } from '$lib/stores/toastStore';
   import { goto } from '$app/navigation';
   import { generateUniqueShortCode, generateUniqueAccessUUID } from '$lib/utils/codeUtils';
   import { DatePicker } from '@svelte-plugins/datepicker';
   import { format } from 'date-fns';
   import HoleSelector from './HoleSelector.svelte';
+  import type { Event, Organization } from '$lib/validations';
+  import { eventSchema } from '$lib/validations';
+  import type { TimeFilter } from '$lib/validations/timeFilter';
 
   // Props
   export let showModal = false;
@@ -88,23 +90,6 @@
     };
 
     try {
-      logStep('Verifying user authentication...');
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
-        const errorMsg = 'Your session has expired. Please log in again.';
-        console.error('❌ [createEvent] Authentication error:', {
-          error: authError,
-          hasUser: !!user,
-          userId: user?.id
-        });
-        showToast(errorMsg, 'error');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await supabase.auth.signOut();
-        goto('/login');
-        return;
-      }
-
       // Validate organization
       if (!organization || !organization.id) {
         const errorMsg = 'No organization found. Please refresh the page.';
@@ -131,82 +116,80 @@
         return;
       }
 
-      // Prepare event date
-      let event_date = null;
-      if (selectedType === 'single' && newDate) {
-        // Ensure we're sending a proper ISO string to Supabase
-        event_date = new Date(newDate).toISOString();
-      }
-
       // Generate short code and access UUID
       const [short_code, access_uuid] = await Promise.all([
         generateUniqueShortCode(),
         generateUniqueAccessUUID()
       ]);
       
-      // Prepare event data
-      const eventData = { 
-        title: newTitle, 
-        event_date, 
+      logStep('Generated short_code and access_uuid');
+      console.log('Generated codes:', { short_code, access_uuid });
+      
+      // Prepare event data according to schema
+      const eventData = {
+        title: newTitle,
+        event_date: selectedType === 'single' ? newDate.toISOString() : null,
         organization_id: organization.id,
-        settings_json: {
-          hole_count: holeCount
-        },
-        created_at: new Date().toISOString(),
-        published: false,
+        hole_count: holeCount,
+        created_at: null, // Let Supabase handle the created_at timestamp
+        published: true,
         short_code,
-        access_uuid
+        access_uuid,
+        logo_url: null,
+        ads_image_url: null,
+        accent_color: null,
+        show_on_main_leaderboard: true,
+        archived: false,
+        ads_text: null,
+        ads_url: null,
+        time_filters: ['all_time'] as TimeFilter[],
+        settings_json: {}
       };
 
+      // Validate the event data
+      const validationResult = eventSchema.safeParse(eventData);
+      if (!validationResult.success) {
+        console.error('❌ [createEvent] Validation error:', validationResult.error);
+        createError = 'Invalid event data. Please try again.';
+        creating = false;
+        return;
+      }
+
+      logStep('Event data validated successfully');
+
+      // Use eventSource to create the event
       try {
-        // Try direct insert first
-        const { data: insertData, error: insertErr } = await supabase
-          .from('events')
-          .insert(eventData)
-          .select();
-        
-        let createdEvents = insertData;
-        
-        if (insertErr) {
-          // If direct insert fails with RLS error, try with RPC
-          if (insertErr?.code === '42501' || insertErr?.message?.includes('permission denied')) {
-            const { data: rpcData, error: rpcError } = await supabase
-              .rpc('create_event', {
-                event_data: eventData
-              });
-            
-            if (rpcData) {
-              createdEvents = Array.isArray(rpcData) ? rpcData : [rpcData];
-            } else if (rpcError) {
-              throw new Error(`RPC failed: ${rpcError.message}`);
-            }
-          } else {
-            throw insertErr;
-          }
-        }
-
-        if (!createdEvents || createdEvents.length === 0) {
-          throw new Error('No event was created. Please try again.');
-        }
-
-        const newEvent = createdEvents[0];
+        await eventSource.addEvent(eventData);
+        logStep('Event created successfully');
         showToast(`Event "${newTitle}" created successfully!`, 'success');
         
         // Reset form and close modal
         closeModal();
         
-        // Refresh the dashboard by dispatching an event
-        dispatch('eventCreated', { event: newEvent });
-        
+        // Dispatch event created
+        dispatch('eventCreated', { event: eventData });
       } catch (error: any) {
-        console.error('❌ [createEvent] Error creating event:', error);
-        createError = error.message || 'Failed to create event. Please try again.';
-        showToast(createError, 'error');
+        console.error('❌ [createEvent] Error from eventSource.addEvent:', error);
+        console.error('Error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        });
+        throw error; // Re-throw to be caught by outer try-catch
       }
       
     } catch (error: any) {
       console.error('🔥 [createEvent] Unexpected error:', error);
-      createError = 'An unexpected error occurred. Please try again.';
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        stack: error.stack
+      });
+      createError = error.message || 'An unexpected error occurred. Please try again.';
+      showToast(createError, 'error');
     } finally {
       creating = false;
     }

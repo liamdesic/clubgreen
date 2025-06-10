@@ -5,7 +5,7 @@
   import type { ScoreTimeRange } from '$lib/utils/timeFilterUtils';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { showToast } from '$lib/toastStore';
+  import { showToast } from '$lib/stores/toastStore';
   import DashboardHeader from '$lib/DashboardHeader.svelte';
   import EventDetailsForm from './EventDetailsForm.svelte';
   import LeaderboardSettings from './LeaderboardSettings.svelte';

@@ -1,27 +1,67 @@
 <script lang="ts">
-  import { rotationStore } from '$lib/stores/view/RotationStore';
-  import type { Board } from '$lib/stores/view/RotationStore';
   import type { Event } from '$lib/validations';
   import type { Organization } from '$lib/validations';
+  import { currentScores, activeBoard, runtimeStatus } from '$lib/runtime';
   import LeaderboardHeader from './LeaderboardHeader.svelte';
   import LeaderboardScores from './LeaderboardScores.svelte';
   import LeaderboardSidebar from './LeaderboardSidebar.svelte';
   import TransitionOverlay from './TransitionOverlay.svelte';
   import LeaderboardRotationStatus from './LeaderboardRotationStatus.svelte';
+  import type { TimeFilter } from '$lib/validations/timeFilter';
+  import type { LeaderboardBoardView } from '$lib/validations/leaderboardView';
+  import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
+  import { onMount } from 'svelte';
+  import { boardRuntime } from '$lib/runtime';
+  import { currentScores as currentScoresRuntime, activeBoard as activeBoardRuntime, runtimeStatus as runtimeStatusRuntime } from '$lib/runtime';
+  import type { PlayerTotalScore } from '$lib/validations/playerScore';
 
   export let organization: Organization;
   export let event: Event;
   export let loading = false;
   export let error: string | null = null;
+
+  // Debug logs for store initialization
+  console.log('LeaderboardLayout - Store imports:', {
+    currentScores,
+    activeBoard,
+    runtimeStatus,
+    boardRuntime
+  });
+
+  onMount(() => {
+    console.log('LeaderboardLayout - onMount - Store state:', {
+      currentScores: $currentScores,
+      activeBoard: $activeBoard,
+      runtimeStatus: $runtimeStatus
+    });
+  });
+
+  // Get the current board status with defensive guards
+  $: {
+    console.log('LeaderboardLayout - Reactive update:', {
+      loading,
+      currentScoresValue: $currentScores,
+      activeBoardValue: $activeBoard,
+      runtimeStatusValue: $runtimeStatus
+    });
+  }
+
+  $: status = loading ? { timeUntilRotation: 0, isRotating: false } : $runtimeStatus;
+  $: currentBoard = loading ? null : $activeBoard;
+  $: scores = loading ? [] : ($currentScores || []);
+  $: lastUpdated = ($runtimeStatus?.lastUpdated) ? new Date($runtimeStatus.lastUpdated).toLocaleTimeString() : null;
 </script>
 
 <div class="leaderboard-layout">
   {#if loading}
     <div class="loading-overlay">
-      <div class="loading-spinner">
-        <div class="spinner"></div>
-        <div class="spinner-label">Loading leaderboard...</div>
-      </div>
+      <LoadingSpinner 
+        size="xl"
+        color="var(--accent-color)"
+        label="Loading leaderboard..."
+        showLabel={true}
+        center={true}
+      />
     </div>
   {/if}
 
@@ -42,14 +82,31 @@
   {/if}
 
   <div class="main-wrapper">
-    <LeaderboardHeader {organization} {event} />
-    
-    <div class="content">
-      <LeaderboardScores {event} />
-      <LeaderboardSidebar {event} {organization} />
-    </div>
+    {#if currentBoard && event?.id}
+      <LeaderboardHeader {organization} {event} />
+      
+      <div class="content">
+        <LeaderboardScores {event} leaderboard={scores} />
+        <LeaderboardSidebar {event} {organization} />
+      </div>
 
-    <LeaderboardRotationStatus />
+      {#if !loading}
+        <LeaderboardRotationStatus
+          events={[event]}
+          currentEventId={event.id}
+          currentTimeFilter={'all_time' as TimeFilter}
+          timeRemaining={status.timeUntilRotation}
+          rotationInterval={10000}
+          accentColor={event.accent_color ?? '#4CAF50'}
+        />
+      {/if}
+
+      {#if lastUpdated}
+        <div class="last-updated">
+          Last updated: {lastUpdated}
+        </div>
+      {/if}
+    {/if}
   </div>
 
   <TransitionOverlay />
@@ -58,8 +115,9 @@
 <style>
   /* Root Variables */
   :global(:root) {
-    --accent-color: #00c853; /* Default accent color - will be overridden by event settings */
-    --accent-color-dark: #006622; /* Darker version of default */
+    --accent-color: #00c853;
+    --accent-color-dark: color-mix(in srgb, var(--accent-color) 20%, #101010);
+    --accent-color-light: color-mix(in srgb, var(--accent-color) 20%, #ffffff);
   }
 
   /* Dynamic Accent Color */
@@ -67,7 +125,6 @@
     --accent-h: 138;
     --accent-s: 10%;
     --accent-l: 119%;
-    --accent-color-dark: color-mix(in srgb, var(--accent-color) 20%, #101010);
   }
 
   /* Global Body Styles */
@@ -130,24 +187,6 @@
     z-index: 1000;
   }
 
-  .loading-spinner {
-    text-align: center;
-  }
-
-  .spinner {
-    width: 50px;
-    height: 50px;
-    border: 4px solid var(--accent-color);
-    border-top-color: transparent;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-  }
-
-  .spinner-label {
-    margin-top: 1rem;
-    color: white;
-  }
-
   .error-message {
     background: var(--error-color);
     padding: 2rem;
@@ -165,15 +204,20 @@
     cursor: pointer;
   }
 
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
-
   /* Responsive Styles */
   @media (max-width: 1024px) {
     .content {
       flex-direction: column;
       align-items: center;
     }
+  }
+
+  .last-updated {
+    position: fixed;
+    bottom: 1rem;
+    left: 1rem;
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.6);
+    z-index: 100;
   }
 </style> 

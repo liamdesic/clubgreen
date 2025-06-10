@@ -28,7 +28,6 @@ export const eventSchema = z.object({
   short_code: z.string().regex(/^[a-z0-9-]+$/, 'Only lowercase letters, numbers, and hyphens allowed'),
   organization_id: z.string().uuid('Invalid organization ID').nullable(),
   created_at: nullableDateSchema,
-  updated_at: nullableDateSchema,
   event_date: nullableDateSchema,
   accent_color: z.string().regex(/^#[0-9a-f]{6}$/i, 'Must be a valid hex color').nullable(),
   logo_url: z.string().url('Invalid URL').nullable(),
@@ -40,7 +39,14 @@ export const eventSchema = z.object({
   ads_url: z.string().url('Invalid URL').nullable(),
   ads_image_url: z.string().url('Invalid URL').nullable(),
   time_filters: z.array(timeFilterSchema).nullable(),
-  settings: eventSettingsSchema.nullable().default({}),
+  settings_json: z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.record(z.any()),
+    z.array(z.any())
+  ]).nullable().default(null)
 });
 
 export type Event = z.infer<typeof eventSchema>;
@@ -50,7 +56,7 @@ export function normalizeEvent(raw: any): Event {
   return {
     ...raw,
     time_filters: parseJSONField(raw.time_filters, z.array(timeFilterSchema)) ?? null,
-    settings: parseJSONField(raw.settings, eventSettingsSchema) ?? {}
+    settings_json: parseJSONField(raw.settings_json, z.any()) ?? null
   };
 }
 

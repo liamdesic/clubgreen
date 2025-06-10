@@ -117,7 +117,6 @@ export type Database = {
           created_at: string
           event_id: string
           id: string
-          last_updated: string
           scores: Json
           time_filter: string
           updated_at: string
@@ -126,7 +125,6 @@ export type Database = {
           created_at?: string
           event_id: string
           id?: string
-          last_updated?: string
           scores: Json
           time_filter?: string
           updated_at?: string
@@ -135,7 +133,6 @@ export type Database = {
           created_at?: string
           event_id?: string
           id?: string
-          last_updated?: string
           scores?: Json
           time_filter?: string
           updated_at?: string

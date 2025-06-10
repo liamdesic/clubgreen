@@ -1,8 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import type { Event, Organization } from '$lib/types';
-  import { eventStore } from '../../backup/eventStore';
-  import { showToast } from '$lib/toastStore.js';
+  import { showToast } from '$lib/stores/toastStore.js';
   import { supabase } from '$lib/supabaseClient';
   import { invalidate } from '$app/navigation';
   import { goto } from '$app/navigation';

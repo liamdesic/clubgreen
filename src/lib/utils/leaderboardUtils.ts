@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, PUBLIC_LEADERBOARD_API_KEY } from '$env/static/public';
 import type { PlayerTotalScore } from '$lib/validations/playerScore';
+import type { TimeFilter } from '$lib/validations/timeFilter';
 import { z } from 'zod';
 
 const supabase = createClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
@@ -70,7 +71,7 @@ export function parseLeaderboardScores(scores: unknown): PlayerTotalScore[] | nu
  */
 export async function triggerLeaderboardUpdate(
   eventId: string,
-  timeFilter: 'today' | 'all_time' = 'all_time'
+  timeFilter: TimeFilter = 'all_time'
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const response = await fetch(`${PUBLIC_SUPABASE_URL}/functions/v1/update-leaderboard`, {

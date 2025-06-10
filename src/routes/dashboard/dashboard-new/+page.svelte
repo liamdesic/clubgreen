@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { Event, Organization } from '$lib/types';
-  import { showToast } from '$lib/toastStore.js';
+  import { showToast } from '$lib/stores/toastStore.js';
   import '$lib/styles/base.css';
   import '$lib/styles/theme.css';
   import '$lib/styles/dashboard.css';
