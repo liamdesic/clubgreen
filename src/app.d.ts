@@ -30,6 +30,9 @@ declare global {
     readonly STRIPE_PRICE_ID: string;
     readonly PUBLIC_STRIPE_PUBLISHABLE_KEY: string;
     
+    // Leaderboard
+    readonly PUBLIC_LEADERBOARD_API_KEY: string;
+    
     // Environment
     readonly VITE_LOCAL_DEV?: string;
     readonly VITE_SUPABASE_REDIRECT_URL?: string;

@@ -10,6 +10,7 @@ import {
 import type { PlayerHoleScore } from '$lib/validations/playerScore';
 import type { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import type { PostgrestSingleResponse } from '@supabase/supabase-js';
+import { triggerLeaderboardUpdate } from '$lib/utils/leaderboardUtils';
 
 type RealtimeEvent = 'INSERT' | 'UPDATE' | 'DELETE';
 
@@ -143,6 +144,13 @@ function createScoresSource() {
       
       const playerHoleScore = toPlayerHoleScore(newScore);
       update(scores => [...scores, newScore]);
+      
+      // Trigger leaderboard update in the background - don't wait for it
+      if (newScore.event_id) {
+        triggerLeaderboardUpdate(newScore.event_id, 'all_time')
+          .catch(err => console.error('Failed to update leaderboard:', err));
+      }
+      
       return playerHoleScore;
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to add score';

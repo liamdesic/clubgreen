@@ -40,6 +40,8 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.PUBLIC_SUPABASE_ANON_KEY': JSON.stringify(env.PUBLIC_SUPABASE_ANON_KEY || ''),
       // Stripe
       'import.meta.env.PUBLIC_STRIPE_PUBLISHABLE_KEY': JSON.stringify(env.PUBLIC_STRIPE_PUBLISHABLE_KEY || ''),
+      // Leaderboard
+      'import.meta.env.PUBLIC_LEADERBOARD_API_KEY': JSON.stringify(env.PUBLIC_LEADERBOARD_API_KEY || ''),
       // App mode
       'import.meta.env.MODE': JSON.stringify(mode)
     },

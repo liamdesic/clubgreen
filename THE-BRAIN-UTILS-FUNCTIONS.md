@@ -3,7 +3,53 @@
 ## Overview
 This document serves as the single source of truth for all utility functions in the ClubGreen application. Each utility is designed to be reusable, well-documented, and follow consistent patterns.
 
+## Leaderboard System
+
+### Overview
+The leaderboard system uses a snapshot-based approach to provide real-time updates with minimal database load. It consists of:
+
+1. **Edge Function (`/supabase/functions/update-leaderboard/`)**
+   - Aggregates scores on the server
+   - Updates the `leaderboard_snapshot` table
+   - Can be triggered manually or via database triggers
+
+2. **Database Table (`leaderboard_snapshot`)**
+   - Stores pre-calculated leaderboard data
+   - One row per (event_id, time_filter) combination
+   - Automatically updated via triggers or scheduled jobs
+
+3. **Client Utilities (`leaderboardUtils.ts`)**
+   - Fetch cached leaderboards
+   - Trigger updates
+   - Subscribe to real-time changes
+
+### Usage Example
+
+```typescript
+// Fetch the current leaderboard
+const leaderboard = await fetchLeaderboardSnapshot(eventId, 'all_time');
+
+// Trigger an update (e.g., after submitting a score)
+await triggerLeaderboardUpdate(eventId, 'all_time');
+
+// Subscribe to real-time updates
+const unsubscribe = subscribeToLeaderboardUpdates(eventId, (scores) => {
+  console.log('Leaderboard updated:', scores);
+});
+
+// Later, to unsubscribe
+unsubscribe();
+```
+
 ## Core Utilities
+
+### `leaderboardUtils.ts`
+**Purpose**: Provides utilities for working with the leaderboard snapshot system.
+
+**Exports**:
+- `fetchLeaderboardSnapshot(eventId, timeFilter)`: Fetches the cached leaderboard for an event
+- `triggerLeaderboardUpdate(eventId, timeFilter)`: Triggers an update of the leaderboard snapshot
+- `subscribeToLeaderboardUpdates(eventId, callback)`: Subscribes to real-time leaderboard updates
 
 ### `codeUtils.ts`
 **Purpose**: Handles generation, validation, and management of codes and UUIDs used throughout the application.

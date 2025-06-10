@@ -18,6 +18,7 @@ declare module '$env/static/public' {
   export const PUBLIC_STRIPE_PUBLISHABLE_KEY: string;
   export const PUBLIC_STRIPE_PRICE_ID: string;
   export const PUBLIC_SUPABASE_REDIRECT_URL: string;
+  export const PUBLIC_LEADERBOARD_API_KEY: string;
 }
 
 // For $env/dynamic/private
@@ -39,6 +40,7 @@ declare module '$env/dynamic/public' {
     PUBLIC_STRIPE_PUBLISHABLE_KEY: string;
     PUBLIC_STRIPE_PRICE_ID: string;
     PUBLIC_SUPABASE_REDIRECT_URL: string;
+    PUBLIC_LEADERBOARD_API_KEY: string;
     [key: string]: string | undefined;
   };
 }
