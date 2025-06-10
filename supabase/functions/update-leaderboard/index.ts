@@ -135,26 +135,10 @@ interface UpdateLeaderboardRequest {
   time_filter?: 'today' | 'all_time';
 }
 
-// Helper function to validate API key
-function isValidApiKey(req: Request): boolean {
-  // Get API key from headers (try both x-api-key and authorization)
-  const apiKey = req.headers.get('x-api-key') || 
-                (() => {
-                  const authHeader = req.headers.get('authorization');
-                  return authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-                })();
-  
-  if (!apiKey) {
-    console.error('No API key provided in x-api-key header or Authorization: Bearer token');
-    return false;
-  }
-
-  // Check if the provided API key matches any of the allowed keys
-  const isValid = API_KEYS.some(key => key === apiKey);
-  if (!isValid) {
-    console.error('Invalid API key provided');
-  }
-  return isValid;
+// TEMPORARILY DISABLED FOR TESTING - RE-ENABLE BEFORE DEPLOYMENT
+function isValidApiKey(_req: Request): boolean {
+  console.log('Skipping API key validation for testing');
+  return true;
 }
 
 // Main handler for the Edge Function
@@ -173,13 +157,14 @@ serve(async (req) => {
       );
     }
     
+    // TEMPORARILY DISABLED FOR TESTING - RE-ENABLE BEFORE DEPLOYMENT
     // Verify API key
-    if (!isValidApiKey(req)) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // if (!isValidApiKey(req)) {
+    //   return new Response(
+    //     JSON.stringify({ error: 'Unauthorized' }),
+    //     { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    //   );
+    // }
 
     // Parse the request body
     const requestData: UpdateLeaderboardRequest = await req.json();

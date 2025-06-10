@@ -18,6 +18,7 @@ export interface LeaderboardBoardView {
   loading: boolean;
   error: string | null;
   lastUpdated?: string;
+  _unsubscribe?: () => void;  // For cleaning up subscriptions
 }
 
 /**

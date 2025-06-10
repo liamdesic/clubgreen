@@ -188,3 +188,30 @@ export const eventLogSchema = z.object({
 });
 
 export type EventLog = z.infer<typeof eventLogSchema>;
+
+// LeaderboardSnapshot schema - maps to leaderboard_snapshot table
+export const leaderboardSnapshotSchema = z.object({
+  id: z.string().uuid().optional(),
+  event_id: z.string().uuid('Invalid event ID'),
+  scores: z.record(z.any()).or(z.array(z.any())),
+  time_filter: z.string().optional(),
+  created_at: z.string().datetime().nullable(),
+  updated_at: z.string().datetime().nullable(),
+  last_updated: z.string().datetime().nullable(),
+});
+
+export type LeaderboardSnapshot = z.infer<typeof leaderboardSnapshotSchema>;
+
+export const leaderboardSnapshotInsertSchema = leaderboardSnapshotSchema.pick({
+  event_id: true,
+  scores: true,
+  time_filter: true,
+});
+
+export type LeaderboardSnapshotInsert = z.infer<typeof leaderboardSnapshotInsertSchema>;
+
+export const leaderboardSnapshotUpdateSchema = leaderboardSnapshotSchema.partial().required({
+  id: true,
+});
+
+export type LeaderboardSnapshotUpdate = z.infer<typeof leaderboardSnapshotUpdateSchema>;

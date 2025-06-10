@@ -16,6 +16,16 @@ Each table has three main type variants:
 - `Insert`: Type for creating new rows
 - `Update`: Type for updating existing rows
 
+### Leaderboard Snapshot
+- `leaderboard_snapshot`: Table for storing leaderboard snapshots
+  - `id`: UUID (auto-generated)
+  - `event_id`: References an event
+  - `scores`: JSON data containing the snapshot
+  - `time_filter`: Optional time filter for the snapshot
+  - `created_at`: Timestamp of creation
+  - `updated_at`: Timestamp of last update
+  - `last_updated`: Timestamp of last data update
+
 ---
 
 ## Core Exports Reference
@@ -29,6 +39,7 @@ Each table has three main type variants:
 - `organizationSchema`: Core organization data structure
 - `scorecardSchema`: Scorecard data structure with validation
 - `eventLogSchema`: Event logging structure
+- `leaderboardSnapshotSchema`: Leaderboard snapshot data structure with validation
 
 ### Types
 - `Event`: Type for event data
@@ -173,3 +184,9 @@ Each table has three main type variants:
   - `addScore(score: ScorecardInsert)`: Adds a new score
   - `updateScore(score: Scorecard)`: Updates an existing score
   - `deleteScore(scoreId: string)`: Deletes a score
+
+### snapshotSource.ts
+- `snapshotSource`: Store for managing leaderboard snapshots
+  - `fetchSnapshot(eventId: string, timeFilter?: string)`: Fetches a snapshot for an event
+  - `saveSnapshot(snapshot: LeaderboardSnapshotInsert)`: Saves a new snapshot
+  - `updateSnapshot(update: LeaderboardSnapshotUpdate)`: Updates an existing snapshot

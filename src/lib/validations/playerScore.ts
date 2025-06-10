@@ -40,8 +40,9 @@ export interface PlayerScoreInput {
 }
 
 /**
- * Schema for legacy player score validation
- * @deprecated Use PlayerHoleScore and PlayerTotalScore instead
+ * @deprecated Use PlayerHoleScore and PlayerTotalScore instead. This schema is only maintained for backward compatibility.
+ * @see PlayerHoleScore For individual hole scores
+ * @see PlayerTotalScore For aggregated player scores
  */
 export const playerScoreSchema = z.object({
   id: z.string().uuid('Invalid UUID format'),

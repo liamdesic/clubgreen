@@ -112,6 +112,44 @@ export type Database = {
           },
         ]
       }
+      leaderboard_snapshot: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          last_updated: string
+          scores: Json
+          time_filter: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          last_updated?: string
+          scores: Json
+          time_filter?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          last_updated?: string
+          scores?: Json
+          time_filter?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leaderboard_snapshot_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           ads_image_url: string | null

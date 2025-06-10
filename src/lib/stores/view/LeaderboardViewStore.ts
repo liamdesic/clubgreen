@@ -1,9 +1,7 @@
 import { writable, derived, get } from 'svelte/store';
 import type { LeaderboardBoard, LeaderboardBoardView } from '$lib/validations/leaderboardView';
 import { rotationStore } from './RotationStore';
-import { scoresSource } from '$lib/stores/source/scoresSource';
-import { getTimeRangeCutoff } from '$lib/utils/timeFiltersUtils';
-import { aggregatePlayerScores } from '$lib/utils/scoreCalculator';
+import { snapshotStore, subscribeToLeaderboard } from '$lib/stores/source/snapshotSource';
 import { onDestroy } from 'svelte';
 
 function createLeaderboardViewStore() {
@@ -52,8 +50,8 @@ function createLeaderboardViewStore() {
     });
   }
 
-  // Load scores for a specific board
-  async function loadScores(board: LeaderboardBoard) {
+  // Load scores for a specific board using real-time snapshot
+  function loadScores(board: LeaderboardBoard) {
     const key = `${board.eventId}-${board.timeFilter}`;
     
     update(views => ({
@@ -65,40 +63,54 @@ function createLeaderboardViewStore() {
       }
     }));
 
-    try {
-      const cutoff = getTimeRangeCutoff(board.timeFilter);
-      const scores = await scoresSource.fetchScores(board.eventId);
+    // Subscribe to real-time updates for this board
+    const unsubscribe = subscribeToLeaderboard(board.eventId, board.timeFilter);
+    
+    // Set up the subscription to update the store when snapshot changes
+    const snapshotUnsubscribe = snapshotStore.subscribe((snapshot) => {
+      if (snapshot && snapshot.event_id === board.eventId && snapshot.time_filter === board.timeFilter) {
+        update(views => ({
+          ...views,
+          [key]: {
+            ...views[key],
+            scores: snapshot.scores || [],
+            loading: false,
+            lastUpdated: snapshot.updated_at || new Date().toISOString()
+          }
+        }));
+      }
+    });
 
-      const aggregatedScores = aggregatePlayerScores(scores);
-
-      update(views => ({
-        ...views,
-        [key]: {
-          ...views[key],
-          scores: aggregatedScores,
-          loading: false,
-          lastUpdated: new Date().toISOString()
+    // Store the unsubscription function
+    update(views => ({
+      ...views,
+      [key]: {
+        ...views[key],
+        _unsubscribe: () => {
+          unsubscribe();
+          snapshotUnsubscribe();
         }
-      }));
-
-    } catch (error) {
-      update(views => ({
-        ...views,
-        [key]: {
-          ...views[key],
-          loading: false,
-          error: error instanceof Error ? error.message : 'Failed to load scores'
-        }
-      }));
-    }
+      }
+    }));
   }
 
   // Cleanup function
   function cleanup() {
+    // Unsubscribe from rotation store
     if (unsubscribe) {
       unsubscribe();
       unsubscribe = null;
     }
+    
+    // Unsubscribe from all board subscriptions
+    update(views => {
+      Object.values(views).forEach(view => {
+        if (view._unsubscribe) {
+          view._unsubscribe();
+        }
+      });
+      return {};
+    });
   }
 
   return {

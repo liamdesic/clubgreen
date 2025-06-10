@@ -1,5 +1,5 @@
 // @deno-types="https://esm.sh/v135/@supabase/supabase-js@2.49.8/mod.d.ts"
-import { createClient as createSupabaseClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient as createSupabaseClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.49.8';
 import type { Database } from './types.gen.ts';
 
 // Create a typed Supabase client

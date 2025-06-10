@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, PUBLIC_LEADERBOARD_API_KEY } from '$env/static/public';
 import type { PlayerTotalScore } from '$lib/validations/playerScore';
+import { z } from 'zod';
 
 const supabase = createClient(PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY, {
   global: {
@@ -32,7 +33,33 @@ export async function fetchLeaderboardSnapshot(
     return null;
   }
 
-  return data.scores as PlayerTotalScore[];
+  return parseLeaderboardScores(data.scores);
+}
+
+/**
+ * Parses and validates leaderboard scores from unknown input
+ * @param scores - The scores to parse
+ * @returns Array of PlayerTotalScore if valid, null otherwise
+ */
+export function parseLeaderboardScores(scores: unknown): PlayerTotalScore[] | null {
+  const scoreArraySchema = z.array(
+    z.object({
+      player_id: z.string(),
+      name: z.string(),
+      scores: z.array(z.number().nullable()),
+      holeInOnes: z.number(),
+      totalScore: z.number(),
+      lastUpdated: z.string(),
+      id: z.string().optional()
+    })
+  ) as z.ZodType<PlayerTotalScore[]>;
+
+  const parsed = scoreArraySchema.safeParse(scores);
+  if (!parsed.success) {
+    console.error('Invalid scores format:', parsed.error);
+    return null;
+  }
+  return parsed.data;
 }
 
 /**
