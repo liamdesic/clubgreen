@@ -1,44 +1,73 @@
 import { writable, derived } from 'svelte/store';
-import type { TimeFilter } from '$lib/validations/timeFilter';
-
-export type Board = {
-  eventId: string;
-  timeFilter: TimeFilter;
-};
-
-interface RotationState {
-  boards: Board[];
-  currentIndex: number;
-  intervalMs: number;
-}
+import type { LeaderboardBoard, LeaderboardRotationState } from '$lib/validations/leaderboardView';
 
 function createRotationStore() {
-  const initialState: RotationState = {
+  const { subscribe, set, update } = writable<LeaderboardRotationState>({
     boards: [],
     currentIndex: 0,
-    intervalMs: 15000
-  };
+    intervalMs: 10000, // 10 seconds default
+    timeRemaining: 0,
+    currentBoard: null
+  });
 
-  const { subscribe, set, update } = writable<RotationState>(initialState);
-  let timer: ReturnType<typeof setInterval> | null = null;
+  let rotationInterval: NodeJS.Timeout | null = null;
+  let countdownInterval: NodeJS.Timeout | null = null;
 
-  function initialize(boards: Board[], intervalMs: number) {
-    if (timer) clearInterval(timer);
-    set({ boards, currentIndex: 0, intervalMs });
-    timer = setInterval(() => {
+  function initialize(boards: LeaderboardBoard[], intervalMs = 10000) {
+    // Clear any existing intervals
+    if (rotationInterval) clearInterval(rotationInterval);
+    if (countdownInterval) clearInterval(countdownInterval);
+
+    set({
+      boards,
+      currentIndex: 0,
+      intervalMs,
+      timeRemaining: intervalMs,
+      currentBoard: boards[0] || null
+    });
+
+    // Set up rotation interval
+    rotationInterval = setInterval(() => {
+      update(state => {
+        const nextIndex = (state.currentIndex + 1) % state.boards.length;
+        return {
+          ...state,
+          currentIndex: nextIndex,
+          currentBoard: state.boards[nextIndex] || null,
+          timeRemaining: state.intervalMs
+        };
+      });
+    }, intervalMs);
+
+    // Set up countdown interval
+    countdownInterval = setInterval(() => {
       update(state => ({
         ...state,
-        currentIndex: (state.currentIndex + 1) % state.boards.length
+        timeRemaining: Math.max(0, state.timeRemaining - 1000)
       }));
-    }, intervalMs);
+    }, 1000);
   }
 
-  const currentBoard = derived({ subscribe }, $state => $state.boards[$state.currentIndex] || null);
+  // Derived store for current board
+  const currentBoard = derived({ subscribe }, $state => $state.currentBoard);
+
+  // Derived store for rotation progress (0-100)
+  const progress = derived({ subscribe }, $state => 
+    (($state.intervalMs - $state.timeRemaining) / $state.intervalMs) * 100
+  );
+
+  // Cleanup function
+  function cleanup() {
+    if (rotationInterval) clearInterval(rotationInterval);
+    if (countdownInterval) clearInterval(countdownInterval);
+  }
 
   return {
     subscribe,
     initialize,
-    currentBoard
+    currentBoard,
+    progress,
+    cleanup
   };
 }
 
