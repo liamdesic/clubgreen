@@ -1,9 +1,9 @@
 <script lang="ts">
   import { DatePicker } from '@svelte-plugins/datepicker';
   import { Calendar } from 'lucide-svelte';
-  import HoleSelector from '$lib/components/HoleSelector.svelte';
+  import HoleSelector from '$lib/components/dashboard/HoleSelector.svelte';
   import type { Writable } from 'svelte/store';
-  import type { Event } from '$lib/types/event';
+  import type { Event } from '$lib/validations';
   import type { ScoreTimeRange } from '$lib/utils/timeFilterUtils';
   import '$lib/styles/EditEvent.css';
 

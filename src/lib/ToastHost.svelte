@@ -1,5 +1,5 @@
 <script>
-  import { toasts, removeToast } from './toastStore.js';
+  import { toasts, removeToast } from '$lib/stores/toastStore';
   import { fade, fly } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
 </script>

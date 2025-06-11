@@ -4,7 +4,7 @@
   import { showToast } from '$lib/stores/toastStore';
   import DashboardHeader from '$lib/DashboardHeader.svelte';
   import FileUpload from '$lib/FileUpload.svelte';
-  import ColorPalette from '$lib/components/ColorPalette.svelte';
+  import ColorPalette from '$lib/components/Dashboard/ColorPalette.svelte';
   import '$lib/styles/theme.css';
   import '$lib/styles/base.css';
   import '$lib/styles/DashboardSettings.css';

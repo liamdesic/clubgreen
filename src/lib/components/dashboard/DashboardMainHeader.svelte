@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { Organization } from '$lib/types';
+  import type { Organization } from '$lib/validations';
   import { User, Settings, Palette } from 'lucide-svelte/icons';
-  import TrialStatus from '$lib/TrialStatus.svelte';
+  import TrialStatus from '$lib/components/dashboard/TrialStatus.svelte';
 
   export let organization: Organization | null = null;
   export let loading = false;

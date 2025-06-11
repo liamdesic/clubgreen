@@ -6,7 +6,7 @@
 
   import { getTimeRangeLabel } from '$lib/utils/timeFiltersUtils';
   import type { ScoreTimeRange } from '$lib/utils/timeFilterUtils';
-  import type { Event } from '$lib/types/event';
+  import type { Event } from '$lib/validations';
   import type { BoardRuntimeStatus } from '$lib/runtime';
 
   // Props

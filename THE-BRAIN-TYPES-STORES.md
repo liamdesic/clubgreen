@@ -169,24 +169,50 @@ Each table has three main type variants:
 - `eventSource`: Store for managing event data
   - `fetchEvents(orgId: string)`: Fetches events for an organization
   - `addEvent(newEvent: Omit<Event, 'id'>)`: Adds a new event
-  - `updateEvent(updatedEvent: Event)`: Updates an existing event
-  - `deleteEvent(eventId: string)`: Deletes an event
+  - `updateEvent(id: string, updates: Partial<Event>)`: Updates an existing event
+  - `loading`: Writable store for loading state
+  - `error`: Writable store for error state
+  - Features:
+    - Automatic data normalization
+    - Zod schema validation
+    - Error handling with toast notifications
+    - Type-safe operations
 
 ### orgSource.ts
 - `orgSource`: Store for managing organization data
-  - `fetchOrganizations()`: Fetches all organizations
-  - `addOrganization(org: Omit<Organization, 'id'>)`: Adds a new organization
-  - `updateOrganization(org: Organization)`: Updates an organization
+  - `fetchOrg(orgId: string)`: Fetches a single organization
+  - `updateOrg(orgId: string, updates: Partial<Organization>)`: Updates an organization
+  - `loading`: Writable store for loading state
+  - `error`: Writable store for error state
+  - Features:
+    - Automatic data normalization
+    - Zod schema validation
+    - Error handling with toast notifications
+    - Type-safe operations
 
 ### scoresSource.ts
 - `scoresSource`: Store for managing score data
   - `fetchScores(eventId: string)`: Fetches scores for an event
   - `addScore(score: ScorecardInsert)`: Adds a new score
-  - `updateScore(score: Scorecard)`: Updates an existing score
-  - `deleteScore(scoreId: string)`: Deletes a score
+  - `subscribeToEventScores(eventId: string)`: Subscribes to real-time score updates
+  - `stop()`: Cleans up subscriptions
+  - `loading`: Writable store for loading state
+  - `error`: Writable store for error state
+  - `pendingWrites`: Writable store for offline queue
+  - Features:
+    - Real-time updates via Supabase subscriptions
+    - Offline support with pending writes queue
+    - Automatic leaderboard updates
+    - Type-safe operations
 
 ### snapshotSource.ts
 - `snapshotSource`: Store for managing leaderboard snapshots
-  - `fetchSnapshot(eventId: string, timeFilter?: string)`: Fetches a snapshot for an event
-  - `saveSnapshot(snapshot: LeaderboardSnapshotInsert)`: Saves a new snapshot
-  - `updateSnapshot(update: LeaderboardSnapshotUpdate)`: Updates an existing snapshot
+  - `snapshotStore`: Writable store for current snapshot
+  - `subscribeToLeaderboard(eventId: string, timeFilter: TimeFilter)`: Subscribes to real-time updates
+  - `fetchLeaderboardSnapshot(eventId: string, timeFilter: TimeFilter)`: Fetches current snapshot
+  - Features:
+    - Real-time subscription management
+    - Automatic cleanup of subscriptions
+    - Score validation and parsing
+    - Type-safe operations with PlayerTotalScore[]
+    - Automatic error handling

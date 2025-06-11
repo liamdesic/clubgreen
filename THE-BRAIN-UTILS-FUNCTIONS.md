@@ -47,63 +47,94 @@ unsubscribe();
 **Purpose**: Provides utilities for working with the leaderboard snapshot system.
 
 **Exports**:
-- `fetchLeaderboardSnapshot(eventId, timeFilter)`: Fetches the cached leaderboard for an event
-- `triggerLeaderboardUpdate(eventId, timeFilter)`: Triggers an update of the leaderboard snapshot
-- `subscribeToLeaderboardUpdates(eventId, callback)`: Subscribes to real-time leaderboard updates
+- `fetchLeaderboardSnapshot(eventId: string, timeFilter: TimeFilter)`: Fetches the cached leaderboard
+- `subscribeToLeaderboardUpdates(eventId: string, timeFilter: TimeFilter)`: Subscribes to real-time updates
+- `parseLeaderboardScores(scores: unknown)`: Validates and parses leaderboard scores
+- `triggerLeaderboardUpdate(eventId: string, timeFilter: TimeFilter)`: Triggers a snapshot update
 
 ### `codeUtils.ts`
-**Purpose**: Handles generation, validation, and management of codes and UUIDs used throughout the application.
+**Purpose**: Handles generation, validation, and management of codes and UUIDs.
 
 **Exports**:
-- `generateShortCode(length = 7)`: Generates a random alphanumeric code (excludes ambiguous chars)
+- `generateShortCode(length = 7)`: Generates a random alphanumeric code
 - `generateAccessUUID()`: Generates a secure UUID v4
-- `generateUniqueShortCode(length = 7)`: Generates a short code that doesn't exist in the database
-- `generateUniqueAccessUUID()`: Generates a UUID that doesn't exist in the database
+- `generateUniqueShortCode(length = 7)`: Generates a unique short code
+- `generateUniqueAccessUUID()`: Generates a unique UUID
 - `generateUniqueOrgLeaderboardCode(length = 7)`: Generates a unique org leaderboard code
-- `isValidShortCode(code)`: Validates short code format
-- `isValidAccessUUID(uuid)`: Validates UUID format
-- `parseCodeAndUUID(combined)`: Parses combined code-uuid strings
-- `shortCodeExists(code)`: Checks if a short code exists in the database
-- `accessUUIDExists(uuid)`: Checks if a UUID exists in the database
-- `orgLeaderboardCodeExists(code)`: Checks if an org leaderboard code exists
+- `isValidShortCode(code: string)`: Validates short code format
+- `isValidAccessUUID(uuid: string)`: Validates UUID format
+- `parseCodeAndUUID(combined: string)`: Parses combined code-uuid strings
+- `shortCodeExists(code: string)`: Checks if a short code exists
+- `accessUUIDExists(uuid: string)`: Checks if a UUID exists
+- `orgLeaderboardCodeExists(code: string)`: Checks if an org leaderboard code exists
 
-### `eventStatus.ts`
-**Purpose**: Determines and formats the status of events based on dates and score data.
-
-**Exports**:
-- `getEventStatus(event, scoreCount = 0)`: Returns an EventStatus object with:
-  - `code`: Numeric status code
-  - `label`: Human-readable status
-  - `isLive`: Boolean indicating if event is live
-  - `color`: Color code for UI
-
-### `generalUtils.ts`
-**Purpose**: General-purpose utility functions used across the application.
+### `scoreCalculator.ts`
+**Purpose**: Core utilities for score aggregation and leaderboard calculations.
 
 **Exports**:
-- `formatDateTime(date)`: Formats date to "8 Jun 2025, 3:00 PM"
-- `getRelativeTime(date)`: Returns relative time string (e.g., "2 hours ago")
-- `isToday(date)`: Checks if date is today
-- `isThisWeek(date)`: Checks if date is in current week
-- `groupBy(arr, key)`: Groups array items by key or key function
-- `sortBy(arr, selector, direction)`: Sorts array by selector function
-- `filterBy(arr, predicate)`: Filters array by predicate function
-- `truncateText(text, maxLength)`: Truncates text with ellipsis
-- `debounce(fn, delay)`: Creates a debounced function
-
-### `jsonUtils.ts`
-**Purpose**: JSON parsing and stringification utilities with error handling.
-
-**Exports**:
-- `safeStringify(data)`: Safely stringifies JSON with error handling
-- `safeParse(json)`: Safely parses JSON with error handling
+- `aggregatePlayerScores(holeScores: PlayerHoleScore[], filterFn?: (score: PlayerHoleScore) => boolean)`: Groups and aggregates hole scores
+- `sortPlayerScores(scores: PlayerTotalScore[])`: Sorts players by score, hole-in-ones, and name
+- `getTopPlayerScores(holeScores: PlayerHoleScore[], limit = 10)`: Gets top N players
+- `getPlayerScore(playerId: string, holeScores: PlayerHoleScore[])`: Gets score for one player
+- `getPlayerScores(playerIds: string[], holeScores: PlayerHoleScore[])`: Gets scores for multiple players
 
 ### `timeFiltersUtils.ts`
 **Purpose**: Utilities for working with time-based filters.
 
 **Exports**:
-- `getTimeRangeCutoff(timeRange)`: Gets cutoff timestamp for a time range
-- `getTimeRangeLabel(timeRange)`: Gets human-readable label for time range
+- `getTimeRangeCutoff(timeRange: TimeFilter)`: Gets cutoff timestamp
+- `getTimeRangeLabel(timeRange: TimeFilter)`: Gets human-readable label
+- `validateTimeFilter(value: unknown)`: Validates time filter value
+- `isValidTimeFilter(value: unknown)`: Type guard for time filter
+
+### `eventStatus.ts`
+**Purpose**: Determines and formats the status of events.
+
+**Exports**:
+- `getEventStatus(event: Event, scoreCount: number = 0)`: Returns EventStatus object
+  ```typescript
+  type EventStatus = {
+    code: number;
+    label: string;
+    isLive: boolean;
+    color: string;
+  }
+  ```
+
+### `generalUtils.ts`
+**Purpose**: General-purpose utility functions.
+
+**Exports**:
+- **Date/Time**:
+  - `formatDateTime(date: Date | string): string` - Formats date to "8 Jun 2025, 3:00 PM"
+  - `getRelativeTime(date: Date | string): string` - Returns "X hours ago" style string
+  - `isToday(date: Date | string): boolean` - Checks if date is today
+  - `isThisWeek(date: Date | string): boolean` - Checks if date is in current week
+- **Array Helpers**:
+  - `groupBy<T, K>(arr: T[], key: K | ((item: T) => PropertyKey)): Record<string, T[]>`
+  - `sortBy<T>(arr: T[], selector: (item: T) => number | string, direction?: 'asc' | 'desc'): T[]`
+  - `filterBy<T>(arr: T[], predicate: (item: T) => boolean): T[]`
+- **Text**:
+  - `truncateText(text: string, maxLength: number): string` - Truncates with ellipsis
+- **Async**:
+  - `debounce<T extends (...args: any[]) => any>(fn: T, delay: number): (...args: Parameters<T>) => void`
+
+### `toastStore.ts`
+**Purpose**: Manages toast notifications.
+
+**Exports**:
+- `showToast(options: ToastOptions): void`
+  ```typescript
+  type ToastOptions = {
+    message: string;
+    type?: 'success' | 'error' | 'info';
+    duration?: number;
+  }
+  ```
+- Helper functions:
+  - `showSuccess(message: string, duration?: number): void`
+  - `showError(message: string, duration?: number): void`
+  - `showInfo(message: string, duration?: number): void`
 
 ## Score Management
 

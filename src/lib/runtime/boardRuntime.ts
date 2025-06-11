@@ -58,6 +58,52 @@ function setState(updater: (state: InternalState) => InternalState) {
   update(updater);
 }
 
+// Add helper function after setState and getState
+function subscribeToActiveBoard() {
+  setState(state => {
+    const { activeBoardId, boards } = state;
+    if (!activeBoardId) return state;
+
+    const current = boards.get(activeBoardId);
+    if (!current) return state;
+
+    // Clean up any previous subscription
+    current.unsubscribe?.();
+
+    const unsubscribe = subscribeToLeaderboard(current.board, (scores, error) => {
+      setState(s => {
+        const updatedBoards = new Map(s.boards);
+        const target = updatedBoards.get(activeBoardId);
+        if (!target) return s;
+
+        updatedBoards.set(activeBoardId, {
+          ...target,
+          scores,
+          error,
+          loading: false,
+          lastUpdated: new Date().toISOString(),
+        });
+
+        return {
+          ...s,
+          boards: updatedBoards,
+        };
+      });
+    });
+
+    const updatedBoards = new Map(boards);
+    updatedBoards.set(activeBoardId, {
+      ...current,
+      unsubscribe,
+    });
+
+    return {
+      ...state,
+      boards: updatedBoards,
+    };
+  });
+}
+
 /**
  * Initialize the board runtime with configuration
  */
@@ -86,12 +132,9 @@ function initialize(config: Partial<BoardRuntimeConfig> = {}) {
   return () => {
     console.log('boardRuntime - initialize cleanup called');
     stopRotation();
-    // Unsubscribe from all boards
     setState(state => {
       state.boards.forEach(board => {
-        if (board.unsubscribe) {
-          board.unsubscribe();
-        }
+        board.unsubscribe?.();
       });
       return { ...initialState };
     });
@@ -143,6 +186,11 @@ function setBoards(boards: LeaderboardBoard[]) {
       activeBoardId,
     };
   });
+
+  // Call subscribeToActiveBoard after state update
+  setTimeout(() => {
+    subscribeToActiveBoard();
+  }, 0);
 }
 
 /**
@@ -211,6 +259,11 @@ function setActiveBoard(boardId: string) {
     activeBoardId: boardId,
     boardActivatedAt: Date.now(),
   }));
+
+  // Call subscribeToActiveBoard after state update
+  setTimeout(() => {
+    subscribeToActiveBoard();
+  }, 0);
 }
 
 /**

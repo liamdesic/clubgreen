@@ -1,12 +1,12 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import type { Event, Organization } from '$lib/types';
+  import type { Event, Organization } from '$lib/validations';
   import { showToast } from '$lib/stores/toastStore.js';
   import  '$lib/styles/base.css'
   import '$lib/styles/theme.css';
   import '$lib/styles/dashboard.css';
   import { slide } from 'svelte/transition';
-  import QRCodeModal from '$lib/QRCodeModal.svelte';
+  import QRCodeModal from '$lib/components/dashboard/QRCodeModal.svelte';
   import { supabase } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
   import { invalidate } from '$app/navigation';
@@ -15,14 +15,14 @@
     Palette
   } from 'lucide-svelte/icons';
   import Tv from 'lucide-svelte/icons/tv';
-  import TrialStatus from '$lib/TrialStatus.svelte';
-  import NewRoundModal from '$lib/components/NewRoundModal.svelte';
-  import EventCard from '$lib/components/EventCard.svelte';
+  import TrialStatus from '$lib/components/dashboard/TrialStatus.svelte';
+  import NewRoundModal from '$lib/components/dashboard/NewRoundModal.svelte';
+  import EventCard from '$lib/components/dashboard/EventCard.svelte';
   import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
-  import MainLeaderboardCard from '$lib/components/MainLeaderboardCard.svelte';
-  import EmptyDashboard from '$lib/components/EmptyDashboard.svelte';
-  import DashboardMainHeader from '$lib/components/DashboardMainHeader.svelte';
-  import ArchivedEventsSection from '$lib/components/ArchivedEventsSection.svelte';
+  import MainLeaderboardCard from '$lib/components/dashboard/MainLeaderboardCard.svelte';
+  import EmptyDashboard from '$lib/components/dashboard/EmptyDashboard.svelte';
+  import DashboardMainHeader from '$lib/components/dashboard/DashboardMainHeader.svelte';
+  import ArchivedEventsSection from '$lib/components/dashboard/ArchivedEventsSection.svelte';
 
   // --- DATA FROM SERVER ---
   export let data: {

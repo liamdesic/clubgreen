@@ -12,11 +12,11 @@
   import { fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { showToast } from '$lib/stores/toastStore';
-  import LeaderboardModal from '$lib/components/LeaderboardModal.svelte';
+  import LeaderboardModal from '$lib/components/scorecard/LeaderboardModal.svelte';
   import { v4 as uuidv4 } from 'uuid';
   import profanity from 'leo-profanity';
   import { goto } from '$app/navigation';
-  import RecoveryPrompt from '$lib/components/RecoveryPrompt.svelte';
+  import RecoveryPrompt from '$lib/components/scorecard/RecoveryPrompt.svelte';
   import { createBlankPlayer, isValidScore, isGameComplete, formatScore, generateGameId } from '$lib/utils/scoreUtils';
   
   // Only import scorecard.css if we're in the browser and on the scorecard page

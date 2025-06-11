@@ -1,18 +1,19 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Event, Organization } from '$lib/types';
-  import { showToast } from '$lib/stores/toastStore.js';
+  import type { Event, Organization } from '$lib/validations';
+  import { showToast } from '$lib/stores/toastStore';
   import '$lib/styles/base.css';
   import '$lib/styles/theme.css';
   import '$lib/styles/dashboard.css';
   import { supabase } from '$lib/supabaseClient';
   import { goto } from '$app/navigation';
   import { invalidate } from '$app/navigation';
-  import { eventStore, scoreStore } from '../../../backup/eventStore';
-  import EventSections from '$lib/components/EventSections/index.svelte';
-  import NewRoundModal from '$lib/components/NewRoundModal.svelte';
-  import QRCodeModal from '$lib/QRCodeModal.svelte';
-  import DashboardMainHeader from '$lib/components/DashboardMainHeader.svelte';
+  import { eventSource } from '$lib/stores/source/eventSource';
+  import { scoresSource } from '$lib/stores/source/scoresSource';
+  import EventSections from '$lib/components/dashboard/index.svelte';
+  import NewRoundModal from '$lib/components/dashboard/NewRoundModal.svelte';
+  import QRCodeModal from '$lib/components/dashboard/QRCodeModal.svelte';
+  import DashboardMainHeader from '$lib/components/dashboard/DashboardMainHeader.svelte';
 
   // --- DATA FROM SERVER ---
   export let data: {
@@ -62,7 +63,7 @@
         shortCode: e.short_code
       }))
     });
-    eventStore.set(data.events);
+    eventSource.set(data.events);
     loadScoreCounts(); // Load scores when events are available
   }
 
@@ -113,7 +114,7 @@
       });
 
       // Update the scoreStore with the counts
-      scoreStore.set(counts);
+      scoresSource.set(counts);
       
       // Update local state for the EventSections component
       scoreCounts = counts;
@@ -199,7 +200,7 @@
   async function handleEventCreated(event: CustomEvent) {
     console.log('🎉 [dashboard-new] New event created:', event.detail?.event);
     if (event.detail?.event) {
-      eventStore.addEvent(event.detail.event);
+      eventSource.addEvent(event.detail.event);
       await invalidate('app:dashboard');
     }
   }

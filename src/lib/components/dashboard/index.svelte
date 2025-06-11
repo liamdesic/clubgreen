@@ -1,11 +1,17 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import type { Organization } from '$lib/types';
-  import { eventStore, liveEvents, activeEvents, archivedEvents } from '../../../backup/eventStore';
-  import MainLeaderboardCard from '../MainLeaderboardCard.svelte';
-  import EventCard from '../EventCard.svelte';
-  import AddEventCard from '../AddEventCard.svelte';
+  import type { Event, Organization } from '$lib/validations';
+  import { eventSource } from '$lib/stores/source/eventSource';
+  import { derived } from 'svelte/store';
+  import MainLeaderboardCard from './MainLeaderboardCard.svelte';
+  import EventCard from './EventCard.svelte';
+  import AddEventCard from './AddEventCard.svelte';
   import LoadingSpinner from '../LoadingSpinner.svelte';
+  
+  // Create derived stores
+  const liveEvents = derived(eventSource, $source => $source.filter((e: Event) => e.show_on_main_leaderboard));
+  const activeEvents = derived(eventSource, $source => $source.filter((e: Event) => !e.archived));
+  const archivedEvents = derived(eventSource, $source => $source.filter((e: Event) => e.archived));
 
   // Props
   export let organization: Organization;
@@ -26,15 +32,15 @@
       : [];
 
   // Filter out live events from active events
-  $: nonLiveActiveEvents = $activeEvents.filter(event => 
-    !$liveEvents.some(liveEvent => liveEvent.id === event.id)
+  $: nonLiveActiveEvents = $activeEvents.filter((event: Event) => 
+    !$liveEvents.some((liveEvent: Event) => liveEvent.id === event.id)
   );
 
   // Debug logs for live events
   $: {
     console.log('🔍 [EventSections] Live events:', {
       count: $liveEvents.length,
-      events: $liveEvents.map(e => ({
+      events: $liveEvents.map((e: Event) => ({
         id: e.id,
         title: e.title,
         scoreCount: scoreCounts[e.id] || 0
@@ -46,8 +52,8 @@
     dispatch('addEvent');
   }
 
-  function handleQrModal(event: any) {
-    dispatch('qrModal', event);
+  function handleQrModal(e: CustomEvent<Event>) {
+    dispatch('qrModal', e.detail);
   }
 
   function handleEdit(e: CustomEvent<Event>) {
@@ -59,12 +65,12 @@
     dispatch('edit', e.detail);
   }
 
-  function handleArchived({ detail }: any) {
-    dispatch('archived', detail);
+  function handleArchived(e: CustomEvent<Event>) {
+    dispatch('archived', e.detail);
   }
 
-  function handleDeleted({ detail }: any) {
-    dispatch('deleted', detail);
+  function handleDeleted(e: CustomEvent<Event>) {
+    dispatch('deleted', e.detail);
   }
 
   function toggleArchived() {
@@ -241,7 +247,6 @@
 
   .toggle-button:hover {
     background: rgba(255, 255, 255, 0.1);
-    color: white;
   }
 
   .debug-info {

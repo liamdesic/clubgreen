@@ -42,6 +42,9 @@ export interface BoardState {
   
   /** Last updated timestamp */
   lastUpdated: string | null;
+
+  /** Optional unsubscribe function for cleanup */
+  unsubscribe?: () => void;
 }
 
 /**

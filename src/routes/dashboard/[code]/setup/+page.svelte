@@ -1,12 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { supabase } from '$lib/supabaseClient';
-  import type { Event, EventSettings } from '$lib/types/event';
-  import type { ScoreTimeRange } from '$lib/utils/timeFilterUtils';
+  import type { TimeFilter } from '$lib/validations/timeFilter';
+  import { timeFilterSchema } from '$lib/validations/timeFilter';
+  import type { Event } from '$lib/validations';
+  import type { Database } from '$lib/database.types';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { showToast } from '$lib/stores/toastStore';
-  import DashboardHeader from '$lib/DashboardHeader.svelte';
+  import DashboardHeader from '$lib/components/dashboard/DashboardPageHeader.svelte';
   import EventDetailsForm from './EventDetailsForm.svelte';
   import LeaderboardSettings from './LeaderboardSettings.svelte';
   import AdvertisementSettings from './AdvertisementSettings.svelte';
@@ -15,10 +17,21 @@
   import BackToDashboardButton from './BackToDashboardButton.svelte';
   import '$lib/styles/EditEvent.css';
 
-  interface FormSettings extends EventSettings {
+  type EventRow = Database['public']['Tables']['events']['Row'];
+  type EventUpdate = Database['public']['Tables']['events']['Update'];
+  type Json = Database['public']['Tables']['events']['Row']['settings_json'];
+
+  interface FormSettings {
     event_name: string;
     hole_count: number;
     accent_color: string;
+    archived: boolean;
+    scorecard_ad_text: string;
+    scorecard_ad_url: string;
+    show_on_main_leaderboard: boolean;
+    event_type: 'single' | 'ongoing';
+    score_time_range: TimeFilter;
+    additional_time_filters: TimeFilter[];
   }
 
   interface PlayerScore {
@@ -31,26 +44,26 @@
 
   interface Organization {
     name: string;
-    settings_json?: { color_palette?: string[] };
+    settings_json?: {
+      color_palette?: string[];
+    };
   }
 
   let eventDate: string = '';
   let isDatePickerOpen = false;
   let eventCode = '';
   let eventUuid = '';
-  let event: any = null;
+  let event: EventRow | null = null;
   let organization: Organization = { name: '', settings_json: { color_palette: ['#00c853'] } };
-  let settings: FormSettings = {
-    event_name: '',
+  let settings: EventUpdate = {
+    title: '',
     hole_count: 9,
     accent_color: '#00c853',
     archived: false,
-    scorecard_ad_text: '',
-    scorecard_ad_url: 'https://clubgreen.au',
+    ads_text: '',
+    ads_url: 'https://clubgreen.au',
     show_on_main_leaderboard: true,
-    event_type: 'single',
-    score_time_range: 'all_time',
-    additional_time_filters: []
+    time_filters: ['all_time'] as TimeFilter[]
   };
   let playerScores: PlayerScore[] = [];
   let modifiedScores = new Map<string, boolean>();
@@ -61,6 +74,14 @@
   let subscription: any = null;
 
   $: eventCode = $page.params.code;
+  $: timeFilters = (settings.time_filters as TimeFilter[] | undefined) ?? ['all_time'];
+  $: eventName = settings.title ?? '';
+  $: holeCount = settings.hole_count ?? 9;
+  $: accentColor = settings.accent_color ?? '#00c853';
+  $: showOnMainLeaderboard = settings.show_on_main_leaderboard ?? true;
+  $: adText = settings.ads_text ?? '';
+  $: adUrl = settings.ads_url ?? 'https://clubgreen.au';
+  $: isArchived = settings.archived ?? false;
 
   async function loadEventAndSettings() {
     try {
@@ -82,10 +103,11 @@
         return;
       }
       // Defensive fallback for color_palette
+      const orgSettings = orgs[0].settings_json as { color_palette?: string[] } | null;
       organization = {
         name: orgs[0].name,
         settings_json: {
-          color_palette: orgs[0].settings_json?.color_palette || ['#00c853']
+          color_palette: orgSettings?.color_palette || ['#00c853']
         }
       };
       // Use the shortcode to find the event
@@ -99,16 +121,14 @@
       eventUuid = eventData.id;
       event = eventData;
       settings = {
-        event_name: eventData.title || '',
-        hole_count: eventData.settings_json?.hole_count ?? 9,
-        accent_color: eventData.settings_json?.accent_color ?? '#00c853',
-        archived: eventData.settings_json?.archived ?? false,
-        scorecard_ad_text: eventData.settings_json?.scorecard_ad_text ?? '',
-        scorecard_ad_url: eventData.settings_json?.scorecard_ad_url ?? 'https://clubgreen.au',
-        show_on_main_leaderboard: eventData.settings_json?.show_on_main_leaderboard ?? true,
-        event_type: eventData.settings_json?.event_type ?? 'single',
-        score_time_range: (eventData.settings_json as EventSettings)?.score_time_range ?? 'all_time',
-        additional_time_filters: (eventData.settings_json as EventSettings)?.additional_time_filters ?? []
+        title: eventData.title || '',
+        hole_count: eventData.hole_count ?? 9,
+        accent_color: eventData.accent_color ?? '#00c853',
+        archived: eventData.archived ?? false,
+        ads_text: eventData.ads_text ?? '',
+        ads_url: eventData.ads_url ?? 'https://clubgreen.au',
+        show_on_main_leaderboard: eventData.show_on_main_leaderboard ?? true,
+        time_filters: (eventData.time_filters as TimeFilter[] | null) ?? ['all_time']
       };
       eventDate = eventData.event_date ? new Date(eventData.event_date).toISOString().split('T')[0] : '';
       await loadPlayerScores();
@@ -165,9 +185,15 @@
       const { error: updateError } = await supabase
         .from('events')
         .update({
-          title: settings.event_name,
+          title: settings.title,
           event_date: eventDate || null,
-          settings_json: { ...settings, event_name: undefined }
+          hole_count: settings.hole_count,
+          accent_color: settings.accent_color,
+          archived: settings.archived,
+          ads_text: settings.ads_text,
+          ads_url: settings.ads_url,
+          show_on_main_leaderboard: settings.show_on_main_leaderboard,
+          time_filters: settings.time_filters
         })
         .eq('id', eventUuid);
       if (updateError) throw updateError;
@@ -189,7 +215,7 @@
       settings.archived = true;
       const { error: updateError } = await supabase
         .from('events')
-        .update({ settings_json: { ...settings } })
+        .update({ archived: true })
         .eq('id', eventUuid);
       if (updateError) throw updateError;
       showToast('Event archived successfully', 'success');
@@ -212,44 +238,58 @@
   }
 
   function handleEventNameChange(val: string) {
-    settings.event_name = val;
+    settings.title = val;
     unsavedChanges = true;
   }
+
   function handleEventDateChange(val: string) {
     eventDate = val;
     unsavedChanges = true;
   }
+
   function handleHoleCountChange(val: number) {
     settings.hole_count = val;
     unsavedChanges = true;
   }
+
   function handleAccentColorChange(val: string) {
     settings.accent_color = val;
     unsavedChanges = true;
   }
+
   function handleShowOnMainLeaderboardChange(val: boolean) {
     settings.show_on_main_leaderboard = val;
     unsavedChanges = true;
   }
-  function handleScoreTimeRangeChange(val: ScoreTimeRange) {
-    settings.score_time_range = val;
-    // Remove the new primary filter from additional filters if it exists
-    settings.additional_time_filters = settings.additional_time_filters?.filter(f => f !== val) ?? [];
+
+  function handleTimeFilterToggle(filter: TimeFilter, checked: boolean) {
+    if (!settings.time_filters) settings.time_filters = ['all_time'];
+    const filters = settings.time_filters as TimeFilter[];
+    if (checked) {
+      if (!filters.includes(filter)) {
+        settings.time_filters = [...filters, filter];
+      }
+    } else {
+      settings.time_filters = filters.filter(f => f !== filter);
+    }
     unsavedChanges = true;
   }
 
-  function handleAdditionalTimeFiltersChange(filters: ScoreTimeRange[]) {
-    settings.additional_time_filters = filters;
+  function handleTimeFiltersChange(filters: TimeFilter[]) {
+    settings.time_filters = filters;
     unsavedChanges = true;
   }
+
   function handleAdTextChange(val: string) {
-    settings.scorecard_ad_text = val;
+    settings.ads_text = val;
     unsavedChanges = true;
   }
+
   function handleAdUrlChange(val: string) {
-    settings.scorecard_ad_url = val;
+    settings.ads_url = val;
     unsavedChanges = true;
   }
+
   function handleTogglePublished(id: string) {
     // Implement publish toggle logic as needed
   }
@@ -271,35 +311,33 @@
     <div class="event-sections-wrapper">
       <section class="event-section">
         <EventDetailsForm
-          eventName={settings.event_name}
+          eventName={eventName}
           onEventNameChange={handleEventNameChange}
           eventDate={eventDate}
           onEventDateChange={handleEventDateChange}
-          holeCount={settings.hole_count}
+          holeCount={holeCount}
           onHoleCountChange={handleHoleCountChange}
-          accentColor={settings.accent_color}
+          accentColor={accentColor}
           colorPalette={organization.settings_json?.color_palette || ['#00c853']}
           onAccentColorChange={handleAccentColorChange}
           isDatePickerOpen={isDatePickerOpen}
           setDatePickerOpen={v => isDatePickerOpen = v}
         />
         <LeaderboardSettings
-          showOnMainLeaderboard={settings.show_on_main_leaderboard}
+          showOnMainLeaderboard={showOnMainLeaderboard}
           onShowOnMainLeaderboardChange={handleShowOnMainLeaderboardChange}
-          scoreTimeRange={settings.score_time_range}
-          onScoreTimeRangeChange={handleScoreTimeRangeChange}
-          additionalTimeFilters={settings.additional_time_filters}
-          onAdditionalTimeFiltersChange={handleAdditionalTimeFiltersChange}
+          timeFilters={timeFilters}
+          onTimeFiltersChange={handleTimeFiltersChange}
         />
         <AdvertisementSettings
-          adText={settings.scorecard_ad_text}
+          adText={adText}
           onAdTextChange={handleAdTextChange}
-          adUrl={settings.scorecard_ad_url}
+          adUrl={adUrl}
           onAdUrlChange={handleAdUrlChange}
         />
         <EventActions
           saving={saving}
-          archived={settings.archived}
+          archived={isArchived}
           onSave={saveSettings}
           onCancel={cancelChanges}
           onArchive={archiveEvent}

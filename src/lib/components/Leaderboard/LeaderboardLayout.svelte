@@ -14,11 +14,18 @@
   import { boardRuntime } from '$lib/runtime';
   import { currentScores as currentScoresRuntime, activeBoard as activeBoardRuntime, runtimeStatus as runtimeStatusRuntime } from '$lib/runtime';
   import type { PlayerTotalScore } from '$lib/validations/playerScore';
+  import { showToast } from '$lib/stores/toastStore';
 
   export let organization: Organization;
   export let event: Event;
   export let loading = false;
   export let error: string | null = null;
+  export let children: any;
+
+  // Show error toast when error prop changes
+  $: if (error) {
+    showToast(error, 'error');
+  }
 
   // Debug logs for store initialization
   console.log('LeaderboardLayout - Store imports:', {
@@ -50,6 +57,11 @@
   $: currentBoard = loading ? null : $activeBoard;
   $: scores = loading ? [] : ($currentScores || []);
   $: lastUpdated = ($runtimeStatus?.lastUpdated) ? new Date($runtimeStatus.lastUpdated).toLocaleTimeString() : null;
+
+  function handleRetry() {
+    showToast('Refreshing leaderboard...', 'info');
+    window.location.reload();
+  }
 </script>
 
 <div class="leaderboard-layout">
@@ -72,7 +84,7 @@
         <p id="error-text">{error}</p>
         <button 
           class="retry-button" 
-          on:click={() => window.location.reload()}
+          on:click={handleRetry}
           aria-label="Retry loading data"
         >
           Retry
@@ -85,10 +97,9 @@
     {#if currentBoard && event?.id}
       <LeaderboardHeader {organization} {event} />
       
-      <div class="content">
-        <LeaderboardScores {event} leaderboard={scores} />
-        <LeaderboardSidebar {event} {organization} />
-      </div>
+      <slot>
+        {children}
+      </slot>
 
       {#if !loading}
         <LeaderboardRotationStatus

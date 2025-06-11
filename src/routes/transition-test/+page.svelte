@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import TransitionOverlay from '$lib/components/TransitionOverlay.svelte';
+  import TransitionOverlay from '$lib/components/leaderboard/TransitionOverlay.svelte';
   
   // State
   let showTransition = false;

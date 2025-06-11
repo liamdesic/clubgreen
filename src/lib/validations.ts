@@ -22,7 +22,7 @@ export type OrganizationSettings = z.infer<typeof organizationSettingsSchema>;
 
 // Event schema - maps to events table
 export const eventSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().uuid(),
   title: z.string().min(1, 'Title is required'),
   access_uuid: z.string().uuid('Invalid access UUID'),
   short_code: z.string().regex(/^[a-z0-9-]+$/, 'Only lowercase letters, numbers, and hyphens allowed'),
@@ -48,6 +48,8 @@ export const eventSchema = z.object({
     z.array(z.any())
   ]).nullable().default(null)
 });
+
+export const eventInsertSchema = eventSchema.omit({ id: true });
 
 export type Event = z.infer<typeof eventSchema>;
 

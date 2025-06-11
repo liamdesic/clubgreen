@@ -16,8 +16,6 @@
 - Suspicious score detection
 - Manual score approval workflow
 - Real-time score monitoring
-- Player behavior analysis
-- Player reputation system
 
 ## General Improvements
 - Enhanced leaderboard analytics

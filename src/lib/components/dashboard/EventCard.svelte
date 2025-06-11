@@ -1,9 +1,13 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import type { Event, Organization } from '$lib/types';
-  import { QrCode, User, Trophy } from 'lucide-svelte/icons';
+  import type { Database } from '$lib/database.types';
+  type Event = Database['public']['Tables']['events']['Row'];
+  type Organization = Database['public']['Tables']['organizations']['Row'];
+  import { QrCode, User } from 'lucide-svelte';
+  import Trophy from 'lucide-svelte/icons/trophy.svelte';
   import EventManagement from './EventManagement.svelte';
   import { getEventStatus } from '$lib/utils/eventStatus';
+  import type { LucideIcon } from 'lucide-svelte';
 
   // Props
   export let event: Event;
