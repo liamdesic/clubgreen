@@ -1,10 +1,10 @@
 <script lang="ts">
   import type { Event } from '$lib/validations';
-  import type { PlayerTotalScore } from '$lib/validations/playerScore';
+  import type { LeaderboardScore } from '$lib/validations/leaderboardView';
   import { fade } from 'svelte/transition';
 
   export let event: Event;
-  export let leaderboard: PlayerTotalScore[] = [];
+  export let leaderboard: LeaderboardScore[] = [];
 </script>
 
 <div class="leaderboard-tables">

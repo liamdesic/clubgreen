@@ -19,12 +19,11 @@ Each table has three main type variants:
 ### Leaderboard Snapshot
 - `leaderboard_snapshot`: Table for storing leaderboard snapshots
   - `id`: UUID (auto-generated)
-  - `event_id`: References an event
+  - `event_id`: References an event (Foreign Key → events.id)
   - `scores`: JSON data containing the snapshot
-  - `time_filter`: Optional time filter for the snapshot
+  - `time_filter`: Time filter for the snapshot (default: 'all_time')
   - `created_at`: Timestamp of creation
   - `updated_at`: Timestamp of last update
-  - `last_updated`: Timestamp of last data update
 
 ---
 
@@ -40,18 +39,6 @@ Each table has three main type variants:
 - `scorecardSchema`: Scorecard data structure with validation
 - `eventLogSchema`: Event logging structure
 - `leaderboardSnapshotSchema`: Leaderboard snapshot data structure with validation
-
-### Types
-- `Event`: Type for event data
-- `Organization`: Type for organization data
-- `Scorecard`: Type for scorecard data
-- `EventLog`: Type for event log entries
-- `ScorecardInsert`: Type for creating new scorecards
-- `ScorecardUpdate`: Type for updating existing scorecards
-
-### Helper Functions
-- `normalizeEvent(raw: any): Event`: Converts raw event data to normalized form
-- `fromScorecardRow(row: unknown): Scorecard | null`: Converts DB row to Scorecard
 
 ### Types
 - `Event`: Type for event data
@@ -170,6 +157,7 @@ Each table has three main type variants:
   - `fetchEvents(orgId: string)`: Fetches events for an organization
   - `addEvent(newEvent: Omit<Event, 'id'>)`: Adds a new event
   - `updateEvent(id: string, updates: Partial<Event>)`: Updates an existing event
+  - `deleteEvent(id: string)`: Deletes an event and removes it from the store
   - `loading`: Writable store for loading state
   - `error`: Writable store for error state
   - Features:

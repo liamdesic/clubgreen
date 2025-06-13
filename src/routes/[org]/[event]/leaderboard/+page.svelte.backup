@@ -70,7 +70,8 @@
 
   // Organization settings
   let organizationSettings = {
-    logo_url: ''
+    logo_url: '',
+    ads_image_url: ''
   };
 
   // Event settings (with safe defaults)
@@ -92,7 +93,7 @@
       console.log('🔍 Fetching organization data for slug:', currentOrg);
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
-        .select('settings_json')
+        .select('logo_url, ads_image_url')
         .eq('slug', currentOrg)
         .single();
         
@@ -100,10 +101,10 @@
       
       console.log('✅ Organization data fetched:', orgData);
       
-      if (orgData?.settings_json) {
+      if (orgData) {
         organizationSettings = {
-          logo_url: orgData.settings_json.logo_url || '',
-          ad_image_url: orgData.settings_json.ad_image_url || ''
+          logo_url: orgData.logo_url || '',
+          ads_image_url: orgData.ads_image_url || ''
         };
         console.log('📋 Organization settings loaded:', organizationSettings);
       } else {
@@ -122,7 +123,7 @@
       // Get the event details
       const { data: eventData, error: eventError } = await supabase
         .from('events')
-        .select('id, title, settings_json')
+        .select('id, title, hole_count, accent_color, logo_url, enable_ads, ads_text, ads_url')
         .eq('slug', currentEvent)
         .single();
 
@@ -131,14 +132,17 @@
 
       eventId = eventData.id;
       
-          // Merge default settings with any settings from the database
+      // Merge default settings with any settings from the database
       eventSettings = {
         ...eventSettings,
         title: eventData.title || eventSettings.title,
-        ...(eventData.settings_json || {})
+        hole_count: eventData.hole_count || eventSettings.hole_count,
+        accent_color: eventData.accent_color || eventSettings.accent_color,
+        logo_url: eventData.logo_url || eventSettings.logo_url,
+        enable_ads: eventData.enable_ads || eventSettings.enable_ads,
+        ads_text: eventData.ads_text || eventSettings.ads_text,
+        ads_url: eventData.ads_url || eventSettings.ads_url
       };
-      
-
       
       console.log('✅ EVENT SETTINGS:', eventSettings);
     } catch (err) {
@@ -452,11 +456,11 @@
   <!-- 📢 SIDEBAR -->
   <div class="sidebar">
   <!-- 📢 Ad Image -->
-  {#if organizationSettings?.ad_image_url || eventSettings.ads_image_url}
+  {#if organizationSettings?.ads_image_url || eventSettings.ads_image_url}
     <div class="ad-container">
       <a href={eventSettings.ads_url || '#'} class="ad-banner">
         <img 
-          src={eventSettings.ads_image_url || organizationSettings.ad_image_url} 
+          src={eventSettings.ads_image_url || organizationSettings.ads_image_url} 
           alt={eventSettings.ads_text || 'Advertisement'}
           class="ad-image"
         />

@@ -1,8 +1,6 @@
 /* -----------------------------------
    🎨 BASE STYLES & TYPOGRAPHY
 ----------------------------------- */
-@import url('https://use.typekit.net/kic0xlz.css'); /* Obviously font */
-@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css');
 
 :root {
   --accent-color: #00c853; /* Default accent color - will be overridden by event settings */
@@ -20,7 +18,7 @@
 }
 
 body {
-  font-family: 'obviously', sans-serif;
+  font-family: var(--user-font-body);
   background: var(--accent-color-light);
   margin: 0;
   padding: 0;
@@ -184,7 +182,7 @@ body {
 /* 🧩 Player Input */
 .player-input-label {
   display: block;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--user-font-body);
   font-size: 1.1rem;
   font-weight: 500;
   color: var(--accent-color);
@@ -306,7 +304,7 @@ body {
   align-items: center;
   position: relative;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -327,9 +325,8 @@ body {
 }
 
 .leaderboard-button::after {
-  content: '\f078';
-  font-family: 'Font Awesome 6 Free';
-  font-weight: 900;
+  content: '▼';
+  font-size: 0.8em;
   position: absolute;
   right: 1rem;
   font-size: 0.8em;
@@ -353,7 +350,7 @@ body {
 
 
 .bottom-bar-button {
-  font-family: 'obviously', sans-serif;
+  font-family: var(--user-font-header);
   background: var(--accent-color);
   color: white;
   font-size: 1.25rem;
@@ -366,7 +363,7 @@ body {
   border-radius: 0 0 30px 30px;
   cursor: pointer;
   text-align: center;
-  transition: all 0.3s ease;
+  transition: background-color 0.3s ease, opacity 0.3s ease, transform 0.3s ease;
   display: block;
   box-sizing: border-box;
   white-space: nowrap;
@@ -451,7 +448,7 @@ body {
   margin-bottom: 1.5rem;
   position: relative;
   z-index: 8;
-  font-family: 'obviously-narrow', sans-serif;
+  font-family: var(--user-font-display);
   font-weight: 700;
   letter-spacing: 0.5px;
 }
@@ -481,7 +478,7 @@ body {
 .player-card {
   border-radius: 12px;
   margin-bottom: 1rem;
-  transition: all 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
   position: relative;
   overflow: hidden;
 }
@@ -562,7 +559,7 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
 
 .edit-btn:hover {
@@ -602,7 +599,7 @@ body {
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -655,9 +652,6 @@ body {
   font-size: 1rem;
 }
 
-.edit-btn i {
-  pointer-events: none;
-}
 
 
 
@@ -702,7 +696,6 @@ color: white;
   top: -30px;
   left: 50%;
   transform: translateX(-50%);
-  pointer-events: none;
 }
 
 .final-table {
@@ -824,7 +817,7 @@ color: white;
   text-decoration: none;
   backdrop-filter: blur(5px);
   border: 1px solid rgba(255, 255, 255, 0.15);
-  transition: all 0.3s ease;
+  transition: background 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
   cursor: pointer;
   font-weight: 500;
 }

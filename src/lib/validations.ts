@@ -4,6 +4,12 @@ import { parseJSONField } from './utils/jsonUtils';
 import { dateSchema, nullableDateSchema } from './validations/dateSchemas';
 import { timeFilterSchema, type TimeFilter } from './validations/timeFilter';
 import { type FormErrorResponse } from './validations/errorSchemas';
+import { toISOString } from './utils/generalUtils';
+
+// Helper function to normalize datetime values
+function normalizeDateTime(value: unknown): string | null {
+  return toISOString(value);
+}
 
 // Core schema definitions - these map directly to Supabase tables
 // Keep these in this file as they are fundamental to the application
@@ -49,7 +55,33 @@ export const eventSchema = z.object({
   ]).nullable().default(null)
 });
 
-export const eventInsertSchema = eventSchema.omit({ id: true });
+// Create a proper insert schema that matches the database's Insert type
+export const eventInsertSchema = z.object({
+  title: z.string().min(1, 'Title is required'),
+  access_uuid: z.string().uuid('Invalid access UUID'),
+  short_code: z.string().regex(/^[a-z0-9-]+$/, 'Only lowercase letters, numbers, and hyphens allowed'),
+  organization_id: z.string().uuid('Invalid organization ID').nullable(),
+  created_at: nullableDateSchema.optional(),
+  event_date: nullableDateSchema,
+  accent_color: z.string().regex(/^#[0-9a-f]{6}$/i, 'Must be a valid hex color').nullable(),
+  logo_url: z.string().url('Invalid URL').nullable(),
+  hole_count: z.number().int().positive('Must be a positive number').nullable(),
+  show_on_main_leaderboard: z.boolean().default(false).nullable(),
+  archived: z.boolean().default(false).nullable(),
+  published: z.boolean().default(false).nullable(),
+  ads_text: z.string().nullable(),
+  ads_url: z.string().url('Invalid URL').nullable(),
+  ads_image_url: z.string().url('Invalid URL').nullable(),
+  time_filters: z.array(timeFilterSchema).nullable(),
+  settings_json: z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.record(z.any()),
+    z.array(z.any())
+  ]).nullable().default(null)
+});
 
 export type Event = z.infer<typeof eventSchema>;
 
@@ -57,6 +89,12 @@ export type Event = z.infer<typeof eventSchema>;
 export function normalizeEvent(raw: any): Event {
   return {
     ...raw,
+    // Normalize short_code to lowercase
+    short_code: typeof raw.short_code === 'string' ? raw.short_code.toLowerCase() : raw.short_code,
+    // Handle datetime fields - normalize to ISO string
+    created_at: normalizeDateTime(raw.created_at),
+    event_date: normalizeDateTime(raw.event_date),
+    // Parse JSON fields
     time_filters: parseJSONField(raw.time_filters, z.array(timeFilterSchema)) ?? null,
     settings_json: parseJSONField(raw.settings_json, z.any()) ?? null
   };
@@ -83,7 +121,7 @@ export const organizationSchema = z.object({
       }
     })
     .default([]),
-  leaderboard_rotation_interval: z.enum(['5s', '10s', '15s', '30s', '60s']).default('10s'),
+  leaderboard_rotation_interval: z.number().int().positive('Must be a positive number').nullable().default(15),
   payment_up_to_date: z.boolean().default(false),
   stripe_customer_id: z.string().nullable(),
   stripe_subscription_id: z.string().nullable(),
@@ -103,8 +141,8 @@ type ScorecardRow = Tables['scorecard']['Row']; // Used for type inference
 // Base schema with all fields and their validation rules
 const baseScorecardSchema = {
   id: z.string().uuid().optional(),
-  created_at: z.string().datetime().nullable(),
-  updated_at: z.string().datetime().nullable(), // Changed from nullish to nullable for DB consistency
+  created_at: z.string().datetime({ offset: true }).nullable(),
+  updated_at: z.string().datetime({ offset: true }).nullable().optional(), // Made optional and handle timezone
   name: z.string().min(1, 'Name is required'),
   score: z.number().int('Score must be an integer').min(0, 'Score cannot be negative'),
   published: z.boolean().default(false).nullable(),

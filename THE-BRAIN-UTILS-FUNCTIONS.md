@@ -52,12 +52,28 @@ unsubscribe();
 - `parseLeaderboardScores(scores: unknown)`: Validates and parses leaderboard scores
 - `triggerLeaderboardUpdate(eventId: string, timeFilter: TimeFilter)`: Triggers a snapshot update
 
+### `eventUtils.ts`
+**Purpose**: Event management and filtering utilities.
+
+**Exports**:
+- `getLiveVisibleEventsForOrg(orgId: string)`: Gets all live and visible events for an organization
+- `getEventsForOrg(orgId: string)`: Fetches all events for an organization
+- `countScoresForEvents(events: Event[])`: Counts scores for a batch of events
+- `generateOrgLeaderboardBoards(liveEvents: Event[])`: Generates LeaderboardBoard[] from live events and their time filters
+
+### `jsonUtils.ts`
+**Purpose**: Safe JSON parsing utilities with type validation.
+
+**Exports**:
+- `parseJSONField<T>(value: unknown, schema: z.ZodType<T>): T | null`: Parse JSON field with Zod schema validation
+
 ### `codeUtils.ts`
 **Purpose**: Handles generation, validation, and management of codes and UUIDs.
 
 **Exports**:
 - `generateShortCode(length = 7)`: Generates a random alphanumeric code
 - `generateAccessUUID()`: Generates a secure UUID v4
+- `validateOrgLeaderboardCode(orgId: string, code: string)`: Validates if a code belongs to an organization
 - `generateUniqueShortCode(length = 7)`: Generates a unique short code
 - `generateUniqueAccessUUID()`: Generates a unique UUID
 - `generateUniqueOrgLeaderboardCode(length = 7)`: Generates a unique org leaderboard code
@@ -135,6 +151,36 @@ unsubscribe();
   - `showSuccess(message: string, duration?: number): void`
   - `showError(message: string, duration?: number): void`
   - `showInfo(message: string, duration?: number): void`
+
+## Data Validation & Normalization
+
+### `validationUtils.ts`
+**Purpose**: Generic validation helpers for Zod schemas.
+
+**Exports**:
+- `validate<T>(schema: T, data: unknown)`: Generic validation function
+- `validateEvent(data: unknown)`: Validates event data
+- `validateOrganization(data: unknown)`: Validates organization data
+- `validateScorecard(data: unknown)`: Validates scorecard data
+- `validateEventSettings(data: unknown)`: Validates event settings
+- `validateOrganizationSettings(data: unknown)`: Validates organization settings
+
+### Data Normalization (`validations.ts`)
+**Purpose**: Convert raw database data to application types.
+
+**Exports**:
+- `normalizeEvent(raw: any): Event`: Normalizes raw DB event row to canonical Event type
+- `fromScorecardRow(row: unknown): Scorecard | null`: Converts database row to Scorecard with error handling
+
+## Store Utilities
+
+### Source Store Helpers
+**Purpose**: Data preparation and parsing for source stores.
+
+**Exports**:
+- `prepareForSupabase<T>(data: T)`: Convert Date objects to ISO strings for Supabase
+- `parseScorecard(data: unknown)`: Safely parse scorecard from unknown input
+- `toPlayerHoleScore(scorecard: Scorecard)`: Convert Scorecard to PlayerHoleScore
 
 ## Score Management
 

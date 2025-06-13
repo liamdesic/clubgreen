@@ -46,9 +46,26 @@
   --gradient-color: linear-gradient(135deg, #689ef9, #6e4ef4, #572b86);
   --gradient-light: linear-gradient(135deg, #ffffe6, #f7f7f0, #ccccef);
 
-  /* ✍️ Typography */
-  --font-header: 'obviously', sans-serif;
-  --font-body: 'Inter', sans-serif;
+  /* ✍️ Typography System */
+  
+  /* 🏢 LDRBOARD Brand Fonts (LOCKED - never customizable) */
+  --brand-font-header: 'obviously', 'Inter', sans-serif;
+  --brand-font-header-bold: 'obviously', 'Inter', sans-serif; /* Will use font-weight: 700+ */
+  --brand-font-body: 'Inter', sans-serif;
+  --brand-font-narrow: 'obviously-narrow', 'obviously', sans-serif;
+  --brand-font-mono: 'Roboto Mono', 'Fira Code', Consolas, 'Courier New', monospace;
+  
+  /* 🎨 User Customizable Fonts (scorecard/leaderboard only) */
+  /* Default to brand fonts, can be overridden by user customization */
+  --user-font-header: var(--brand-font-header-bold);
+  --user-font-body: var(--brand-font-body);
+  --user-font-display: var(--brand-font-narrow);
+  
+  /* 📝 Font Presets for User Selection */
+  --font-preset-modern: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-preset-classic: Georgia, 'Times New Roman', serif;
+  --font-preset-sports: 'Impact', 'Arial Black', sans-serif;
+  --font-preset-elegant: 'Playfair Display', Georgia, serif;
 
   /* 🧱 Layout & Spacing */
   --radius: 12px;
@@ -59,8 +76,8 @@
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-header);
-  font-weight: 600;
+  font-family: var(--brand-font-header-bold);
+  font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.2;
   margin-bottom: 0.6em;
@@ -80,7 +97,7 @@ h3 {
 }
 
 p {
-  font-family: var(--font-body);
+  font-family: var(--brand-font-body);
   font-size: 1rem;
   line-height: 1.6;
   margin-bottom: 1rem;
@@ -88,7 +105,7 @@ p {
 }
 
 a {
-  font-family: var(--font-body);
+  font-family: var(--brand-font-body);
   font-weight: 500;
   text-decoration: none;
   transition: color 0.2s ease;
@@ -110,5 +127,15 @@ input[type="reset"],
 [on\:keydown],
 [on\:mousedown],
 [on\:mouseup] {
-  cursor: pointer;
+  cursor: pointer !important;
+}
+
+/* Ensure disabled states override the pointer cursor */
+button:disabled,
+[role="button"]:disabled,
+input[type="submit"]:disabled,
+input[type="button"]:disabled,
+input[type="reset"]:disabled,
+.clickable:disabled {
+  cursor: not-allowed !important;
 }

@@ -4,58 +4,79 @@
 
   export let colors: string[] = ['#00c853'];
   export let maxColors = 6;
+  export let mode: 'customize' | 'select' = 'customize';
+  export let selectedColor: string | null = null;
 
   const dispatch = createEventDispatcher<{
     update: { colors: string[] };
+    select: { color: string };
   }>();
 
   function updateColor(index: number, value: string) {
-    colors[index] = value;
-    dispatch('update', { colors: [...colors] });
+    if (mode === 'customize') {
+      colors[index] = value;
+      dispatch('update', { colors: [...colors] });
+    }
   }
 
   function addColor() {
-    if (colors.length < maxColors) {
+    if (mode === 'customize' && colors.length < maxColors) {
       colors = [...colors, '#000000'];
       dispatch('update', { colors: [...colors] });
     }
   }
 
   function removeColor(index: number) {
-    if (colors.length > 1) {
+    if (mode === 'customize' && colors.length > 1) {
       colors = colors.filter((_, i) => i !== index);
       dispatch('update', { colors: [...colors] });
+    }
+  }
+
+  function selectColor(color: string) {
+    if (mode === 'select') {
+      selectedColor = color;
+      dispatch('select', { color });
     }
   }
 </script>
 
 <div class="color-palette">
-  <div class="description">
-    <h3>Brand Colors</h3>
-    <p>Add your brand colors to use them when creating events. These colors will be available in your event creation tools.</p>
-  </div>
   <div class="color-list">
     {#each colors as color, i}
       <div class="color-item">
-        <input 
-          type="color" 
-          bind:value={colors[i]}
-          on:input={() => updateColor(i, colors[i])}
-        />
-        {#if colors.length > 1}
-          <button 
-            type="button" 
-            class="remove-color" 
-            on:click={() => removeColor(i)}
-            aria-label="Remove color {i + 1}"
-          >
-            ×
-          </button>
+        {#if mode === 'customize'}
+          <input 
+            type="color" 
+            bind:value={colors[i]}
+            on:input={() => updateColor(i, colors[i])}
+          />
+          {#if colors.length > 1}
+            <button 
+              type="button" 
+              class="remove-color" 
+              on:click={() => removeColor(i)}
+              aria-label="Remove color {i + 1}"
+            >
+              ×
+            </button>
+          {/if}
+        {:else}
+          <button
+            type="button"
+            class="color-swatch {selectedColor === color ? 'selected' : ''}"
+            style="background: {color}; opacity: {selectedColor === color ? '1' : '0.5'}"
+            on:click={() => selectColor(color)}
+            on:mouseenter={(e) => e.currentTarget.style.opacity = '1'}
+            on:mouseleave={(e) => e.currentTarget.style.opacity = selectedColor === color ? '1' : '0.5'}
+            aria-label="Select color {color}"
+            title="Click to select this color"
+          ></button>
         {/if}
       </div>
     {/each}
 
-    {#if colors.length < maxColors}
+    {#if mode === 'customize' && colors.length < maxColors}
       <button 
         type="button" 
         class="add-color-button" 
@@ -71,24 +92,6 @@
 <style>
   .color-palette {
     margin: 1rem 0;
-  }
-
-  .description {
-    margin-bottom: 1rem;
-  }
-
-  .description h3 {
-    font-size: 1rem;
-    font-weight: 600;
-    margin: 0 0 0.5rem 0;
-    color: #333;
-  }
-
-  .description p {
-    font-size: 0.875rem;
-    color: #666;
-    margin: 0;
-    line-height: 1.4;
   }
 
   .color-list {
@@ -128,6 +131,25 @@
   input[type="color"]::-moz-color-swatch {
     border: none;
     border-radius: 6px;
+  }
+
+  .color-swatch {
+    width: 48px;
+    height: 48px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    padding: 0;
+    transition: opacity 0.2s ease, transform 0.1s ease;
+  }
+
+  .color-swatch:hover {
+    transform: translateY(-1px);
+  }
+
+  .color-swatch.selected {
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   }
 
   .remove-color {

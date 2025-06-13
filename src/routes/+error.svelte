@@ -1,11 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import SearchIcon from 'lucide-svelte/icons/search';
-  import LockIcon from 'lucide-svelte/icons/lock';
-  import KeyIcon from 'lucide-svelte/icons/key';
-  import AlertTriangleIcon from 'lucide-svelte/icons/alert-triangle';
-  import CreditCardIcon from 'lucide-svelte/icons/credit-card';
-  import HelpCircleIcon from 'lucide-svelte/icons/help-circle';
+  import { Search, Lock, Key, AlertTriangle, CreditCard, HelpCircle } from 'lucide-svelte';
 
   // Define error content based on status code
   const errorContent = {
@@ -15,7 +10,7 @@
       message: "We couldn't find the page you're looking for.",
       action: 'Go to Dashboard',
       actionLink: '/dashboard',
-      icon: SearchIcon
+      icon: Search
     },
     // Forbidden
     403: {
@@ -23,7 +18,7 @@
       message: "You don't have permission to access this resource.",
       action: 'Go to Dashboard',
       actionLink: '/dashboard',
-      icon: LockIcon
+      icon: Lock
     },
     // Unauthorized
     401: {
@@ -31,7 +26,7 @@
       message: 'Please sign in to access this resource.',
       action: 'Sign In',
       actionLink: '/login',
-      icon: KeyIcon
+      icon: Key
     },
     // Server Error
     500: {
@@ -39,7 +34,7 @@
       message: 'Something went wrong on our end. Please try again later.',
       action: 'Go to Dashboard',
       actionLink: '/dashboard',
-      icon: AlertTriangleIcon
+      icon: AlertTriangle
     },
     // Payment Required
     402: {
@@ -47,7 +42,7 @@
       message: 'This feature requires an active subscription.',
       action: 'Manage Subscription',
       actionLink: '/dashboard/settings',
-      icon: CreditCardIcon
+      icon: CreditCard
     },
     // Default
     default: {
@@ -55,7 +50,7 @@
       message: 'An unexpected error occurred.',
       action: 'Go to Dashboard',
       actionLink: '/dashboard',
-      icon: HelpCircleIcon
+      icon: HelpCircle
     }
   };
 

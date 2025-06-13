@@ -6,15 +6,25 @@
   import { supabase } from '$lib/supabaseClient';
   import { invalidate } from '$app/navigation';
   import { goto } from '$app/navigation';
+  import ToastHost from '$lib/ToastHost.svelte';
+  import DevPanel from '$lib/dev/DevPanel.svelte';
+  import { authLogger } from '$lib/dev/logger';
 
   onMount(() => {
+    authLogger.info('Initializing auth state listener');
+    
     const {
       data: { subscription }
-    } = supabase.auth.onAuthStateChange(() => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      authLogger.info(`Auth state changed: ${event}`, { 
+        userId: session?.user?.id,
+        email: session?.user?.email 
+      });
       invalidate('supabase:auth');
     });
 
     return () => {
+      authLogger.info('Cleaning up auth state listener');
       subscription.unsubscribe();
     };
   });
@@ -24,6 +34,8 @@
   <main>
     <slot />
   </main>
+  <ToastHost />
+  <DevPanel />
 </div>
 
 <style>

@@ -18,7 +18,7 @@ export function getEventStatus(event: Event, scoreCount: number = 0): EventStatu
   const eventDate = event.event_date;
   
   // If manually archived, it's always archived
-  if (event.settings_json?.archived) {
+  if (event.archived) {
     return {
       code: 3,
       label: 'Archived',

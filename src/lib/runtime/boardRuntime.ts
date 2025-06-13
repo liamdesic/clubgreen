@@ -1,331 +1,364 @@
 import { writable, derived, get } from 'svelte/store';
-import type { Readable } from 'svelte/store';
-import type { LeaderboardBoard, BoardState, BoardRuntimeConfig, BoardRuntimeStatus } from './board.types';
+import type { LeaderboardBoard, LeaderboardBoardView, LeaderboardRotationState, LeaderboardScore } from '$lib/validations/leaderboardView';
+import type { BoardRuntimeConfig, BoardState, BoardRuntimeStatus, BoardRuntime } from './board.types';
 import { subscribeToLeaderboard } from './scoreSnapshot';
+import { validateLeaderboardScores } from '$lib/validations/leaderboardView';
+import { supabase } from '$lib/supabaseClient';
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import { showToast } from '$lib/stores/toastStore';
+import type { TimeFilter } from '$lib/validations/timeFilter';
 
-// Internal state interface
-interface InternalState {
-  /** List of all configured boards */
-  boards: Map<string, BoardState>;
+/**
+ * Internal state for the runtime
+ */
+interface BoardRuntimeState {
+  /** All boards in the runtime */
+  boards: Record<string, BoardState>;
   
   /** ID of the currently active board */
   activeBoardId: string | null;
   
-  /** Rotation timer ID */
+  /** Timer for rotation */
   rotationTimer: NodeJS.Timeout | null;
   
-  /** Time when the current board was activated */
-  boardActivatedAt: number | null;
+  /** When the next rotation will occur */
+  nextRotationAt: number | null;
   
-  /** Configuration */
+  /** Runtime configuration */
   config: BoardRuntimeConfig;
-  
-  /** Whether the runtime is initialized */
-  initialized: boolean;
 }
 
-const initialState: InternalState = {
-  boards: new Map(),
+// Initial state
+const initialState: BoardRuntimeState = {
+  boards: {},
   activeBoardId: null,
   rotationTimer: null,
-  boardActivatedAt: null,
+  nextRotationAt: null,
   config: {
-    rotationIntervalMs: 10000, // 10 seconds default
-    rotationEnabled: true,
-  },
-  initialized: false,
+    rotationEnabled: false,
+    rotationIntervalMs: 30000, // Default 30 seconds
+    onError: undefined
+  }
 };
 
-// Create the store
-const { subscribe, update } = writable<InternalState>(initialState);
+// Create the runtime store
+const runtimeStore = writable<BoardRuntimeState>(initialState);
 
-console.log('boardRuntime - Store created:', {
-  subscribe: typeof subscribe,
-  update: typeof update,
-  initialState
+// Create derived store for runtime status
+const runtimeStatus = derived(runtimeStore, ($state): BoardRuntimeStatus => {
+  const now = Date.now();
+  const timeUntilRotation = $state.nextRotationAt ? $state.nextRotationAt - now : null;
+  
+  return {
+    isRotating: $state.config.rotationEnabled,
+    rotationIntervalMs: $state.config.rotationIntervalMs,
+    boardCount: Object.keys($state.boards).length,
+    activeBoardId: $state.activeBoardId,
+    nextRotationAt: $state.nextRotationAt,
+    timeUntilRotation,
+    lastUpdated: new Date().toISOString()
+  };
 });
 
-// Helper to get the current state
-function getState(): InternalState {
-  const state = get({ subscribe });
-  console.log('boardRuntime - getState:', state);
-  return state;
-}
+// Create the current board store
+const currentBoard = derived(runtimeStore, ($state) => {
+  if (!$state.activeBoardId) return null;
+  return $state.boards[$state.activeBoardId]?.board || null;
+});
 
-// Helper to update state
-function setState(updater: (state: InternalState) => InternalState) {
-  console.log('boardRuntime - setState called');
-  update(updater);
-}
+// Create the current scores store
+const currentScores = derived(runtimeStore, ($state) => {
+  if (!$state.activeBoardId) return null;
+  return $state.boards[$state.activeBoardId]?.scores || null;
+});
 
-// Add helper function after setState and getState
-function subscribeToActiveBoard() {
-  setState(state => {
-    const { activeBoardId, boards } = state;
-    if (!activeBoardId) return state;
-
-    const current = boards.get(activeBoardId);
-    if (!current) return state;
-
-    // Clean up any previous subscription
-    current.unsubscribe?.();
-
-    const unsubscribe = subscribeToLeaderboard(current.board, (scores, error) => {
-      setState(s => {
-        const updatedBoards = new Map(s.boards);
-        const target = updatedBoards.get(activeBoardId);
-        if (!target) return s;
-
-        updatedBoards.set(activeBoardId, {
-          ...target,
-          scores,
-          error,
-          loading: false,
-          lastUpdated: new Date().toISOString(),
-        });
-
-        return {
-          ...s,
-          boards: updatedBoards,
-        };
-      });
-    });
-
-    const updatedBoards = new Map(boards);
-    updatedBoards.set(activeBoardId, {
-      ...current,
-      unsubscribe,
-    });
-
-    return {
-      ...state,
-      boards: updatedBoards,
-    };
-  });
-}
-
-/**
- * Initialize the board runtime with configuration
- */
-function initialize(config: Partial<BoardRuntimeConfig> = {}) {
-  console.log('boardRuntime - initialize called with config:', config);
+// Create the board runtime
+const boardRuntime: BoardRuntime = {
+  subscribe: runtimeStore.subscribe,
   
-  setState(state => {
-    console.log('boardRuntime - initialize updating state');
-    return {
-      ...state,
-      config: {
-        ...state.config,
-        ...config,
-      },
-      initialized: true,
-    };
-  });
-  
-  // Start rotation if enabled
-  if (config.rotationEnabled !== false) {
-    console.log('boardRuntime - initialize starting rotation');
-    startRotation();
-  }
-  
-  // Cleanup on destroy
-  return () => {
-    console.log('boardRuntime - initialize cleanup called');
-    stopRotation();
-    setState(state => {
-      state.boards.forEach(board => {
-        board.unsubscribe?.();
-      });
-      return { ...initialState };
-    });
-  };
-}
-
-/**
- * Add or update boards in the runtime
- */
-function setBoards(boards: LeaderboardBoard[]) {
-  setState(state => {
-    const newBoards = new Map(state.boards);
+  initialize: (config) => {
+    // Update config if provided
+    if (config) {
+      runtimeStore.update(state => ({
+        ...state,
+        config: {
+          ...state.config,
+          ...config
+        }
+      }));
+    }
     
-    // Update or add new boards
-    boards.forEach(board => {
-      const existing = newBoards.get(board.id);
-      
-      if (existing) {
-        // Update existing board
-        newBoards.set(board.id, {
-          ...existing,
-          board: {
-            ...existing.board,
-            ...board,
-          },
+    // Return cleanup function
+    return () => {
+      runtimeStore.update(state => {
+        // Clear rotation timer
+        if (state.rotationTimer) {
+          clearTimeout(state.rotationTimer);
+        }
+        
+        // Unsubscribe from all boards
+        Object.values(state.boards).forEach(board => {
+          if (board.unsubscribe) {
+            board.unsubscribe();
+          }
         });
-      } else {
-        // Add new board
-        newBoards.set(board.id, {
+        
+        return initialState;
+      });
+    };
+  },
+  
+  async setBoards(boards: LeaderboardBoard[]) {
+    try {
+      const newBoards: Record<string, BoardState> = {};
+      for (const board of boards) {
+        const scores = await supabase
+          .from('leaderboard_snapshot')
+          .select('scores')
+          .eq('event_id', board.eventId)
+          .eq('time_filter', board.timeFilter)
+          .single();
+
+        if (scores.error) {
+          newBoards[board.id] = {
+            board,
+            scores: null,
+            error: scores.error.message,
+            loading: false,
+            lastUpdated: new Date().toISOString(),
+            unsubscribe: () => {}
+          };
+          continue;
+        }
+
+        const validatedScores = validateLeaderboardScores(scores.data?.scores || []);
+        newBoards[board.id] = {
           board,
-          scores: null,
+          scores: validatedScores || null,
           error: null,
           loading: false,
-          lastUpdated: null,
-          unsubscribe: () => {},
-        });
+          lastUpdated: new Date().toISOString(),
+          unsubscribe: () => {}
+        };
       }
-    });
-    
-    // If no active board, set the first one
-    let activeBoardId = state.activeBoardId;
-    if (!activeBoardId && boards.length > 0) {
-      activeBoardId = boards[0].id;
-    }
-    
-    return {
-      ...state,
-      boards: newBoards,
-      activeBoardId,
-    };
-  });
 
-  // Call subscribeToActiveBoard after state update
-  setTimeout(() => {
-    subscribeToActiveBoard();
-  }, 0);
+      runtimeStore.update(state => ({
+        ...state,
+        boards: newBoards,
+        activeBoardId: boards[0]?.id || null
+      }));
+    } catch (error) {
+      console.error('Error setting boards:', error);
+      const currentState = get(runtimeStore);
+      if (currentState.config.onError) {
+        currentState.config.onError(error instanceof Error ? error : new Error('Unknown error'));
+      }
+      throw error;
+    }
+  },
+  
+  startRotation: () => {
+    try {
+      runtimeStore.update(state => {
+        console.log('[boardRuntime] Starting rotation with:', {
+          boardCount: Object.keys(state.boards).length,
+          activeBoardId: state.activeBoardId,
+          rotationIntervalMs: state.config.rotationIntervalMs
+        });
+        
+        // Clear existing timer
+        if (state.rotationTimer) {
+          clearTimeout(state.rotationTimer);
+        }
+        
+        // Set rotation enabled
+        const newState = {
+          ...state,
+          config: {
+            ...state.config,
+            rotationEnabled: true
+          }
+        };
+        
+        // Start rotation timer
+        if (Object.keys(state.boards).length > 1) {
+          const nextRotationAt = Date.now() + state.config.rotationIntervalMs;
+          const timer = setTimeout(() => {
+            console.log('[boardRuntime] Timer fired, rotating to next board');
+            rotateToNextBoard();
+          }, state.config.rotationIntervalMs);
+          
+          console.log('[boardRuntime] Rotation timer set for', state.config.rotationIntervalMs, 'ms');
+          
+          return {
+            ...newState,
+            rotationTimer: timer,
+            nextRotationAt
+          };
+        } else {
+          console.log('[boardRuntime] Not enough boards for rotation:', Object.keys(state.boards).length);
+        }
+        
+        return newState;
+      });
+    } catch (error) {
+      const state = get(runtimeStore);
+      if (state.config.onError) {
+        state.config.onError(error instanceof Error ? error : new Error('Failed to start rotation'));
+      }
+      throw error;
+    }
+  },
+  
+  stopRotation: () => {
+    try {
+      runtimeStore.update(state => {
+        // Clear rotation timer
+        if (state.rotationTimer) {
+          clearTimeout(state.rotationTimer);
+        }
+        
+        return {
+          ...state,
+          config: {
+            ...state.config,
+            rotationEnabled: false
+          },
+          rotationTimer: null,
+          nextRotationAt: null
+        };
+      });
+    } catch (error) {
+      const state = get(runtimeStore);
+      if (state.config.onError) {
+        state.config.onError(error instanceof Error ? error : new Error('Failed to stop rotation'));
+      }
+      throw error;
+    }
+  },
+  
+  setActiveBoard: (boardId) => {
+    try {
+      runtimeStore.update(state => {
+        // Don't change if already active
+        if (state.activeBoardId === boardId) return state;
+        
+        // Update active board
+        return {
+          ...state,
+          activeBoardId: boardId,
+          boardActivatedAt: Date.now().toString()
+        };
+      });
+      
+      // Subscribe to new active board
+      subscribeToActiveBoard(boardId);
+    } catch (error) {
+      const state = get(runtimeStore);
+      if (state.config.onError) {
+        state.config.onError(error instanceof Error ? error : new Error('Failed to set active board'));
+      }
+      throw error;
+    }
+  },
+  
+  getStatus: () => get(runtimeStatus)
+};
+
+// Helper function to subscribe to a board's updates
+function subscribeToActiveBoard(boardId: string) {
+  const state = get(runtimeStore);
+  const board = state.boards[boardId];
+  if (!board) return;
+  
+  // Unsubscribe from previous board
+  if (board.unsubscribe) {
+    board.unsubscribe();
+  }
+  
+  // Subscribe to new board
+  const unsubscribe = subscribeToLeaderboard(board.board, (scores, error) => {
+    runtimeStore.update(state => ({
+      ...state,
+      boards: {
+        ...state.boards,
+        [boardId]: {
+          ...state.boards[boardId],
+          scores,
+          error: error ? new Error(error) : null,
+          loading: false,
+          lastUpdated: new Date().toISOString()
+        }
+      }
+    }));
+  });
+  
+  // Update board state with unsubscribe function
+  runtimeStore.update(state => ({
+    ...state,
+    boards: {
+      ...state.boards,
+      [boardId]: {
+        ...state.boards[boardId],
+        unsubscribe
+      }
+    }
+  }));
 }
 
-/**
- * Start the board rotation
- */
-function startRotation() {
-  setState(state => {
-    if (state.rotationTimer || !state.config.rotationEnabled) {
-      return state;
-    }
+// Helper function to rotate to the next board
+function rotateToNextBoard() {
+  console.log('[boardRuntime] rotateToNextBoard called');
+  
+  const state = get(runtimeStore);
+  const boardIds = Object.keys(state.boards);
+  console.log('[boardRuntime] Available boards:', boardIds);
+  
+  if (boardIds.length <= 1) {
+    console.log('[boardRuntime] Not enough boards for rotation');
+    return;
+  }
+  
+  // Add a 150ms delay to let transition overlay cover the screen first
+  setTimeout(() => {
+    runtimeStore.update(state => {
+      // Find current index
+      const currentIndex = boardIds.indexOf(state.activeBoardId || '');
+      const nextIndex = (currentIndex + 1) % boardIds.length;
+      const nextBoardId = boardIds[nextIndex];
+      
+      console.log('[boardRuntime] Rotating from', state.activeBoardId, 'to', nextBoardId);
+      
+      // Set next board as active
+      return {
+        ...state,
+        activeBoardId: nextBoardId,
+        nextRotationAt: Date.now() + state.config.rotationIntervalMs
+      };
+    });
     
-    const timer = setInterval(() => {
+    // Subscribe to new active board
+    const newState = get(runtimeStore);
+    if (newState.activeBoardId) {
+      subscribeToActiveBoard(newState.activeBoardId);
+    }
+  }, 150); // 150ms delay to let transition overlay cover screen
+  
+  // Schedule next rotation
+  runtimeStore.update(state => {
+    const timer = setTimeout(() => {
+      console.log('[boardRuntime] Next rotation timer fired');
       rotateToNextBoard();
     }, state.config.rotationIntervalMs);
     
-    return {
-      ...state,
-      rotationTimer: timer,
-      boardActivatedAt: Date.now(),
-    };
-  });
-}
-
-/**
- * Stop the board rotation
- */
-function stopRotation() {
-  setState(state => {
-    if (state.rotationTimer) {
-      clearInterval(state.rotationTimer);
-    }
-    return {
-      ...state,
-      rotationTimer: null,
-      boardActivatedAt: null,
-    };
-  });
-}
-
-/**
- * Rotate to the next available board
- */
-function rotateToNextBoard() {
-  setState(state => {
-    const boardIds = Array.from(state.boards.keys());
-    if (boardIds.length === 0) return state;
-    
-    const currentIndex = state.activeBoardId ? boardIds.indexOf(state.activeBoardId) : -1;
-    const nextIndex = (currentIndex + 1) % boardIds.length;
-    const nextBoardId = boardIds[nextIndex];
+    console.log('[boardRuntime] Next rotation scheduled for', state.config.rotationIntervalMs, 'ms');
     
     return {
       ...state,
-      activeBoardId: nextBoardId,
-      boardActivatedAt: Date.now(),
+      rotationTimer: timer
     };
   });
 }
 
-/**
- * Set the active board by ID
- */
-function setActiveBoard(boardId: string) {
-  setState(state => ({
-    ...state,
-    activeBoardId: boardId,
-    boardActivatedAt: Date.now(),
-  }));
-
-  // Call subscribeToActiveBoard after state update
-  setTimeout(() => {
-    subscribeToActiveBoard();
-  }, 0);
-}
-
-/**
- * Get the current runtime status
- */
-function getStatus(): BoardRuntimeStatus {
-  const state = getState();
-  const now = Date.now();
-  
-  return {
-    activeBoardId: state.activeBoardId,
-    timeUntilRotation: state.boardActivatedAt 
-      ? Math.max(0, state.config.rotationIntervalMs - (now - state.boardActivatedAt))
-      : 0,
-    isRotating: !!state.rotationTimer,
-    lastUpdated: state.boards.get(state.activeBoardId || '')?.lastUpdated || null,
-    boardCount: state.boards.size,
-  };
-}
-
-// Derived stores for common use cases
-export const activeBoard = derived(
-  { subscribe },
-  ($state) => {
-    console.log('activeBoard - derived store update:', $state);
-    if (!$state.activeBoardId) return null;
-    return $state.boards.get($state.activeBoardId)?.board || null;
-  }
-);
-
-export const currentScores = derived(
-  { subscribe },
-  ($state) => {
-    console.log('currentScores - derived store update:', $state);
-    if (!$state.activeBoardId) return null;
-    return $state.boards.get($state.activeBoardId)?.scores || null;
-  }
-);
-
-export const runtimeStatus = derived(
-  { subscribe },
-  ($state) => {
-    console.log('runtimeStatus - derived store update:', $state);
-    return getStatus();
-  }
-);
-
-console.log('boardRuntime - Derived stores created:', {
-  activeBoard: typeof activeBoard.subscribe,
-  currentScores: typeof currentScores.subscribe,
-  runtimeStatus: typeof runtimeStatus.subscribe
-});
-
-// Public API
-export const boardRuntime = {
-  subscribe,
-  initialize,
-  setBoards,
-  startRotation,
-  stopRotation,
-  setActiveBoard,
-  getStatus,
-};
-
-export type BoardRuntime = typeof boardRuntime;
+// Export the runtime and stores
+export { boardRuntime, runtimeStatus, currentBoard, currentScores };

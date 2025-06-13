@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { organizationSettingsSchema } from './organizationSettings';
 
 export const organizationFormSchema = z.object({
   name: z
@@ -14,7 +15,8 @@ export const organizationFormSchema = z.object({
       message: 'URL can only contain lowercase letters, numbers, and hyphens' 
     })
     .transform(val => val.toLowerCase().trim()),
-  logoUrl: z.string().url({ message: 'Please enter a valid URL' }).optional().or(z.literal(''))
+  logoUrl: z.string().url({ message: 'Please enter a valid URL' }).optional().or(z.literal('')),
+  settings: organizationSettingsSchema.optional(),
 });
 
 export type OrganizationFormData = z.infer<typeof organizationFormSchema>;

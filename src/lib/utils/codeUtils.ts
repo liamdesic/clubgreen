@@ -73,6 +73,36 @@ async function orgLeaderboardCodeExists(code: string): Promise<boolean> {
 }
 
 /**
+ * Validates if an org leaderboard code belongs to a specific organization
+ * @param orgId - The organization ID
+ * @param code - The code to validate
+ * @returns Boolean indicating if the code is valid for this org
+ */
+export async function validateOrgLeaderboardCode(orgId: string, code: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('organizations')
+    .select('org_leaderboard_codes')
+    .eq('id', orgId)
+    .single();
+    
+  if (error || !data) {
+    console.error('Error validating org leaderboard code:', error);
+    return false;
+  }
+  
+  const codes = data.org_leaderboard_codes;
+  if (!Array.isArray(codes)) return false;
+  
+  // org_leaderboard_codes is an array of objects with { code: string }
+  return codes.some(codeObj => 
+    typeof codeObj === 'object' && 
+    codeObj !== null && 
+    'code' in codeObj && 
+    codeObj.code === code
+  );
+}
+
+/**
  * Generates a unique short code that doesn't exist in the database
  * @param length - Length of the code to generate
  * @returns Promise resolving to a unique short code

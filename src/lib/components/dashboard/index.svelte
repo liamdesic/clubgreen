@@ -2,21 +2,34 @@
   import { createEventDispatcher } from 'svelte';
   import type { Event, Organization } from '$lib/validations';
   import { eventSource } from '$lib/stores/source/eventSource';
-  import { derived } from 'svelte/store';
   import MainLeaderboardCard from './MainLeaderboardCard.svelte';
   import EventCard from './EventCard.svelte';
   import AddEventCard from './AddEventCard.svelte';
+  import EmptyDashboard from './EmptyDashboard.svelte';
   import LoadingSpinner from '../LoadingSpinner.svelte';
+  import { getEventStatus } from '$lib/utils/eventStatus';
+  import { showToast } from '$lib/stores/toastStore';
   
-  // Create derived stores
-  const liveEvents = derived(eventSource, $source => $source.filter((e: Event) => e.show_on_main_leaderboard));
-  const activeEvents = derived(eventSource, $source => $source.filter((e: Event) => !e.archived));
-  const archivedEvents = derived(eventSource, $source => $source.filter((e: Event) => e.archived));
-
   // Props
   export let organization: Organization;
   export let scoreCounts: Record<string, number> = {};
   export let playerCounts: Record<string, number> = {};
+
+  // Create reactive derived stores that filter events based on their status
+  $: liveEvents = $eventSource.filter((e: Event) => 
+    e.show_on_main_leaderboard && 
+    getEventStatus(e, scoreCounts[e.id] || 0).isLive
+  );
+
+  $: activeEvents = $eventSource.filter((e: Event) => 
+    !e.archived && 
+    getEventStatus(e, scoreCounts[e.id] || 0).code !== 3
+  );
+
+  $: archivedEvents = $eventSource.filter((e: Event) => 
+    e.archived || 
+    getEventStatus(e, scoreCounts[e.id] || 0).code === 3
+  );
 
   // State
   let showArchived = false;
@@ -32,17 +45,38 @@
       : [];
 
   // Filter out live events from active events
-  $: nonLiveActiveEvents = $activeEvents.filter((event: Event) => 
-    !$liveEvents.some((liveEvent: Event) => liveEvent.id === event.id)
+  $: nonLiveActiveEvents = activeEvents.filter((event: Event) => 
+    !liveEvents.some((liveEvent: Event) => liveEvent.id === event.id)
   );
 
-  // Debug logs for live events
+  // Debug logs for event status
   $: {
-    console.log('🔍 [EventSections] Live events:', {
-      count: $liveEvents.length,
-      events: $liveEvents.map((e: Event) => ({
+    console.log('🔍 [EventSections] Event status:', {
+      liveEvents: liveEvents.map(e => ({
         id: e.id,
         title: e.title,
+        status: getEventStatus(e, scoreCounts[e.id] || 0),
+        showOnMain: e.show_on_main_leaderboard,
+        eventDate: e.event_date,
+        archived: e.archived,
+        scoreCount: scoreCounts[e.id] || 0
+      })),
+      activeEvents: activeEvents.map(e => ({
+        id: e.id,
+        title: e.title,
+        status: getEventStatus(e, scoreCounts[e.id] || 0),
+        showOnMain: e.show_on_main_leaderboard,
+        eventDate: e.event_date,
+        archived: e.archived,
+        scoreCount: scoreCounts[e.id] || 0
+      })),
+      archivedEvents: archivedEvents.map(e => ({
+        id: e.id,
+        title: e.title,
+        status: getEventStatus(e, scoreCounts[e.id] || 0),
+        showOnMain: e.show_on_main_leaderboard,
+        eventDate: e.event_date,
+        archived: e.archived,
         scoreCount: scoreCounts[e.id] || 0
       }))
     });
@@ -53,6 +87,7 @@
   }
 
   function handleQrModal(e: CustomEvent<Event>) {
+    console.log('[EventSections] handleQrModal received:', e.detail);
     dispatch('qrModal', e.detail);
   }
 
@@ -80,13 +115,13 @@
 
 <div class="event-sections">
   <!-- Live Section -->
-  {#if $liveEvents.length > 0}
+  {#if liveEvents.length > 0}
     <section class="live-section">
       <MainLeaderboardCard 
         organizationSlug={organization.slug} 
         {orgLeaderboardCodes}
         leaderboardRotationInterval={organization.leaderboard_rotation_interval || '10s'}
-        events={$liveEvents}
+        events={liveEvents}
         {scoreCounts}
         on:intervalChange={e => {
           // Forward the interval change event up to the parent
@@ -94,7 +129,7 @@
         }}
       />
       <div class="event-grid">
-        {#each $liveEvents as event}
+        {#each liveEvents as event}
           <EventCard 
             {event} 
             {organization}
@@ -112,8 +147,8 @@
     <div class="debug-info">
       <p>No live events found. Debug info:</p>
       <pre>{JSON.stringify({
-        liveEventsCount: $liveEvents.length,
-        activeEventsCount: $activeEvents.length,
+        liveEventsCount: liveEvents.length,
+        activeEventsCount: activeEvents.length,
         scoreCounts,
         orgLeaderboardCodes
       }, null, 2)}</pre>
@@ -137,15 +172,12 @@
       {/each}
       <AddEventCard on:click={handleAddEvent} />
     </div>
-  {:else}
-    <div class="empty-state">
-      <p>No active events yet. Create your first event to get started!</p>
-      <AddEventCard on:click={handleAddEvent} />
-    </div>
+  {:else if $eventSource.length === 0}
+    <EmptyDashboard on:createEvent={handleAddEvent} />
   {/if}
 
   <!-- Archived Events Section -->
-  {#if $archivedEvents.length > 0}
+  {#if archivedEvents.length > 0}
     <section class="archived-section">
       <div class="section-header">
         <h2>Archived Events</h2>
@@ -160,7 +192,7 @@
 
       {#if showArchived}
         <div class="event-grid archived">
-          {#each $archivedEvents as event}
+          {#each archivedEvents as event}
             <EventCard 
               {event} 
               {organization}

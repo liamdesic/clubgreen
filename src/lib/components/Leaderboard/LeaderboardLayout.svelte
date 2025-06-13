@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Event } from '$lib/validations';
   import type { Organization } from '$lib/validations';
-  import { currentScores, activeBoard, runtimeStatus } from '$lib/runtime';
+  import { currentScores, currentBoard, runtimeStatus } from '$lib/runtime';
   import LeaderboardHeader from './LeaderboardHeader.svelte';
   import LeaderboardScores from './LeaderboardScores.svelte';
   import LeaderboardSidebar from './LeaderboardSidebar.svelte';
@@ -12,55 +12,113 @@
   import LoadingSpinner from '$lib/components/LoadingSpinner.svelte';
   import { onMount } from 'svelte';
   import { boardRuntime } from '$lib/runtime';
-  import { currentScores as currentScoresRuntime, activeBoard as activeBoardRuntime, runtimeStatus as runtimeStatusRuntime } from '$lib/runtime';
-  import type { PlayerTotalScore } from '$lib/validations/playerScore';
+  import { currentScores as currentScoresRuntime, currentBoard as currentBoardRuntime, runtimeStatus as runtimeStatusRuntime } from '$lib/runtime';
+  import type { LeaderboardScore } from '$lib/validations/leaderboardView';
   import { showToast } from '$lib/stores/toastStore';
+  import { createEventDispatcher } from 'svelte';
+
+  const dispatch = createEventDispatcher();
 
   export let organization: Organization;
-  export let event: Event;
+  export let event: Event | null = null;
   export let loading = false;
   export let error: string | null = null;
   export let children: any;
+  
+  // Optional props for org leaderboards with multiple events
+  export let allEvents: Event[] = [];
+  export let rotationInterval: number = 10000;
+  export let showTransition = false;
 
   // Show error toast when error prop changes
   $: if (error) {
+    console.error('[LeaderboardLayout] Error:', error, { currentBoard, event: displayEvent });
     showToast(error, 'error');
   }
 
   // Debug logs for store initialization
   console.log('LeaderboardLayout - Store imports:', {
     currentScores,
-    activeBoard,
+    currentBoard,
     runtimeStatus,
     boardRuntime
   });
 
   onMount(() => {
-    console.log('LeaderboardLayout - onMount - Store state:', {
-      currentScores: $currentScores,
-      activeBoard: $activeBoard,
-      runtimeStatus: $runtimeStatus
+    console.log('[LeaderboardLayout] Initializing with stores:', {
+      currentScores: $currentScores ? `${$currentScores.length} scores` : 'null',
+      currentBoard: $currentBoard ? { id: $currentBoard.id, title: $currentBoard.title } : 'null',
+      runtimeStatus: {
+        activeBoardId: $runtimeStatus.activeBoardId,
+        timeUntilRotation: $runtimeStatus.timeUntilRotation,
+        isRotating: $runtimeStatus.isRotating,
+        boardCount: $runtimeStatus.boardCount
+      }
     });
   });
 
-  // Get the current board status with defensive guards
+  // Consolidate store logging
   $: {
-    console.log('LeaderboardLayout - Reactive update:', {
-      loading,
-      currentScoresValue: $currentScores,
-      activeBoardValue: $activeBoard,
-      runtimeStatusValue: $runtimeStatus
+    if ($currentScores) {
+      console.log('[LeaderboardLayout] Scores updated:', {
+        boardId: $currentBoard?.id,
+        scoreCount: $currentScores.length
+      });
+    }
+  }
+
+  // Consolidate board change logging
+  $: if ($currentBoard) {
+    console.log('[LeaderboardLayout] Board changed:', {
+      boardId: $currentBoard.id,
+      eventId: $currentBoard.eventId,
+      timeFilter: $currentBoard.timeFilter
     });
   }
 
   $: status = loading ? { timeUntilRotation: 0, isRotating: false } : $runtimeStatus;
-  $: currentBoard = loading ? null : $activeBoard;
   $: scores = loading ? [] : ($currentScores || []);
   $: lastUpdated = ($runtimeStatus?.lastUpdated) ? new Date($runtimeStatus.lastUpdated).toLocaleTimeString() : null;
+  
+  // For org leaderboards, determine the current event from the active board
+  $: displayEvent = event || (currentBoard && allEvents.find(e => e.id === currentBoard.eventId));
+  $: eventsForRotationStatus = allEvents.length > 0 ? allEvents : (event ? [event] : []);
+  $: currentTimeFilter = currentBoard?.timeFilter || 'all_time';
+  $: currentEventId = displayEvent?.id || '';
 
   function handleRetry() {
     showToast('Refreshing leaderboard...', 'info');
     window.location.reload();
+  }
+
+  // Handle transition completion
+  function handleTransitionComplete() {
+    console.log('LeaderboardLayout - Transition complete');
+    dispatch('transitionComplete');
+  }
+
+  // Handle board transitions
+  $: if ($currentBoard && $currentScores) {
+    console.log('[LeaderboardLayout] Received scores for board', $currentBoard.id, $currentScores);
+    showTransition = true;
+    setTimeout(() => {
+      showTransition = false;
+      console.log('[LeaderboardLayout] Transition complete');
+    }, 1000);
+  }
+
+  // Handle board changes
+  $: if ($currentBoard) {
+    console.log('[LeaderboardLayout] Active board changed:', {
+      id: $currentBoard.id,
+      title: $currentBoard.title,
+      timeFilter: $currentBoard.timeFilter
+    });
+    showTransition = true;
+    setTimeout(() => {
+      showTransition = false;
+      console.log('[LeaderboardLayout] Board change transition complete');
+    }, 1000);
   }
 </script>
 
@@ -94,21 +152,25 @@
   {/if}
 
   <div class="main-wrapper">
-    {#if currentBoard && event?.id}
-      <LeaderboardHeader {organization} {event} />
+    {#if currentBoard && displayEvent}
+      <LeaderboardHeader 
+        organization={organization} 
+        event={displayEvent} 
+        timeFilter={currentTimeFilter}
+      />
       
       <slot>
         {children}
       </slot>
 
-      {#if !loading}
+      {#if !loading && eventsForRotationStatus.length > 0}
         <LeaderboardRotationStatus
-          events={[event]}
-          currentEventId={event.id}
-          currentTimeFilter={'all_time' as TimeFilter}
+          events={eventsForRotationStatus}
+          currentEventId={currentEventId}
+          currentTimeFilter={currentTimeFilter}
           timeRemaining={status.timeUntilRotation}
-          rotationInterval={10000}
-          accentColor={event.accent_color ?? '#4CAF50'}
+          rotationInterval={rotationInterval}
+          accentColor={displayEvent.accent_color ?? '#4CAF50'}
         />
       {/if}
 
@@ -120,7 +182,12 @@
     {/if}
   </div>
 
-  <TransitionOverlay />
+  <TransitionOverlay 
+    active={showTransition}
+    accentColor={displayEvent?.accent_color ?? '#4CAF50'}
+    logoUrl={organization.logo_url || ''}
+    on:complete={handleTransitionComplete}
+  />
 </div>
 
 <style>
@@ -151,7 +218,8 @@
 
   /* Layout Styles */
   .leaderboard-layout {
-    background: black;
+    background: var(--accent-gradient-very-dark);
+    background-attachment: fixed;
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
@@ -161,6 +229,7 @@
     height: 100vh;
     position: relative;
     overflow: hidden;
+    transition: background 0.5s ease-in-out;
   }
 
   .main-wrapper {

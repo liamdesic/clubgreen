@@ -1,15 +1,13 @@
 import { supabase } from '$lib/supabaseClient';
 import { writable } from 'svelte/store';
 import type { TimeFilter } from '$lib/validations/timeFilter';
-import type { PlayerTotalScore } from '$lib/validations/playerScore';
+import type { LeaderboardScore } from '$lib/validations/leaderboardView';
 import type { Database } from '$lib/database.types';
-import { parseLeaderboardScores } from '$lib/utils/leaderboardUtils';
+import { validateLeaderboardScores } from '$lib/validations/leaderboardView';
 
-// Use the existing PlayerTotalScore interface for type safety
-type ScoreArray = PlayerTotalScore[];
-
-type LeaderboardSnapshot = Omit<Database['public']['Tables']['leaderboard_snapshot']['Row'], 'scores'> & {
-  scores: PlayerTotalScore[];
+// Use LeaderboardScore for leaderboard snapshot data
+export type LeaderboardSnapshot = Omit<Database['public']['Tables']['leaderboard_snapshot']['Row'], 'scores'> & {
+  scores: LeaderboardScore[];
 };
 
 export const snapshotStore = writable<LeaderboardSnapshot | null>(null);
@@ -35,7 +33,7 @@ export function subscribeToLeaderboard(eventId: string, timeFilter: TimeFilter) 
       if (!data) return;
 
       // Parse and validate the scores
-      const scores = parseLeaderboardScores(data.scores);
+      const scores = validateLeaderboardScores(data.scores);
       if (!scores) return;
       
       const snapshot: LeaderboardSnapshot = {
@@ -69,7 +67,7 @@ export function subscribeToLeaderboard(eventId: string, timeFilter: TimeFilter) 
           if (snapshot.time_filter !== timeFilter) return;
 
           // Parse and validate the scores
-          const scores = parseLeaderboardScores(snapshot.scores);
+          const scores = validateLeaderboardScores(snapshot.scores);
           if (!scores) return;
 
           const updatedSnapshot: LeaderboardSnapshot = {
@@ -117,7 +115,7 @@ export async function fetchLeaderboardSnapshot(
     if (!data) return null;
 
     // Parse and validate the scores
-    const scores = parseLeaderboardScores(data.scores);
+    const scores = validateLeaderboardScores(data.scores);
     if (!scores) return null;
 
     return {

@@ -10,7 +10,8 @@ import {
 import type { PlayerHoleScore } from '$lib/validations/playerScore';
 import type { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import type { PostgrestSingleResponse } from '@supabase/supabase-js';
-import { triggerLeaderboardUpdate } from '$lib/utils/leaderboardUtils';
+import { triggerLeaderboardUpdate } from '$lib/runtime/scoreSnapshot';
+import type { Event } from '$lib/validations';
 
 type RealtimeEvent = 'INSERT' | 'UPDATE' | 'DELETE';
 
@@ -268,12 +269,8 @@ function createScoresSource() {
   return {
     subscribe,
     fetchScores,
-    addScore,
-    subscribeToEventScores,
-    stop,
-    flushPending,
-    loading: { subscribe: loading.subscribe },
-    error: { subscribe: error.subscribe },
+    loading,
+    error,
     pendingWrites: { subscribe: pendingWrites.subscribe }
   };
 }

@@ -8,9 +8,23 @@ declare global {
       supabase: SupabaseClient<Database>
       getUser(): Promise<User | null>
       user: User | null
+      session: Session | null
     }
     interface PageData {
       user: User | null
+      org: {
+        id: string
+        name: string
+        slug: string
+      }
+      events: Array<{
+        id: string
+        name: string
+        organization_id: string
+        created_at: string
+        updated_at: string | null
+        // Add other event properties as needed
+      }>
     }
     // interface Error {}
     // interface PageState {}
@@ -45,6 +59,21 @@ declare global {
   interface ImportMeta {
     readonly env: ImportMetaEnv;
   }
+}
+
+declare module '$app/navigation' {
+  export function goto(url: string | URL, opts?: { replaceState?: boolean }): Promise<void>;
+}
+
+declare module '$app/stores' {
+  import { Readable } from 'svelte/store';
+  export const page: Readable<{
+    url: URL;
+    params: Record<string, string>;
+    route: { id: string | null };
+    status: number;
+    error: Error | null;
+  }>;
 }
 
 export {}

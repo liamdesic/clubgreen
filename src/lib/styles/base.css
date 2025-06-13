@@ -1,5 +1,6 @@
 /* 1. Normalize browser defaults */
 @import 'normalize.css';
+@import url('https://use.typekit.net/kic0xlz.css'); /* Obviously font */
 
 /* 2. Box sizing reset */
 *,
@@ -28,16 +29,28 @@ ul, ol {
 
 /* 5. Reset buttons */
 button {
+  text-align: center;
   background: none;
   border: none;
   padding: 0;
   margin: 0;
   font: inherit;
   color: inherit;
-  cursor: pointer;
+  cursor: pointer !important;
   font-family: inherit;
   font-size: 1rem;
-  text-align: inherit;
+}
+
+/* Ensure cursor stays pointer for all button states */
+button:hover,
+button:focus,
+button:active {
+  cursor: pointer !important;
+}
+
+/* Exception for disabled buttons */
+button:disabled {
+  cursor: not-allowed !important;
 }
 
 /* 6. Inputs */

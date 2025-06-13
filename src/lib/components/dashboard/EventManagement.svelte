@@ -1,9 +1,9 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import { showToast } from '$lib/stores/toastStore.js';
+  import { showToast } from '$lib/stores/toastStore';
+  import { eventSource } from '$lib/stores/source/eventSource';
+  import type { Event, Organization } from '$lib/validations';
   import { supabase } from '$lib/supabaseClient';
-  import { invalidate } from '$app/navigation';
-  import { goto } from '$app/navigation';
 
   // Props
   export let organization: Organization;
@@ -15,6 +15,7 @@
   let isDeleting = false;
   let showConfirmDelete = false;
   let showConfirmArchive = false;
+  let archivedModalOpen = false;
 
   const dispatch = createEventDispatcher();
 
@@ -29,61 +30,25 @@
     dispatch('edit', { event });
   }
 
-  async function handleArchive() {
+  async function handleArchive(event: Event) {
     try {
-      isArchiving = true;
-      
-      const newSettings = {
-        ...event.settings_json,
-        archived: true,
-        archivedAt: new Date().toISOString()
-      };
-
-      const { error } = await supabase
-        .from('events')
-        .update({ settings_json: newSettings })
-        .eq('id', event.id);
-
-      if (error) throw error;
-
-      // Update local store
-      eventStore.updateEvent(event.id, { settings_json: newSettings });
-      
+      await eventSource.updateEvent(event.id, {
+        archived: true
+      });
       showToast('Event archived successfully', 'success');
-      dispatch('archived', { eventId: event.id });
-      
     } catch (error) {
       console.error('Error archiving event:', error);
       showToast('Failed to archive event', 'error');
-    } finally {
-      isArchiving = false;
-      showConfirmArchive = false;
     }
   }
 
-  async function handleDelete() {
+  async function handleDelete(event: Event) {
     try {
-      isDeleting = true;
-      
-      const { error } = await supabase
-        .from('events')
-        .delete()
-        .eq('id', event.id);
-
-      if (error) throw error;
-
-      // Update local store
-      eventStore.removeEvent(event.id);
-      
+      await eventSource.deleteEvent(event.id);
       showToast('Event deleted successfully', 'success');
-      dispatch('deleted', { eventId: event.id });
-      
     } catch (error) {
       console.error('Error deleting event:', error);
       showToast('Failed to delete event', 'error');
-    } finally {
-      isDeleting = false;
-      showConfirmDelete = false;
     }
   }
 

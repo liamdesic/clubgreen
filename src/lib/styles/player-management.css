@@ -1,0 +1,284 @@
+/* Player Management Page Styles */
+.player-management-page {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  color: var(--text-primary, #ffffff);
+}
+
+.page-header {
+  margin-bottom: 2.5rem;
+  text-align: center;
+}
+
+.page-header h1 {
+  font-size: 2.25rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(90deg, #a78bfa, #8b5cf6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+.org-name {
+  color: #a1a1aa;
+  font-size: 1.1rem;
+  margin-top: 0.5rem;
+}
+
+/* Event Tabs */
+.event-tabs {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  scrollbar-width: thin;
+  scrollbar-color: #4b5563 #1f2937;
+}
+
+.event-tab {
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  background: #1e1e2d;
+  border: 1px solid #2d3748;
+  color: #e2e8f0;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.event-tab:hover {
+  background: #2d3748;
+  transform: translateY(-1px);
+}
+
+.event-tab.active {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+  border-color: #8b5cf6;
+  color: white;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Time Filter Tabs */
+.time-filter-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.time-filter-tab {
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  background: #1e1e2d;
+  border: 1px solid #2d3748;
+  color: #a1a1aa;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.time-filter-tab:hover {
+  background: #2d3748;
+  color: #e2e8f0;
+}
+
+.time-filter-tab.active {
+  background: #3f3f5a;
+  border-color: #6366f1;
+  color: white;
+}
+
+/* Player Table */
+.player-table-container {
+  background: #1a1a2e;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  margin-bottom: 2rem;
+}
+
+.player-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.player-table th {
+  background: #2d2b42;
+  color: #a1a1aa;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-align: left;
+  padding: 1rem 1.5rem;
+}
+
+.player-table td {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #2d3748;
+  vertical-align: middle;
+}
+
+.player-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.player-table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.player-table tbody tr:hover {
+  background: rgba(79, 70, 229, 0.1);
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #4b5563;
+  transition: .4s;
+  border-radius: 24px;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 4px;
+  bottom: 4px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+
+input:checked + .toggle-slider {
+  background-color: #8b5cf6;
+}
+
+input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+
+/* Action Buttons */
+.action-button {
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: background 0.2s ease, color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+  cursor: pointer;
+}
+
+.unpublish-button {
+  background: #1e1e2d;
+  color: #f87171;
+  border: 1px solid #f87171;
+}
+
+.unpublish-button:hover {
+  background: #7f1d1d;
+  color: white;
+}
+
+.refresh-button {
+  background: #1e40af;
+  color: white;
+  margin-bottom: 1.5rem;
+}
+
+.refresh-button:hover {
+  background: #1e3a8a;
+}
+
+/* Loading and Error States */
+.loading-state,
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  border-top-color: #8b5cf6;
+  animation: spin 1s ease-in-out infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .player-management-page {
+    padding: 1rem;
+  }
+  
+  .event-tabs {
+    gap: 0.5rem;
+  }
+  
+  .event-tab {
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+  }
+  
+  .player-table th,
+  .player-table td {
+    padding: 0.75rem 0.5rem;
+    font-size: 0.875rem;
+  }
+  
+  .action-button {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #a1a1aa;
+}
+
+.empty-state p {
+  margin-top: 1rem;
+  font-size: 1.1rem;
+}

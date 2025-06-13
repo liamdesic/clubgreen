@@ -1,11 +1,20 @@
 <script lang="ts">
+  import type { Event, Organization } from '$lib/validations';
+  import type { TimeFilter } from '$lib/validations/timeFilter';
   import { getTimeRangeLabel } from '$lib/utils/timeFiltersUtils';
-  import type { Event } from '$lib/validations';
-  import type { Organization } from '$lib/validations';
 
   export let organization: Organization;
   export let event: Event;
   export let loading = false;
+  export let timeFilter: TimeFilter = 'all_time';
+
+  $: eventName = event?.name || '';
+  $: courseName = event?.course_name || '';
+  $: courseHoleCount = event?.hole_count || 18;
+  $: organizationId = organization?.id;
+  $: organizationSlug = organization?.slug;
+  $: organizationName = organization?.name || '';
+  $: accentColor = organization?.color_palette?.[0] || '#4CAF50';
 </script>
 
 <div class="event-header">
@@ -45,17 +54,22 @@
     <div class="titles">
       <h1>Mini-Golf Leaderboard</h1>
       <h2 class="event-title">
-        {event?.title || 'Loading...'}
+        {eventName}
         {#if loading}
           <span class="loading-dots">...</span>
         {/if}
-        {#if event?.settings_json?.score_time_range}
-          <span class="time-filter-pill" style="--accent-color: {event?.settings_json?.accent_color || '#4CAF50'}">
-            <span class="pill-prefix">Scores from</span> <span class="pill-time-range">{getTimeRangeLabel(event.settings_json.score_time_range)}</span>
-          </span>
-        {/if}
       </h2>
     </div>
+  </div>
+  
+  <div class="time-filter">
+    {#if loading}
+      <span class="loading-dots">...</span>
+    {:else}
+      <span class="time-filter-pill" style="--accent-color: {event?.accent_color || '#4CAF50'}">
+        <span class="pill-prefix">Scores from</span> <span class="pill-time-range">{getTimeRangeLabel(timeFilter)}</span>
+      </span>
+    {/if}
   </div>
 </div>
 

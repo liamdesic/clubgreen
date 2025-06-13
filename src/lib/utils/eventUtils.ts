@@ -26,7 +26,7 @@ async function getEventsForOrg(orgId: string): Promise<Event[]> {
 /**
  * Counts scores for a batch of events
  */
-async function countScoresForEvents(events: Event[]): Promise<Array<{ event: Event; scoreCount: number }>> {
+export async function countScoresForEvents(events: Event[]): Promise<Array<{ event: Event; scoreCount: number }>> {
   const eventIds = events.map(e => e.id);
   
   const { data, error } = await supabase
@@ -81,4 +81,69 @@ export async function getLiveVisibleEventsForOrg(orgId: string): Promise<Event[]
     showToast('Unable to load live events', 'error');
     return [];
   }
+}
+
+/**
+ * Generates leaderboard boards for all live events and their time filters
+ * Used for organization leaderboard rotation
+ */
+export async function generateOrgLeaderboardBoards(liveEvents: Event[]): Promise<import('$lib/runtime/board.types').LeaderboardBoard[]> {
+  const boards: import('$lib/runtime/board.types').LeaderboardBoard[] = [];
+  
+  for (const event of liveEvents) {
+    // Get time filters from event, default to ['all_time'] if not set
+    let timeFilters: string[] = ['all_time'];
+    
+    if (event.time_filters) {
+      try {
+        const parsed = typeof event.time_filters === 'string' 
+          ? JSON.parse(event.time_filters) 
+          : event.time_filters;
+        if (Array.isArray(parsed)) {
+          timeFilters = parsed;
+        }
+      } catch (err) {
+        console.warn('Failed to parse time_filters for event', event.id, err);
+      }
+    }
+    
+    // Get all snapshots for this event's time filters
+    const { data: snapshots } = await supabase
+      .from('leaderboard_snapshot')
+      .select('id, time_filter, scores')
+      .eq('event_id', event.id)
+      .in('time_filter', timeFilters);
+
+    if (!snapshots?.length) continue;
+    
+    // Create a board for each snapshot
+    for (const snapshot of snapshots) {
+      boards.push({
+        id: snapshot.id, // Use snapshot UUID as board ID
+        eventId: event.id,
+        timeFilter: snapshot.time_filter as import('$lib/validations/timeFilter').TimeFilter,
+        title: `${event.title} (${getTimeFilterLabel(snapshot.time_filter)})`,
+        priority: 1
+      });
+    }
+  }
+  
+  return boards;
+}
+
+/**
+ * Gets a human-readable label for a time filter
+ */
+function getTimeFilterLabel(timeFilter: string): string {
+  const labels: Record<string, string> = {
+    'all_time': 'All Time',
+    'last_hour': 'Last Hour',
+    'last_day': 'Last Day', 
+    'last_week': 'Last Week',
+    'last_month': 'Last Month',
+    'since_start_of_hour': 'This Hour',
+    'since_start_of_day': 'Today',
+    'since_start_of_month': 'This Month'
+  };
+  return labels[timeFilter] || timeFilter;
 } 

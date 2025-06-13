@@ -8,24 +8,19 @@
   import type { ScoreTimeRange } from '$lib/utils/timeFilterUtils';
   import type { Event } from '$lib/validations';
   import type { BoardRuntimeStatus } from '$lib/runtime';
+  import type { TimeFilter } from '$lib/validations/timeFilter';
 
   // Props
   export let events: Event[] = [];
   export let currentEventId: string;
-  export let currentTimeFilter: ScoreTimeRange;
-  export let timeRemaining: number;
+  export let currentTimeFilter: TimeFilter;
+  export let timeRemaining: number | null = null;
   export let rotationInterval: number;
   export let accentColor: string = '#4CAF50';
   
   // Constants that can be used internally but aren't needed as reactive props
   export const currentEventIndex: number = 0;
   export const totalEvents: number = 0;
-
-  // For the circular timer
-  $: progress = (typeof timeRemaining === 'number' ? timeRemaining : parseInt(timeRemaining)) / (rotationInterval / 1000);
-  $: radius = 30; // New smaller radius
-  $: circumference = 2 * Math.PI * radius;
-  $: strokeDashoffset = circumference * (1 - progress);
 
   let status: BoardRuntimeStatus = {
     activeBoardId: null,
@@ -35,13 +30,47 @@
     boardCount: 0
   };
 
+  let clientTimeRemaining = 0;
+  let clientTimer: ReturnType<typeof setInterval> | null = null;
+
+  // Standard SVG progress ring setup
+  const radius = 30;
+  const circumference = 2 * Math.PI * radius; // ~188.5
+  
+  // Progress: 0 = empty ring, 1 = full ring
+  // For countdown: start at 1 (full) and go to 0 (empty)
+  $: progress = status.isRotating && rotationInterval 
+    ? Math.max(0, Math.min(1, clientTimeRemaining / rotationInterval))
+    : 0;
+    
+  // Standard stroke-dashoffset: circumference - (progress * circumference)
+  // When progress = 1: offset = 0 (full ring visible)
+  // When progress = 0: offset = circumference (no ring visible)
+  $: strokeDashoffset = circumference - (progress * circumference);
+  
+
   onMount(() => {
     const unsubscribe = runtimeStatus.subscribe(value => {
       status = value;
+      // Sync client countdown when runtime status updates
+      if (value.timeUntilRotation !== null && value.timeUntilRotation > 0) {
+        const newTimeRemaining = Math.max(0, Math.ceil(value.timeUntilRotation / 1000));
+        clientTimeRemaining = newTimeRemaining;
+      }
     });
+
+    // Simple countdown timer - decrements every second
+    clientTimer = setInterval(() => {
+      if (status.isRotating && clientTimeRemaining > 0) {
+        clientTimeRemaining = Math.max(0, clientTimeRemaining - 1);
+      }
+    }, 1000);
 
     return () => {
       unsubscribe();
+      if (clientTimer) {
+        clearInterval(clientTimer);
+      }
     };
   });
 </script>
@@ -66,7 +95,7 @@
       {/each}
     </div>
     <div class="timer-container">
-      <svg class="progress-ring" width="70" height="70">
+      <svg class="progress-ring" width="70" height="70" viewBox="0 0 70 70">
         <circle
           class="progress-ring-bg"
           stroke="rgba(255,255,255,0.08)"
@@ -84,15 +113,12 @@
           r={radius}
           cx="35"
           cy="35"
-          stroke-dasharray={circumference}
+          stroke-dasharray="{circumference} {circumference}"
           stroke-dashoffset={strokeDashoffset}
-          style="transition: stroke-dashoffset 0.5s;"
         />
       </svg>
-      <span class="timer-text">{timeRemaining}</span>
+      <span class="timer-text" style="color: {accentColor}">{clientTimeRemaining}</span>
     </div>
-    
-    <!-- Time range pill removed as requested -->
   </div>
 </div>
 
@@ -100,7 +126,7 @@
   {#if status.isRotating}
     <div class="countdown" transition:fade>
       <div class="progress-bar" style="width: {(status.timeUntilRotation / 10000) * 100}%"></div>
-      <span class="time">{Math.ceil(status.timeUntilRotation / 1000)}s</span>
+      <span class="time">{clientTimeRemaining}</span>
     </div>
   {/if}
 </div>
@@ -163,20 +189,18 @@
   height: 70px;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   flex-shrink: 0;
 }
 .progress-ring {
-  position: absolute;
-  top: 0;
-  left: 0;
   transform: rotate(-90deg);
+  transform-origin: center;
 }
 .progress-ring-bg {
   opacity: 0.25;
 }
 .progress-ring-fg {
-  transition: stroke-dashoffset 1s ease-in-out;
+  transition: stroke-dashoffset 0.3s ease-out;
 }
 .timer-text {
   position: absolute;
@@ -184,10 +208,10 @@
   top: 50%;
   transform: translate(-50%, -50%);
   font-size: 1.8rem;
-  color: #6fa088;
   font-weight: 500;
   letter-spacing: 0.05em;
   user-select: none;
+  z-index: 2;
 }
 .time-filter-pill {
   position: absolute;

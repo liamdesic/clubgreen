@@ -1,14 +1,13 @@
 <script lang="ts">
-  import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import '$lib/styles/theme.css';
-  import ChevronRight from 'lucide-svelte/icons/chevron-right';
-  import { getTimeRangeLabel } from '$lib/utils/timeFilters';
-  import type { ScoreTimeRange } from '$lib/utils/timeFilters';
+  import { ChevronRight } from 'lucide-svelte/icons';
+  import { getTimeRangeLabel } from '$lib/utils/timeFiltersUtils';
+  import type { TimeFilter } from '$lib/validations/timeFilter';
   
   export let organizationName: string = '';
   export let eventTitle: string = '';
-  export let timeRange: ScoreTimeRange = 'all_time';
+  export let timeRange: TimeFilter = 'all_time';
   export let accentColor: string = '#4CAF50';
   
   function goToDashboard() {
@@ -59,15 +58,20 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem 2rem;
+    padding: 1.5rem 2rem;
     background: var(--gradient-dark);
     background-attachment: fixed;
     color: white;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    width: 100%;
-    position: relative;
-    z-index: 10;
+    width: 100vw;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
     margin: 0;
+    height: 80px;
+    box-sizing: border-box;
   }
   
   .dashboard-header::before {
@@ -79,6 +83,7 @@
     bottom: 0;
     background: var(--gradient-dark);
     z-index: -1;
+    height: 100%;
   }
   
   .logo-button {
@@ -111,6 +116,7 @@
     padding: 0;
     list-style: none;
     font-size: 0.9rem;
+    font-family: var(--brand-font-body);
   }
   
   .breadcrumb li {

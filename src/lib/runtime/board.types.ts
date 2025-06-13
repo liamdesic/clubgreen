@@ -1,66 +1,17 @@
 import type { TimeFilter } from '$lib/validations/timeFilter';
-import type { PlayerTotalScore } from '$lib/validations/playerScore';
-
-/**
- * Represents a single leaderboard board configuration
- */
-export interface LeaderboardBoard {
-  /** Unique identifier for the board */
-  id: string;
-  
-  /** The event ID this board is associated with */
-  eventId: string;
-  
-  /** The time filter applied to this board */
-  timeFilter: TimeFilter;
-  
-  /** Optional display title for the board */
-  title?: string;
-  
-  /** Optional priority for board ordering */
-  priority?: number;
-  
-  /** Whether this board is currently active/visible */
-  isActive?: boolean;
-}
-
-/**
- * Represents the runtime state of a board
- */
-export interface BoardState {
-  /** The board configuration */
-  board: LeaderboardBoard;
-  
-  /** The current scores for this board */
-  scores: PlayerTotalScore[] | null;
-  
-  /** Error state, if any */
-  error: string | null;
-  
-  /** Loading state */
-  loading: boolean;
-  
-  /** Last updated timestamp */
-  lastUpdated: string | null;
-
-  /** Optional unsubscribe function for cleanup */
-  unsubscribe?: () => void;
-}
+import type { LeaderboardBoard, LeaderboardScore } from '$lib/validations/leaderboardView';
 
 /**
  * Configuration for the board runtime
  */
 export interface BoardRuntimeConfig {
+  /** Whether board rotation is enabled */
+  rotationEnabled: boolean;
+  
   /** Rotation interval in milliseconds */
   rotationIntervalMs: number;
   
-  /** Whether rotation is enabled */
-  rotationEnabled: boolean;
-  
-  /** Callback when the active board changes */
-  onBoardChange?: (board: LeaderboardBoard) => void;
-  
-  /** Callback when an error occurs */
+  /** Optional error handler */
   onError?: (error: Error) => void;
 }
 
@@ -68,18 +19,93 @@ export interface BoardRuntimeConfig {
  * Runtime status information
  */
 export interface BoardRuntimeStatus {
-  /** Current active board ID */
-  activeBoardId: string | null;
-  
-  /** Time remaining until next rotation (ms) */
-  timeUntilRotation: number;
-  
-  /** Whether the runtime is currently rotating boards */
+  /** Whether board rotation is enabled */
   isRotating: boolean;
   
-  /** Timestamp of last update */
+  /** Rotation interval in milliseconds */
+  rotationIntervalMs: number;
+  
+  /** Number of boards in the rotation */
+  boardCount: number;
+  
+  /** ID of the currently active board */
+  activeBoardId: string | null;
+  
+  /** Timestamp when the next rotation will occur */
+  nextRotationAt: number | null;
+  
+  /** Time until next rotation in milliseconds */
+  timeUntilRotation: number | null;
+  
+  /** When the status was last updated */
+  lastUpdated: string;
+}
+
+/**
+ * State for a single board in the runtime
+ */
+export interface BoardState {
+  /** The board configuration */
+  board: LeaderboardBoard;
+  
+  /** Current scores for the board */
+  scores: LeaderboardScore[] | null;
+  
+  /** Any error that occurred */
+  error: string | null;
+  
+  /** Whether the board is currently loading */
+  loading: boolean;
+  
+  /** When the board was last updated */
   lastUpdated: string | null;
   
-  /** Number of boards in rotation */
-  boardCount: number;
+  /** Function to unsubscribe from updates */
+  unsubscribe: () => void;
+}
+
+/**
+ * Internal runtime state
+ */
+export interface BoardRuntimeState {
+  /** Map of board ID to board state */
+  boards: Record<string, BoardState>;
+  
+  /** ID of the currently active board */
+  activeBoardId: string | null;
+  
+  /** Rotation timer handle */
+  rotationTimer: NodeJS.Timeout | null;
+  
+  /** Timestamp when the next rotation will occur */
+  nextRotationAt: number | null;
+  
+  /** Runtime configuration */
+  config: BoardRuntimeConfig;
+}
+
+/**
+ * The board runtime interface
+ */
+export interface BoardRuntime {
+  /** Subscribe to runtime state changes */
+  subscribe: (callback: (state: BoardRuntimeState) => void) => () => void;
+  
+  /** Initialize the runtime with configuration */
+  initialize: (config?: Partial<BoardRuntimeConfig>) => () => void;
+  
+  /** Set the boards to display */
+  setBoards: (boards: LeaderboardBoard[]) => void;
+  
+  /** Start the board rotation */
+  startRotation: () => void;
+  
+  /** Stop the board rotation */
+  stopRotation: () => void;
+  
+  /** Set the active board by ID */
+  setActiveBoard: (boardId: string) => void;
+  
+  /** Get the current runtime status */
+  getStatus: () => BoardRuntimeStatus;
 }

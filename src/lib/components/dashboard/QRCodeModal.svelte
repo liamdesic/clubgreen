@@ -1,12 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import QRCode from 'qrcode';
-  import Check from 'lucide-svelte/icons/check';
-  import Smartphone from 'lucide-svelte/icons/smartphone';
-  import Monitor from 'lucide-svelte/icons/monitor';
-  import Download from 'lucide-svelte/icons/download';
-  import Copy from 'lucide-svelte/icons/copy';
-  import ExternalLink from 'lucide-svelte/icons/external-link';
+  import { Check, QrCode, CloudUpload, Link, ArrowRight } from 'lucide-svelte';
   
   type QRCodeType = 'leaderboard' | 'scorecard';
   
@@ -14,10 +9,14 @@
   export let shortCode = '';
   export let accessUuid = '';
   
+  console.log('[QRCodeModal] Props:', { organization, shortCode, accessUuid });
+  
   // Generate the correct URLs for the new routing system
   $: baseUrl = window.location.origin;
   $: leaderboardUrl = `${baseUrl}/${organization}/lb/${shortCode}`;
   $: scorecardUrl = `${baseUrl}/${organization}/${shortCode}?access=${accessUuid}`;
+  
+  console.log('[QRCodeModal] Constructed URLs:', { leaderboardUrl, scorecardUrl });
   export let onClose;
   
   let leaderboardQrCode = '';
@@ -28,6 +27,10 @@
   onMount(async () => {
     // Add modal-open class to body
     document.body.classList.add('modal-open');
+    
+    // Log again on mount in case of reactivity
+    console.log('[QRCodeModal] onMount - Props:', { organization, shortCode, accessUuid });
+    console.log('[QRCodeModal] onMount - URLs:', { leaderboardUrl, scorecardUrl });
     
     // Generate QR codes
     leaderboardQrCode = await QRCode.toDataURL(leaderboardUrl, { width: 300 });
@@ -93,7 +96,7 @@
       <!-- Leaderboard QR -->
       <div class="qr-item">
         <div class="qr-icon">
-          <Monitor size={90} />
+          <QrCode size={90} />
         </div>
         <h3>Leaderboard</h3>
         <img src={leaderboardQrCode} alt="Leaderboard QR Code" />
@@ -109,7 +112,7 @@
               {#if copiedType === 'leaderboard'}
                 <Check size={16} /> Copied!
               {:else}
-                <Copy size={16} /> Copy
+                <ArrowRight size={16} /> Copy
               {/if}
             </button>
             <a 
@@ -119,7 +122,7 @@
               class="go-button"
               aria-label="Open leaderboard in new tab"
             >
-              <ExternalLink size={16} /> Go
+              <Link size={16} /> Go
             </a>
           </div>
         </div>
@@ -130,7 +133,7 @@
           {#if downloadedType === 'leaderboard'}
             <Check size={16} /> Downloaded!
           {:else}
-            <Download size={16} /> Download QR
+            <CloudUpload size={16} /> Download QR
           {/if}
         </button>
       </div>
@@ -138,7 +141,7 @@
       <!-- Scorecard QR -->
       <div class="qr-item">
         <div class="qr-icon">
-          <Smartphone size={90} />
+          <QrCode size={90} />
         </div>
         <h3>Scorecard</h3>
         <img src={scorecardQrCode} alt="Scorecard QR Code" />
@@ -154,7 +157,7 @@
               {#if copiedType === 'scorecard'}
                 <Check size={16} /> Copied!
               {:else}
-                <Copy size={16} /> Copy
+                <ArrowRight size={16} /> Copy
               {/if}
             </button>
             <a 
@@ -164,7 +167,7 @@
               class="go-button"
               aria-label="Open scorecard in new tab"
             >
-              <ExternalLink size={16} /> Go
+              <Link size={16} /> Go
             </a>
           </div>
         </div>
@@ -175,7 +178,7 @@
           {#if downloadedType === 'scorecard'}
             <Check size={16} /> Downloaded!
           {:else}
-            <Download size={16} /> Download QR
+            <CloudUpload size={16} /> Download QR
           {/if}
         </button>
       </div>

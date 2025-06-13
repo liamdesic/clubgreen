@@ -1,3 +1,5 @@
+**depreciated
+
 .login-page {
   min-height: 100vh;
   display: flex;
@@ -307,7 +309,6 @@ footer {
   position: absolute;
   left: 0.75rem;
   color: var(--muted-color, #6b7280);
-  pointer-events: none;
 }
 
 .input-with-icon input {
@@ -316,7 +317,7 @@ footer {
   border: 1px solid var(--border-color, #e5e7eb);
   border-radius: 0.5rem;
   font-size: 1rem;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .input-with-icon input:focus {

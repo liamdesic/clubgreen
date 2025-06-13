@@ -64,6 +64,12 @@ const supabaseHandler: Handle = async ({ event, resolve }) => {
   - Sets up Stripe customer
   - Configures initial settings
 
+### 5.4 Logout Flow
+- **Implementation**: Client-side redirect in hooks.server.ts
+- **Logic**: Authenticated users accessing /login are redirected to /dashboard
+- **Session cleanup**: Handled automatically by Supabase client
+- **No explicit logout endpoint**: Logout handled via client-side auth.signOut()
+
 ## 6. Protected Routes
 ```typescript
 // src/routes/(protected)/+layout.server.ts

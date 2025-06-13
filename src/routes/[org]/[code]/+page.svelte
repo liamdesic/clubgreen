@@ -16,8 +16,12 @@
   import { v4 as uuidv4 } from 'uuid';
   import profanity from 'leo-profanity';
   import { goto } from '$app/navigation';
+  import { Trophy, Flag, Plus, X, Edit, Medal, Flame, Circle } from 'lucide-svelte';
   import RecoveryPrompt from '$lib/components/scorecard/RecoveryPrompt.svelte';
-  import { createBlankPlayer, isValidScore, isGameComplete, formatScore, generateGameId } from '$lib/utils/scoreUtils';
+  import { createBlankPlayer, isValidScore, isRoundComplete, formatScore, generateGameId } from '$lib/utils/scorecardUtils';
+  import { triggerLeaderboardUpdate } from '$lib/runtime/scoreSnapshot';
+  import { timeFilterSchema, type TimeFilter } from '$lib/validations/timeFilter';
+  import type { ScorecardInsert } from '$lib/validations';
   
   // Only import scorecard.css if we're in the browser and on the scorecard page
   if (browser && window.location.pathname.includes('/scorecard')) {
@@ -31,8 +35,8 @@
     title: 'Live Leaderboard',  // Default value
     hole_count: 9,  // Default value
     accent_color: '#00c853',  // Default value
-    scorecard_ad_text: '',
-    scorecard_ad_url: ''
+    ads_text: '',
+    ads_url: ''
   };
   let orgSettings = {
     logo_url: null,
@@ -178,7 +182,7 @@
     // Access is granted, now load the full event data
     const { data: fullEventData, error: fullEventError } = await supabase
       .from('events')
-      .select('id, title, settings_json, organization_id')
+      .select('id, title, hole_count, accent_color, ads_text, ads_url, organization_id')
       .eq('short_code', currentCode)
       .single();
       
@@ -196,7 +200,10 @@
     eventSettings = {
       ...eventSettings,
       title: fullEventData.title || eventSettings.title,
-      ...(fullEventData.settings_json || {})
+      hole_count: fullEventData.hole_count || eventSettings.hole_count,
+      accent_color: fullEventData.accent_color || eventSettings.accent_color,
+      ads_text: fullEventData.ads_text || eventSettings.ads_text,
+      ads_url: fullEventData.ads_url || eventSettings.ads_url
     };
     
     console.log('✅ Loaded event settings:', eventSettings);
@@ -205,7 +212,7 @@
   const loadOrgSettings = async () => {
     const { data: orgData, error: orgError } = await supabase
       .from('organizations')
-      .select('settings_json')
+      .select('logo_url, name')
       .eq('id', orgId)
       .single();
       
@@ -214,10 +221,10 @@
       return;
     }
     
-    if (orgData && orgData.settings_json) {
+    if (orgData) {
       orgSettings = {
-        ...orgSettings,
-        ...(orgData.settings_json || {})
+        logo_url: orgData.logo_url || null,
+        name: orgData.name || null
       };
       console.log('✅ Loaded organization settings:', orgSettings);
     }
@@ -359,10 +366,18 @@
 }
 
   function startGame() {
-    if (players.length < 2) {
-      alert('Please enter at least 2 players to start');
+    // Check if there's any text in the input field
+    if (playerName.trim()) {
+      // If there's text, try to add the player first
+      addPlayer();
+    }
+
+    // Check if we have at least one player
+    if (players.length === 0) {
+      showToast('Please add at least one player to start', 'error');
       return;
     }
+
     gameStarted = true;
     
     // Initialize players with active state
@@ -539,7 +554,6 @@
           event_id: eventId,  // Add event_id from the current event
           published: true     // Mark as published by default
         });
-
       }
     }
 
@@ -554,6 +568,17 @@
         console.error('❌ Error inserting final scores:', error);
       } else {
         console.log(`✅ Inserted ${rowsToInsert.length} rows to Supabase`);
+        
+        // Trigger leaderboard updates for all time filters
+        try {
+          const timeFilters = ['all_time', 'today', 'this_week', 'this_month'];
+          for (const filter of timeFilters) {
+            await triggerLeaderboardUpdate(eventId, filter);
+          }
+          console.log('✅ Triggered leaderboard updates for all time filters');
+        } catch (err) {
+          console.error('❌ Error triggering leaderboard updates:', err);
+        }
       }
     } else {
       console.warn("⚠️ No scores found to insert.");
@@ -667,7 +692,7 @@
   <div class="header-inner">
     <div class="leaderboard-link">
       <button class="leaderboard-button" on:click={() => showLeaderboardModal = !showLeaderboardModal}>
-        <i class="fa-solid fa-trophy"></i> Live Leaderboard
+        <Trophy size={20} /> Live Leaderboard
       </button>
       
     </div>
@@ -678,7 +703,7 @@
 
   {#if !showFinal}
     <div class="game-header">
-      <i class="fa-solid fa-flag flag-background"></i>
+      <Flag size={80} class="flag-background" />
 
       <div class="hole-indicator">
         {#if !gameStarted}
@@ -769,7 +794,7 @@
             aria-label="Add player"
             disabled={!playerName.trim()}
           >
-            <i class="fa-solid fa-plus"></i>
+            <Plus size={20} />
           </button>
         </div>
       </form>
@@ -780,7 +805,7 @@
       <li>
         {p.name}
         <button class="remove-player" on:click={() => removePlayer(i)}>
-          <i class="fa-solid fa-xmark"></i>
+          <X size={20} />
         </button>
       </li>
     {/each}
@@ -840,7 +865,7 @@
                   }}
                   aria-label={`Edit ${player.name}'s score`}
                 >
-                  <i class="fa-solid fa-pen-to-square"></i>
+                  <Edit size={16} />
                 </button>
               {/if}
             </div>
@@ -915,17 +940,17 @@
 
 <!-- 🏁 FINAL SCORE SCREEN -->
 {#if showFinal}
-  <div class="main-content final-screen">
+  <div class="main-content final-screen" style="background-color: var(--accent-color-800);">
     <div class="final-header">
       <h1>Congratulations!</h1>
-      <i class="fa-solid fa-trophy trophy-bg"></i>
+      <Trophy size={60} class="trophy-bg" />
     </div>
 
     <div class="final-table">
       <div class="final-row header">
-        <div class="cell rank"><i class="fa-solid fa-medal"></i></div>
+        <div class="cell rank"><Medal size={16} /></div>
         <div class="cell name">Name</div>
-        <div class="cell score"><i class="fa-solid fa-golf-ball-tee"></i> Score</div>
+        <div class="cell score"><Circle size={16} /> Score</div>
       </div>
 
       {#each players as player, index}
@@ -940,7 +965,7 @@
             {player.name}
             {#if player.holeInOnes > 0}
               <div class="hio-note">
-                <i class="fa-solid fa-fire" style="color: #fc4138;"></i>
+                <Flame size={16} style="color: #fc4138;" />
                 {player.holeInOnes} hole-in-one{player.holeInOnes > 1 ? 's' : ''}
               </div>
             {/if}
@@ -967,9 +992,9 @@
       <img src="https://images.squarespace-cdn.com/content/v1/66f47f43360134029ba42149/a7914e99-7939-42b0-b318-c99c685120eb/Asset+5.png?format=1500w" alt="Club Green logo" class="logo" />
     {/if}
   
-    {#if eventSettings?.scorecard_ad_text && eventSettings?.scorecard_ad_url}
-      <a href={eventSettings.scorecard_ad_url} class="footer-promo" target="_blank" rel="noopener noreferrer">
-        {eventSettings.scorecard_ad_text}
+    {#if eventSettings?.ads_text && eventSettings?.ads_url}
+      <a href={eventSettings.ads_url} class="footer-promo" target="_blank" rel="noopener noreferrer">
+        {eventSettings.ads_text}
       </a>
     {/if}
   </div>

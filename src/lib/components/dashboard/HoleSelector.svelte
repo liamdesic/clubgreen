@@ -1,6 +1,5 @@
 <script lang="ts">
-  import Plus from 'lucide-svelte/icons/plus';
-  import Minus from 'lucide-svelte/icons/minus';
+  import { Plus, Minus } from 'lucide-svelte';
   import { createEventDispatcher } from 'svelte';
 
   export let value: number = 9;

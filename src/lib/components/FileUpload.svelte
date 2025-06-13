@@ -1,17 +1,20 @@
-<script>
+<script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { createBrowserClient } from '@supabase/ssr';
   import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$env/static/public';
   import { CloudUpload } from 'lucide-svelte';
+  import '$lib/styles/theme.css';
 
   export let id = `file-upload-${Math.random().toString(36).substr(2, 9)}`;
   export let label = 'Upload File';
   export let folder = 'uploads'; // e.g. logos, ads, qr-codes
   export let initialUrl = ''; // Add this line to accept initial URL
   export let ariaDescribedBy = '';
-  export let theme = 'light'; // 'light' or 'dark'
+  export let theme: 'light' | 'dark' = 'light';
 
-  const dispatch = createEventDispatcher();
+  const dispatch = createEventDispatcher<{
+    uploaded: { url: string };
+  }>();
   
   // Initialize Supabase client
   const supabase = createBrowserClient(
@@ -19,16 +22,17 @@
     PUBLIC_SUPABASE_ANON_KEY
   );
 
-  let file = null;
+  let file: File | null = null;
   let status = '';
   let size = 0;
   let url = initialUrl || '';
 
-  async function handleFileUpload(event) {
-    file = event.target.files[0];
+  async function handleFileUpload(event: Event) {
+    const target = event.target as HTMLInputElement;
+    file = target.files?.[0] || null;
     if (!file) return;
 
-    size = (file.size / 1024).toFixed(1);
+    size = Number((file.size / 1024).toFixed(1));
     status = 'uploading';
 
     try {
@@ -48,21 +52,10 @@
       
       // First, check if the bucket exists by listing buckets
       const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-      const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
+      const bucketExists = buckets?.some((bucket: { name: string }) => bucket.name === bucketName);
       
-      // Only try to create the bucket if it doesn't exist
-      if (!bucketExists) {
-        try {
-          const { error: createError } = await supabase.storage
-            .createBucket(bucketName, { public: true });
-            
-          if (createError && createError.message && !createError.message.includes('already exists')) {
-            console.warn('Error creating bucket:', createError);
-          }
-        } catch (err) {
-          console.warn('Error creating bucket:', err);
-        }
-      }
+      // Skip bucket creation - assume bucket exists or will be created by admin
+      // Bucket creation typically requires elevated permissions
       
       // Upload the file to the specified folder in the bucket
       const { error: uploadError } = await supabase.storage
@@ -97,7 +90,7 @@
       url = urlData.publicUrl;
       status = 'uploaded';
       console.log('File uploaded successfully:', url);
-      dispatch('upload', { url });
+      dispatch('uploaded', { url });
     } catch (err) {
       status = 'error';
       console.error('Upload error:', err);
@@ -111,16 +104,15 @@
     url = ''; // Always clear URL completely, don't use initialUrl
     status = '';
     size = 0;
-    dispatch('upload', { url: '' });
+    dispatch('uploaded', { url: '' });
   }
 </script>
 
-<div class="upload-section">
-  <label>{label}</label>
+<div class="upload-section" data-theme={theme}>
 
   {#if !url && status !== 'uploading'}
     <div class="upload-empty">
-      <CloudUpload size="32" color="#888" />
+      <CloudUpload size="32" color={theme === 'dark' ? 'rgba(255, 255, 255, 0.9)' : '#888'} />
       <p>Drag file here or</p>
       <label for={id} class="upload-browse">
         {label}
@@ -151,9 +143,16 @@
       <div class="file-info">
         <div class="file-name">
           {#if file}
-            {file.name} ({size} KB)
+            {file.name}
           {:else}
             {label.replace('Upload', '')}
+          {/if}
+        </div>
+        <div class="file-details">
+          {#if file}
+            <span class="file-size">{size} KB</span>
+            <span class="file-type">{file.type.split('/')[1].toUpperCase()}</span>
+            <span class="file-date">{new Date(file.lastModified).toLocaleDateString()}</span>
           {/if}
         </div>
         <small>{file ? 'Uploaded' : ''}</small>
@@ -165,25 +164,62 @@
 
 <style>
   .upload-section {
+    margin: 1rem 0;
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    --upload-bg: var(--theme-bg, #fdfdfd);
-    --upload-border: var(--theme-border, #ccc);
-    --upload-text: var(--theme-text, #333);
-    --upload-text-secondary: var(--theme-text-secondary, #666);
-    --upload-hover: var(--theme-hover, #eee);
-    --upload-shadow: var(--theme-shadow, rgba(0,0,0,0.05));
+  }
+
+  .upload-section[data-theme="dark"] {
+    --upload-bg: rgba(0, 0, 0, 0.2);
+    --upload-border: rgba(255, 255, 255, 0.2);
+    --upload-text: rgba(255, 255, 255, 0.9);
+    --upload-text-secondary: rgba(255, 255, 255, 0.7);
+    --upload-hover: rgba(255, 255, 255, 0.1);
+    --upload-shadow: rgba(0, 0, 0, 0.2);
+  }
+
+  .upload-section[data-theme="light"] {
+    --upload-bg: #fdfdfd;
+    --upload-border: #ccc;
+    --upload-text: #333;
+    --upload-text-secondary: #666;
+    --upload-hover: #eee;
+    --upload-shadow: rgba(0, 0, 0, 0.05);
   }
 
   .upload-empty {
-    border: 2px dashed var(--upload-border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--upload-border);
     border-radius: 12px;
     padding: 2rem;
     text-align: center;
     position: relative;
     background: var(--upload-bg);
     color: var(--upload-text);
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+
+  .upload-empty p {
+    color: white;
+  }
+
+  .upload-empty small {
+    margin-top: 10px;
+  }
+
+  .upload-empty:hover {
+    border-color: var(--upload-text-secondary);
+    background: var(--upload-hover);
+  }
+
+  .upload-empty:focus-within {
+    outline-color: var(--upload-text-secondary);
   }
 
   .upload-browse {
@@ -191,10 +227,17 @@
     padding: 0.4rem 1rem;
     font-weight: 600;
     font-size: 0.9rem;
-    background: var(--upload-hover);
+    background: var(--upload-border);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 6px;
     cursor: pointer;
     color: var(--upload-text);
+    transition: background-color 0.2s ease;
+  }
+
+  .upload-browse:hover {
+    background: var(--upload-hover);
+    opacity: 0.9;
   }
 
   .upload-input {
@@ -214,6 +257,7 @@
     border-radius: 10px;
     box-shadow: inset 0 1px 2px var(--upload-shadow);
     color: var(--upload-text);
+    border: 1px solid var(--upload-border);
   }
 
   .thumb {
@@ -235,6 +279,18 @@
     font-weight: 600;
     font-size: 0.95rem;
     color: var(--upload-text);
+  }
+
+  .file-details {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.8rem;
+    color: var(--upload-text-secondary);
+  }
+
+  .file-size, .file-type, .file-date {
+    display: inline-flex;
+    align-items: center;
   }
 
   .upload-progress {
@@ -264,23 +320,8 @@
     color: #e53935;
   }
 
-  /* Dark mode styles */
-  :global(.dark) .upload-section {
-    --theme-bg: #1a1a1a;
-    --theme-border: #333;
-    --theme-text: #fff;
-    --theme-text-secondary: #999;
-    --theme-hover: #2a2a2a;
-    --theme-shadow: rgba(0,0,0,0.2);
-  }
-
-  /* Light mode styles */
-  :global(.light) .upload-section {
-    --theme-bg: #fdfdfd;
-    --theme-border: #ccc;
-    --theme-text: #333;
-    --theme-text-secondary: #666;
-    --theme-hover: #eee;
-    --theme-shadow: rgba(0,0,0,0.05);
+  small {
+    color: var(--upload-text-secondary);
+    font-size: 0.8rem;
   }
 </style>

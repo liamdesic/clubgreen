@@ -2,7 +2,7 @@
     import { page } from '$app/stores';
     import { onMount } from 'svelte';
     import { supabase } from '$lib/supabaseClient';
-    import { triggerLeaderboardUpdate } from '$lib/utils/leaderboardUtils';
+    import { triggerLeaderboardUpdate } from '$lib/runtime/scoreSnapshot';
     import { timeFilterSchema, type TimeFilter } from '$lib/validations/timeFilter';
     import type { ScorecardInsert } from '$lib/validations';
     import { showToast } from '$lib/stores/toastStore';

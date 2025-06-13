@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 import { supabase } from '$lib/supabaseClient';
-import { eventSchema, type Event, normalizeEvent } from '$lib/validations';
+import { eventSchema, eventInsertSchema, type Event, normalizeEvent } from '$lib/validations';
+import { nullableDateSchema } from '$lib/validations/dateSchemas';
 import type { TimeFilter } from '$lib/validations/timeFilter';
 
 // Helper function to convert Date objects to ISO strings for Supabase
@@ -9,10 +10,6 @@ function prepareForSupabase<T extends Record<string, any>>(data: T): T {
     Object.entries(data).map(([key, value]) => {
       if (value instanceof Date) {
         return [key, value.toISOString()];
-      }
-      // Transform settings to settings_json for database
-      if (key === 'settings') {
-        return ['settings_json', value];
       }
       return [key, value];
     })
@@ -25,6 +22,7 @@ function createEventSource() {
   const error = writable<string | null>(null);
 
   async function fetchEvents(orgId: string) {
+    console.log('🔄 [eventSource] fetchEvents called with orgId:', orgId);
     loading.set(true);
     error.set(null);
     const { data, error: err } = await supabase
@@ -32,14 +30,27 @@ function createEventSource() {
       .select('*')
       .eq('organization_id', orgId);
     if (err) {
+      console.error('❌ [eventSource] Error fetching events:', err);
       error.set(err.message);
       set([]);
       loading.set(false);
       return;
     }
+    console.log('📊 [eventSource] Raw event data from DB:', data?.length || 0, 'events');
+    console.log('📋 [eventSource] Raw events:', data);
+    
     const validRows = (data ?? [])
       .map(normalizeEvent)
-      .filter(row => eventSchema.safeParse(row).success);
+      .filter(row => {
+        const validation = eventSchema.safeParse(row);
+        if (!validation.success) {
+          console.warn('⚠️ [eventSource] Event failed validation:', row.id, validation.error);
+        }
+        return validation.success;
+      });
+    
+    console.log('✅ [eventSource] Valid events after filtering:', validRows.length);
+    console.log('📝 [eventSource] Valid events:', validRows.map(e => ({ id: e.id, title: e.title, archived: e.archived })));
     set(validRows);
     loading.set(false);
   }
@@ -47,7 +58,18 @@ function createEventSource() {
   async function addEvent(newEvent: Omit<Event, 'id'>) {
     loading.set(true);
     error.set(null);
-    const eventData = prepareForSupabase(newEvent);
+    
+    // First validate with eventInsertSchema
+    const insertValidation = eventInsertSchema.safeParse(newEvent);
+    if (!insertValidation.success) {
+      console.error('❌ [eventSource] Validation failed before insert:', insertValidation.error);
+      error.set('Validation failed before insert');
+      loading.set(false);
+      throw new Error('Validation failed before insert');
+    }
+    
+    // Remove created_at from the insert data since Supabase will handle it
+    const { created_at, ...eventData } = prepareForSupabase(newEvent);
     console.log('📝 [eventSource] Attempting to create event:', eventData);
     
     const { data, error: err } = await supabase
@@ -70,14 +92,22 @@ function createEventSource() {
     
     console.log('✅ [eventSource] Event created successfully:', data);
     const normalized = normalizeEvent(data);
-    const parsed = eventSchema.safeParse(normalized);
+    
+    // Create a temporary schema that omits created_at since we don't use it
+    const postInsertSchema = eventSchema.omit({ created_at: true });
+    
+    // Validate with the temporary schema
+    const parsed = postInsertSchema.safeParse(normalized);
     if (!parsed.success) {
       console.error('❌ [eventSource] Validation failed after insert:', parsed.error);
       error.set('Validation failed after insert');
       loading.set(false);
       throw new Error('Validation failed after insert');
     }
-    update(events => [...events, parsed.data]);
+    
+    // Add the event to the store with the correct type
+    const validatedEvent = parsed.data as Event;
+    update(events => [...events, validatedEvent]);
     loading.set(false);
   }
 
@@ -107,11 +137,28 @@ function createEventSource() {
     loading.set(false);
   }
 
+  async function deleteEvent(id: string) {
+    loading.set(true);
+    error.set(null);
+    const { error: err } = await supabase
+      .from('events')
+      .delete()
+      .eq('id', id);
+    if (err) {
+      error.set(err.message);
+      loading.set(false);
+      throw err;
+    }
+    update(events => events.filter(e => e.id !== id));
+    loading.set(false);
+  }
+
   return {
     subscribe,
     fetchEvents,
     addEvent,
     updateEvent,
+    deleteEvent,
     loading,
     error
   };

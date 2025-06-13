@@ -11,11 +11,17 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 	}
 
 	// 2. Exchange the code for a session
-	const { error: exchangeError } = await locals.supabase.auth.exchangeCodeForSession(code);
+	const { data: sessionData, error: exchangeError } = await locals.supabase.auth.exchangeCodeForSession(code);
 
 	if (exchangeError) {
 		console.error('❌ [auth/callback] Code exchange failed:', exchangeError.message);
 		throw redirect(303, `/login?error=${encodeURIComponent('Invalid or expired link')}&redirectTo=${encodeURIComponent(redirectTo)}`);
+	}
+
+	// Ensure we have a valid session
+	if (!sessionData?.session) {
+		console.error('❌ [auth/callback] No session after code exchange');
+		throw redirect(303, `/login?error=${encodeURIComponent('Failed to create session')}&redirectTo=${encodeURIComponent(redirectTo)}`);
 	}
 
 	// 3. Get the user from the session

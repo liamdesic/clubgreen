@@ -11,9 +11,22 @@
   import { DatePicker } from '@svelte-plugins/datepicker';
   import { format } from 'date-fns';
   import HoleSelector from './HoleSelector.svelte';
-  import type { Event, Organization } from '$lib/validations';
-  import { eventSchema } from '$lib/validations';
+  import type { Organization } from '$lib/validations';
+  import { eventSchema, eventInsertSchema, type Event } from '$lib/validations';
   import type { TimeFilter } from '$lib/validations/timeFilter';
+  import { toISOString } from '$lib/utils/generalUtils';
+
+  // Helper function to convert Date objects to ISO strings for Supabase
+  function prepareForSupabase<T extends Record<string, any>>(data: T): T {
+    return Object.fromEntries(
+      Object.entries(data).map(([key, value]) => {
+        if (value instanceof Date) {
+          return [key, value.toISOString()];
+        }
+        return [key, value];
+      })
+    ) as T;
+  }
 
   // Props
   export let showModal = false;
@@ -100,7 +113,7 @@
       }
 
       // Validate event title
-      if (!newTitle.trim()) {
+      if (!newTitle || !newTitle.trim()) {
         const errorMsg = 'Please enter a title';
         console.error('❌ [createEvent] Validation error:', errorMsg);
         createError = errorMsg;
@@ -126,28 +139,27 @@
       console.log('Generated codes:', { short_code, access_uuid });
       
       // Prepare event data according to schema
-      const eventData = {
-        title: newTitle,
-        event_date: selectedType === 'single' ? newDate.toISOString() : null,
-        organization_id: organization.id,
+      const newEvent = {
+        title: newTitle.trim(),
+        short_code: short_code,
+        access_uuid: access_uuid,
         hole_count: holeCount,
-        created_at: null, // Let Supabase handle the created_at timestamp
-        published: true,
-        short_code,
-        access_uuid,
+        organization_id: organization.id,
+        accent_color: organization.color_palette ? organization.color_palette.split(',')[0] : '#4CAF50',
         logo_url: null,
-        ads_image_url: null,
-        accent_color: null,
-        show_on_main_leaderboard: true,
-        archived: false,
-        ads_text: null,
+        ads_text: '',
         ads_url: null,
-        time_filters: ['all_time'] as TimeFilter[],
-        settings_json: {}
+        ads_image_url: null,
+        archived: false,
+        published: false,
+        event_date: selectedType === 'single' ? toISOString(newDate) : null,
+        time_filters: ['all_time'],
+        settings_json: null,
+        show_on_main_leaderboard: true
       };
 
       // Validate the event data
-      const validationResult = eventSchema.safeParse(eventData);
+      const validationResult = eventInsertSchema.safeParse(newEvent);
       if (!validationResult.success) {
         console.error('❌ [createEvent] Validation error:', validationResult.error);
         createError = 'Invalid event data. Please try again.';
@@ -159,7 +171,7 @@
 
       // Use eventSource to create the event
       try {
-        await eventSource.addEvent(eventData);
+        await eventSource.addEvent(newEvent);
         logStep('Event created successfully');
         showToast(`Event "${newTitle}" created successfully!`, 'success');
         
@@ -167,7 +179,7 @@
         closeModal();
         
         // Dispatch event created
-        dispatch('eventCreated', { event: eventData });
+        dispatch('eventCreated', { event: newEvent });
       } catch (error: any) {
         console.error('❌ [createEvent] Error from eventSource.addEvent:', error);
         console.error('Error details:', {

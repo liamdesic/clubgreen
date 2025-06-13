@@ -35,7 +35,6 @@
     align-items: center;
     gap: 0.75rem;
     z-index: 10000;
-    pointer-events: none;
     padding: 0 1rem;
   }
 
@@ -52,7 +51,6 @@
     position: relative;
     min-width: 300px;
     max-width: 500px;
-    pointer-events: auto;
   }
 
   .toast-message {

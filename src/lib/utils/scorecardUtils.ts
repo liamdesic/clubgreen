@@ -2,6 +2,7 @@
 // Used by both scorecard and leaderboard for DRY, consistent logic
 
 import type { PlayerHoleScore, PlayerTotalScore } from '$lib/validations/playerScore';
+import { createBlankPlayerHoleScores } from '$lib/validations/playerScore';
 
 /**
  * Generates a new unique ID (UUID v4)
@@ -10,6 +11,9 @@ import type { PlayerHoleScore, PlayerTotalScore } from '$lib/validations/playerS
 export function generateId(): string {
   return crypto.randomUUID();
 }
+
+// Export generateId as generateGameId for backward compatibility
+export const generateGameId = generateId;
 
 /**
  * Calculates the total score from an array of hole scores
@@ -101,4 +105,23 @@ export function getLastUpdated(holeScores: PlayerHoleScore[]): string | undefine
     .filter(Boolean)
     .sort()
     .pop();
+}
+
+/**
+ * Creates a blank player with the given name and hole count
+ * @param name - Player's name
+ * @param holeCount - Number of holes in the game
+ * @returns A new player object with blank scores
+ */
+export function createBlankPlayer(name: string, holeCount: number) {
+  const playerId = generateId();
+  const holeScores = createBlankPlayerHoleScores(playerId, name, holeCount);
+  
+  return {
+    id: playerId,
+    name,
+    scores: holeScores.map(score => score.score),
+    holeInOnes: 0,
+    totalScore: 0
+  };
 }

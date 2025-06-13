@@ -38,7 +38,7 @@
   align-items: center;
   justify-content: center;
   color: #4a5568;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .btn-icon:hover {
@@ -408,7 +408,11 @@
 .add-card-active {
   background: #1e1a26;
   border: 2px solid rgba(255, 255, 255, 0.1);
-  cursor: default;
+}
+
+.add-card-active button,
+.add-card-active button:hover {
+  cursor: pointer;
 }
 
 .add-event-form {
@@ -416,10 +420,24 @@
   color: white;
 }
 
+/* Override global theme.css heading colors for dark dashboard backgrounds */
+.dashboard-wrapper h1,
+.dashboard-wrapper h2, 
+.dashboard-wrapper h3,
+.dashboard-wrapper h4,
+.dashboard-wrapper h5,
+.dashboard-wrapper h6 {
+  color: white;
+  font-family: var(--brand-font-header-bold);
+  font-weight: 700;
+}
+
 .add-event-form h3 {
   margin-top: 0;
   margin-bottom: 1.5rem;
   color: white;
+  font-family: var(--brand-font-header-bold);
+  font-weight: 700;
 }
 
 .form-group {
@@ -430,28 +448,62 @@
   display: block;
   margin-bottom: 0.5rem;
   font-weight: 500;
+  color: white;
+  font-family: var(--brand-font-body);
+}
+
+.form-group small {
+  color: rgba(255, 255, 255, 0.7);
+  font-family: var(--brand-font-body);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+  display: block;
 }
 
 .form-group input[type="text"],
-.form-group input[type="date"] {
+.form-group input[type="date"],
+.form-group input[type="url"] {
   width: 100%;
   padding: 0.75rem;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
   color: white;
   font-size: 1rem;
+  font-family: var(--brand-font-body);
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="date"]:focus,
+.form-group input[type="url"]:focus {
+  outline: none;
+  border-color: var(--accent-color, #4CAF50);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.form-group input[type="text"]::placeholder,
+.form-group input[type="url"]::placeholder {
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .form-group input[type="radio"] {
   margin-right: 0.5rem;
 }
 
-.form-group label {
+.checkbox-label {
   display: inline-flex;
   align-items: center;
   margin-right: 1.5rem;
   cursor: pointer;
+  color: white;
+  font-family: var(--brand-font-body);
+  font-weight: 500;
+}
+
+.checkbox-label input[type="checkbox"] {
+  margin-right: 0.5rem;
 }
 
 .form-actions {
@@ -468,7 +520,7 @@
   border-radius: 4px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease;
 }
 
 .cancel-button {

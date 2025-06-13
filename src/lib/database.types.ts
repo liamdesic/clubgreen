@@ -155,7 +155,7 @@ export type Database = {
           created_at: string | null
           current_period_end: string | null
           id: string
-          leaderboard_rotation_interval: string
+          leaderboard_rotation_interval: number | null
           logo_url: string | null
           name: string
           org_leaderboard_codes: Json
@@ -176,7 +176,7 @@ export type Database = {
           created_at?: string | null
           current_period_end?: string | null
           id?: string
-          leaderboard_rotation_interval?: string
+          leaderboard_rotation_interval?: number | null
           logo_url?: string | null
           name: string
           org_leaderboard_codes?: Json
@@ -197,7 +197,7 @@ export type Database = {
           created_at?: string | null
           current_period_end?: string | null
           id?: string
-          leaderboard_rotation_interval?: string
+          leaderboard_rotation_interval?: number | null
           logo_url?: string | null
           name?: string
           org_leaderboard_codes?: Json

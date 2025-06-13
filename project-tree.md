@@ -14,7 +14,9 @@
 ├── leaderboard-rebuild-brief.md
 ├── package-lock.json
 ├── package.json
+├── plan.md
 ├── project-tree.md
+├── settings_json_migration_checklist.md
 ├── src
 │   ├── ambient.d.ts
 │   ├── app.d.ts
@@ -26,15 +28,20 @@
 │   │   │   ├── Button.svelte
 │   │   │   ├── FileUpload.svelte
 │   │   │   ├── LoadingSpinner.svelte
+│   │   │   ├── Skeleton.svelte
 │   │   │   ├── dashboard
 │   │   │   │   ├── AddEventCard.svelte
 │   │   │   │   ├── ArchivedEventsSection.svelte
+│   │   │   │   ├── AutoSaveForm.svelte
 │   │   │   │   ├── ColorPalette.svelte
+│   │   │   │   ├── DashboardFormLayout.svelte
 │   │   │   │   ├── DashboardMainHeader.svelte
 │   │   │   │   ├── DashboardPageHeader.svelte
+│   │   │   │   ├── DashboardSkeleton.svelte
 │   │   │   │   ├── EmptyDashboard.svelte
 │   │   │   │   ├── EventCard.svelte
 │   │   │   │   ├── EventManagement.svelte
+│   │   │   │   ├── FormField.svelte
 │   │   │   │   ├── HoleSelector.svelte
 │   │   │   │   ├── MainLeaderboardCard.svelte
 │   │   │   │   ├── NewRoundModal.svelte
@@ -89,6 +96,7 @@
 │   │   │   ├── leaderboard.css
 │   │   │   ├── login.css
 │   │   │   ├── onboarding.css
+│   │   │   ├── player-management.css
 │   │   │   ├── scorecard.css
 │   │   │   ├── theme.css
 │   │   │   └── tippy.css
@@ -106,8 +114,10 @@
 │   │   ├── validations
 │   │   │   ├── dateSchemas.ts
 │   │   │   ├── errorSchemas.ts
+│   │   │   ├── index.ts
 │   │   │   ├── leaderboardView.ts
 │   │   │   ├── organizationForm.ts
+│   │   │   ├── organizationSettings.ts
 │   │   │   ├── playerScore.ts
 │   │   │   ├── timeFilter.ts
 │   │   │   └── validationUtils.ts
@@ -132,9 +142,12 @@
 │   │   │   │   └── [shortcode]
 │   │   │   │       ├── +page.server.ts
 │   │   │   │       └── +page.svelte
-│   │   │   ├── mb
 │   │   │   └── ob
-│   │   │       └── [code]
+│   │   │       ├── +layout.server.ts
+│   │   │       ├── +layout.svelte
+│   │   │       └── [org_code]
+│   │   │           ├── +page.server.ts
+│   │   │           └── +page.svelte
 │   │   ├── api
 │   │   │   ├── billing-portal
 │   │   │   │   └── +server.ts
@@ -144,6 +157,9 @@
 │   │   │   │   └── +server.ts
 │   │   │   ├── env-test
 │   │   │   │   └── +server.ts
+│   │   │   ├── organizations
+│   │   │   │   └── [id]
+│   │   │   │       └── +server.ts
 │   │   │   ├── start-trial
 │   │   │   └── webhooks
 │   │   │       └── stripe
@@ -156,27 +172,33 @@
 │   │   │   ├── +page.svelte
 │   │   │   ├── [code]
 │   │   │   │   └── setup
+│   │   │   │       ├── +page.server.ts
 │   │   │   │       ├── +page.svelte
-│   │   │   │       ├── AdvertisementSettings.svelte
-│   │   │   │       ├── BackToDashboardButton.svelte
 │   │   │   │       ├── EventActions.svelte
-│   │   │   │       ├── EventDetailsForm.svelte
-│   │   │   │       ├── LeaderboardSettings.svelte
+│   │   │   │       ├── EventForm.svelte
 │   │   │   │       └── PlayerManagementTable.svelte
 │   │   │   ├── customize
 │   │   │   │   ├── +page.server.ts
 │   │   │   │   └── +page.svelte
-│   │   │   ├── dashboard-new
+│   │   │   ├── manage
+│   │   │   │   ├── +page.server.ts
+│   │   │   │   ├── +page.svelte
+│   │   │   │   └── PlayerManagementTable.svelte
+│   │   │   ├── org-settings
+│   │   │   │   ├── +page.server.ts
 │   │   │   │   └── +page.svelte
 │   │   │   └── settings
 │   │   │       ├── +page.server.ts
 │   │   │       └── +page.svelte
 │   │   ├── login
 │   │   │   └── +page.svelte
+│   │   ├── minimal-test
+│   │   │   └── +page.svelte
 │   │   ├── onboarding
 │   │   │   ├── +page.server.ts
 │   │   │   └── +page.svelte
 │   │   ├── test
+│   │   │   └── +page.svelte
 │   │   └── transition-test
 │   │       └── +page.svelte
 │   └── types
@@ -188,7 +210,6 @@
 │   │   ├── gold-badge.png
 │   │   └── silver-badge.png
 │   ├── favicon.png
-│   ├── fontawesome-subset.css
 │   ├── leaderboard-preload.css
 │   ├── logos
 │   │   ├── ldrb-icon-black.png
@@ -241,6 +262,22 @@
 │       └── auth
 │           ├── login.test.ts
 │           └── supabase.test.ts
+├── test-sveltekit
+│   ├── README.md
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── src
+│   │   ├── app.d.ts
+│   │   ├── app.html
+│   │   ├── lib
+│   │   │   └── index.ts
+│   │   └── routes
+│   │       └── +page.svelte
+│   ├── static
+│   │   └── favicon.png
+│   ├── svelte.config.js
+│   ├── tsconfig.json
+│   └── vite.config.ts
 ├── tiebreakgame.md
 ├── tsconfig.json
 ├── types-rebuild.md
@@ -249,4 +286,4 @@
 ├── vite.config.ts
 └── vitest.config.ts
 
-70 directories, 180 files
+78 directories, 209 files

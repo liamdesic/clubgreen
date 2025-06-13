@@ -35,6 +35,11 @@ export const liveEvents = derived(eventSource, $es =>
 - Handles loading/error states
 - Provides derived store for live events
 - Follows THE-BRAIN architecture
+- Methods:
+  - `fetchEvents(orgId)`: Load events for org
+  - `addEvent(event)`: Create new event
+  - `updateEvent(id, updates)`: Modify event
+  - `deleteEvent(id)`: Remove event
 
 ### 3. Event Status
 ```typescript

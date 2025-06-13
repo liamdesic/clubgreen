@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/stores';
-  import { boardRuntime, activeBoard, currentScores } from '$lib/runtime';
-  import LeaderboardLayout from '$lib/components/Leaderboard/LeaderboardLayout.svelte';
-  import LeaderboardScores from '$lib/components/Leaderboard/LeaderboardScores.svelte';
-  import LeaderboardHeader from '$lib/components/Leaderboard/LeaderboardHeader.svelte';
-  import LeaderboardRotationStatus from '$lib/components/Leaderboard/LeaderboardRotationStatus.svelte';
+  import { boardRuntime, currentBoard, currentScores } from '$lib/runtime';
+  import LeaderboardLayout from '$lib/components/leaderboard/LeaderboardLayout.svelte';
+  import LeaderboardScores from '$lib/components/leaderboard/LeaderboardScores.svelte';
+  import LeaderboardHeader from '$lib/components/leaderboard/LeaderboardHeader.svelte';
+  import LeaderboardRotationStatus from '$lib/components/leaderboard/LeaderboardRotationStatus.svelte';
   import { type FormErrorResponse, createErrorResponse } from '$lib/validations/errorSchemas';
   import { showToast } from '$lib/stores/toastStore';
   import type { TimeFilter } from '$lib/validations/timeFilter';

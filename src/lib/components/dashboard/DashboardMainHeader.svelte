@@ -1,17 +1,29 @@
 <script lang="ts">
   import type { Organization } from '$lib/validations';
   import { User, Settings, Palette } from 'lucide-svelte/icons';
+  import { goto } from '$app/navigation';
   import TrialStatus from '$lib/components/dashboard/TrialStatus.svelte';
+  import OrganizationModal from '$lib/components/dashboard/OrganizationModal.svelte';
 
   export let organization: Organization | null = null;
   export let loading = false;
+
+  let showOrgModal = false;
+
+  function toggleOrgModal() {
+    showOrgModal = !showOrgModal;
+  }
+
+  function handleLogout() {
+    goto('/login');
+  }
 </script>
 
 <header class="dashboard-header">
   <div class="dashboard-title">
-    {#if organization?.settings_json?.logo_url}
+    {#if organization?.logo_url}
       <img 
-        src={organization.settings_json.logo_url} 
+        src={organization.logo_url} 
         alt="{organization.name} logo" 
         class="org-logo"
       />
@@ -37,15 +49,15 @@
           <Palette size="16" />
           <span>Customize</span>
         </a>
-        <a 
-          href="/dashboard/settings"
+        <button 
           class="user-pill" 
-          aria-label="Account settings"
+          aria-label="Organization settings"
+          on:click={toggleOrgModal}
         >
           <User size="16" />
           <span>{organization.name || 'My Organization'}</span>
           <Settings size="16" class="gear-button" />
-        </a>
+        </button>
       {:else if loading}
         <div class="user-pill">
           <div class="skeleton-loader" style="width: 120px; height: 24px;"></div>
@@ -59,6 +71,14 @@
     </div>
   </div>
 </header>
+
+{#if organization}
+  <OrganizationModal 
+    bind:show={showOrgModal} 
+    {organization}
+    on:logout={handleLogout}
+  />
+{/if}
 
 <style>
   .dashboard-header {

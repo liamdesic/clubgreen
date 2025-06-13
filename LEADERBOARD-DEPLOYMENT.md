@@ -63,7 +63,7 @@ PUBLIC_LEADERBOARD_API_KEY=your_secure_api_key_here
 1. The client will automatically trigger leaderboard updates when scores are submitted
 2. To manually trigger an update:
    ```typescript
-   import { triggerLeaderboardUpdate } from '$lib/utils/leaderboardUtils';
+   import { triggerLeaderboardUpdate } from '$lib/runtime/scoreSnapshot';
    
    // Example usage
    const result = await triggerLeaderboardUpdate(eventId, 'all_time');

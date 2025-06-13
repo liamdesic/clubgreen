@@ -1,5 +1,5 @@
 <script>
-  // No JS needed for this page
+  import { Edit, Trophy, Settings } from 'lucide-svelte';
 </script>
 
 <svelte:head>
@@ -11,19 +11,19 @@
 
   <div class="card-grid">
     <a class="nav-card" href="/scorecard">
-      <i class="fa-solid fa-pencil"></i>
+      <Edit size={40} />
       <h2>Scorecard</h2>
       <p>Enter strokes and track players during your event.</p>
     </a>
 
     <a class="nav-card" href="/leaderboard">
-      <i class="fa-solid fa-trophy"></i>
+      <Trophy size={40} />
       <h2>Leaderboard</h2>
       <p>Live leaderboard display for guests and players to view.</p>
     </a>
 
     <a class="nav-card" href="/admin">
-      <i class="fa-solid fa-wrench"></i>
+      <Settings size={40} />
       <h2>Admin</h2>
       <p>Manage settings, logos, ads, and scores behind the scenes.</p>
     </a>
@@ -31,8 +31,6 @@
 </div>
 
 <style>
-  @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css');
-
   .landing-container {
     background: #0f2f2e;
     color: white;
@@ -73,8 +71,7 @@
     box-shadow: 0 12px 25px rgba(0, 0, 0, 0.2);
   }
 
-  .nav-card i {
-    font-size: 2.5rem;
+  .nav-card :global(svg) {
     margin-bottom: 1rem;
     color: #00c853;
   }

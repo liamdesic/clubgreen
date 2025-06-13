@@ -34,7 +34,8 @@ export const load: PageServerLoad = async ({ locals }) => {
   console.log('✅ [customize] Organization loaded:', {
     id: organization.id,
     name: organization.name,
-    hasSettings: !!organization.settings_json
+    logo_url: organization.logo_url,
+    color_palette: organization.color_palette
   });
 
   return {
@@ -42,7 +43,8 @@ export const load: PageServerLoad = async ({ locals }) => {
       id: organization.id,
       name: organization.name,
       slug: organization.slug,
-      settings_json: organization.settings_json || {}
+      logo_url: organization.logo_url,
+      color_palette: organization.color_palette
     }
   };
 }; 

@@ -459,7 +459,7 @@ input[type="url"]:focus {
   font-weight: 500;
   font-size: 0.95rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
   text-align: center;
 }
 
@@ -511,7 +511,7 @@ textarea,
   border-radius: 6px;
   font-size: 0.95rem;
   color: var(--text-primary);
-  transition: all 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
   box-shadow: var(--shadow-sm);
 }
 
@@ -699,7 +699,7 @@ input:checked + .slider:before {
   font-weight: 600;
   font-size: 0.95rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   gap: 0.5rem;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -836,7 +836,7 @@ input:checked + .slider:before {
   background: rgba(255, 255, 255, 0.05);
   padding: 0.5rem 1rem;
   border-radius: 30px;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .publish-toggle:hover {
@@ -1016,7 +1016,7 @@ input:checked + .slider {
   border-radius: 4px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, opacity 0.2s;
 }
 
 .delete-button:hover {
@@ -1071,7 +1071,7 @@ input:checked + .slider {
   border-radius: 4px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s, transform 0.2s, opacity 0.2s;
 }
 
 .button-cancel {
