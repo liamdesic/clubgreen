@@ -66,7 +66,7 @@ export const actions = {
 **Component Locations**:
 - Dashboard: `/src/lib/components/dashboard/`
 - Leaderboard: `/src/lib/components/Leaderboard/`
-- Validations: `/src/lib/validations/`
+- Validations: SSOT:`src/lib/validations.ts` additional:`/src/lib/validations/`
 
 ## Security
 - Organization isolation (all data scoped to org_id)
