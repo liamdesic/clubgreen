@@ -48,7 +48,15 @@ export const actions = {
 
 ## Development
 
-CRITICAL each key checkpoint is a git commit. 
+**CRITICAL: Git commit at EVERY checkpoint to enable rollbacks**
+- Before making changes: `git commit -m "checkpoint: before [description]"`
+- After completing tasks: `git commit -m "feat/fix: [description]"`
+- Before major refactors: `git commit -m "checkpoint: before refactor"`
+
+**Area-Specific Documentation**:
+- Working on Dashboard? Read `CLAUDE-DASHBOARD.md`
+- Working on Leaderboards? Read `CLAUDE-LEADERBOARD.md` 
+- Working on Scorecard? Read `CLAUDE-SCORECARD.md`
 
 **Commands**:
 - `npm run dev` - Start dev server
